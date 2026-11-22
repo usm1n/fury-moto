@@ -1,0 +1,5 @@
+# Original upload kept at root; working copy lives in assets/source/
+/Rider_in_garage_taps_helmet_*.mp4
+node_modules/
+.DS_Store
+Thumbs.db
