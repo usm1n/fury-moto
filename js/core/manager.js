@@ -14,9 +14,8 @@
  *   PRIORITY                           -> shared priority scale used by the engine
  *   isIOS(), hoverCapable()
  *
- * The budget counts *players*: a hero-panel's blurred fill loop is a companion of the
- * hero's main video and plays/pauses with it, so it does not take a second slot.
- * Scrub sections never call play() (they only seek), so they are not counted.
+ * The budget counts *players* (one per playing slot video). The site-wide backdrop
+ * (js/core/backdrop.js) is a canvas sequence, not a player, so it is not counted.
  */
 export const MAX_PLAYING = 2;
 

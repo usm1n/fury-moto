@@ -1,5 +1,5 @@
 /** Single guide page: guide.html?id=<id> */
-import { config, getGuide, getVideo, waLink, formatPrice } from "../core/config.js";
+import { config, getGuide, waLink, formatPrice } from "../core/config.js";
 import { esc, renderTemplate } from "../core/render.js";
 import { getProduct } from "../data/products.js";
 import { mdLite } from "../components/markdown.js";
@@ -61,7 +61,6 @@ export default async function mount(el) {
   const i = all.findIndex((x) => x.id === guide.id);
   const prev = i > 0 ? all[i - 1] : null;
   const next = i >= 0 && i < all.length - 1 ? all[i + 1] : null;
-  const vid = guide.video && getVideo(guide.video) ? guide.video : null;
   const url = location.href;
   const enc = encodeURIComponent;
   const nav = (x, label, cls) => (x
@@ -75,10 +74,9 @@ export default async function mount(el) {
       <h1>${esc(guide.title)}</h1>
       <p class="gd-hero__excerpt">${esc(guide.excerpt)}</p>
     </div>`;
-  const hero = vid
-    ? `<div class="gd-hero gd-hero--video" data-video-slot="gear-doctor-header" data-video-id="${esc(vid)}">${head}</div>`
-    : `<div class="gd-hero">${head}</div>`;
-  const cover = !vid && guide.cover
+  // the site-wide scroll backdrop is the guide hero now
+  const hero = `<div class="gd-hero" data-scene="feature">${head}</div>`;
+  const cover = guide.cover
     ? `<div class="container"><div class="gd-cover"><img src="${esc(guide.cover)}" alt="${esc(guide.title)}" decoding="async" onerror="this.parentNode.remove()"></div></div>`
     : "";
 

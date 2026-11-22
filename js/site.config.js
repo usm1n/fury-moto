@@ -81,9 +81,7 @@ const config = {
    * commands in docs/MEDIA.md, then add an entry here.
    *   mp4 / webm  : { "720": path, "1080": path } — engine picks by screen size
    *   poster      : still shown instantly (and alone for reduced-motion/Save-Data)
-   *   blurFill    : blurred dark loop that fills the screen behind 9:16 on desktop
-   *   scrubMp4    : all-keyframe version used by scroll-scrub sections
-   *   frames      : iOS scrub fallback frame sequence { pattern: "path/f_%03d.webp", count }
+   *   (the site background is NOT here: it uses config.backdrop.frames)
    *   crop        : short 2–4 s clip for category cards
    *   focalPoint  : CSS object-position, keeps the helmet in frame, e.g. "50% 30%"
    * ------------------------------------------------------------------------ */
@@ -94,9 +92,6 @@ const config = {
       mp4: { "720": "assets/video/rider-hero-720.mp4", "1080": "assets/video/rider-hero-1080.mp4" },
       webm: { "720": "assets/video/rider-hero-720.webm", "1080": "assets/video/rider-hero-1080.webm" },
       poster: { webp: "assets/video/rider-hero-poster.webp", jpg: "assets/video/rider-hero-poster.jpg" },
-      blurFill: "assets/video/rider-hero-blurfill.mp4",
-      scrubMp4: "assets/video/rider-hero-scrub.mp4",
-      frames: { pattern: "assets/video/frames/rider-hero/f_%03d.webp", count: 60 },
       crop: "assets/video/rider-hero-crop.mp4",
       loop: true,
       focalPoint: "50% 30%",
@@ -106,95 +101,85 @@ const config = {
   ],
 
   /* --------------------------------------------------------------------------
-   * VIDEO SLOTS — decides WHERE video appears and HOW.
-   * Change videoId or mode here and the section changes; no code edits.
-   *   section        : matches data-video-slot="<section>" in the HTML
-   *   videoId        : an id from `videos` above
-   *   mode           : "background" | "scrub" | "inline" | "card" | "none"
-   *   mobileMode / desktopMode : optional per-breakpoint override of mode
-   *   overlayOpacity : 0–1 dark gradient over the video so text stays readable
-   *   focalPoint     : optional override of the video's focalPoint
-   *   start          : optional start offset in seconds (use a different moment of the same clip)
-   *   playbackRate   : optional, e.g. 0.6 for slow footer loop
-   * ------------------------------------------------------------------------ */
-  /* --------------------------------------------------------------------------
-   * BACKDROP — one fixed, full-screen video behind the WHOLE site, on every page.
-   * As the visitor scrolls, each section "directs" the backdrop with a scene
-   * (zoom, blur, darkness, colour, red tint, drift), so the same footage keeps
-   * moving and changing under the content. Sections with mode "none" below are
-   * see-through windows onto this backdrop.
-   *   enabled     : false = no site-wide video (sections fall back to their own slots)
-   *   videoId     : an id from `videos`
-   *   pages       : "all" or a list of page names, e.g. ["home","shop"]
-   *   scenes      : named looks. Values: scale (1 = fit), x / y (% drift), blur (px),
-   *                 dim (0–1 darkness over the video), saturate, brightness, tint (0–1 red glow).
-   *                 Add `desktop: { … }` inside a scene to override values on wide screens.
-   *   sceneMap    : which scene a section uses, keyed by its data-video-slot name
-   *                 (or data-scene="<name>" on any element). Anything else uses `defaultScene`.
-   *   motion      : the motion-design layer on top. Each switch can be turned off.
+   * BACKDROP: the scroll-driven background of the whole site.
+   * The 9:16 rider clip is extracted to an image sequence (docs/MEDIA.md) and drawn
+   * on one fixed full-screen <canvas> behind every page. Nothing plays on its own:
+   * the frame shown is decided by your scroll position.
+   *   top of the page = first frame (still), scroll down = forward,
+   *   scroll up = backward, stop = hold, bottom of the page = last frame.
+   * The 9:16 frame is NEVER cropped or zoomed. On wide screens the rest of the
+   * screen is filled with a blurred, darkened copy of the same current frame.
    * ------------------------------------------------------------------------ */
   backdrop: {
-    enabled: true,
-    videoId: "rider-hero",
-    pages: "all",
-    focalPoint: "50% 30%",
-    // "scroll" = the video is animated BY your scroll: scroll down → it plays forward,
-    //            scroll up → it rewinds, stop scrolling → it holds the frame.
-    // "loop"   = it plays on its own as a muted loop.
-    playback: "scroll",
-    scroll: {
-      mapping: "distance",    // "distance" = one pass through the clip per `screensPerLoop` screens scrolled
-                              // "page"     = top of the page = first frame, bottom = last frame
-      screensPerLoop: 4,      // bigger = slower, more cinematic
-      pingpong: true,         // at the end of the clip, run it backwards instead of jumping to the start
-      smoothing: 0.12,        // 0.05 = floaty/slow catch-up … 0.3 = tight
+    enabled: true,                 // false = plain dark background, no canvas
+    pages: "all",                  // "all", or a list of page names, e.g. ["home","shop"]
+
+    // Image sequence. %04d = 4-digit frame number starting at 0001.
+    frames: {
+      desktop: "assets/frames/desktop/frame_%04d.webp",  // 1080×1920: large screens on a good connection
+      mobile: "assets/frames/mobile/frame_%04d.webp",    // 720×1280: phones, small screens, slow connections / Save-Data
+      count: 150,                                        // number of frames in each folder (must match)
     },
+    alt: "Rider in a red and black race suit in a hazy pit garage", // described once for screen readers
+
+    // How scroll maps to frames.
+    scroll: {
+      mapping: "page",     // "page" = whole page top→bottom plays the clip once (default)
+                           // "distance" = one pass per `screensPerLoop` screens (optional)
+      smoothing: 0.12,     // easing behind the scroll: 0.05 = floaty … 0.3 = tight, 1 = none
+      startOffset: 0,      // px scrolled before the clip starts moving (holds frame 1 until then)
+      endOffset: 0,        // px before the page bottom at which the last frame is reached
+      screensPerLoop: 4,   // only for mapping "distance"
+      pingpong: false,     // only for mapping "distance": run backwards at the end instead of jumping
+    },
+
+    // Layout of the uncropped 9:16 frame.
+    desktopAlign: "right", // wide screens: "right" (headline on the left) or "center"
+    blurFill: {            // the blurred copy of the frame that fills the rest of the screen
+      blur: 40,            // softness in px
+      darken: 0.6,         // 0 = as bright as the frame, 1 = black
+    },
+    stillFrame: 1,         // frame shown (and nothing else loaded) for reduced-motion visitors
+
+    // Section looks. Each section the visitor scrolls into tints the backdrop.
+    // Allowed: brightness (1 = normal), blur (px, whole backdrop), dim (0–1 dark overlay),
+    // tint (0–1 red glow). Never zoom/crop. Pick a look per section with data-scene="<name>"
+    // in the HTML; sections without one use `defaultScene`; product grids use "shelf".
     defaultScene: "content",
     scenes: {
-      hero:    { scale: 1.0,  x: 0,  y: 0,  blur: 0,  dim: 0.30, saturate: 1.15, brightness: 1,    tint: 0.15,
-                 desktop: { scale: 1.15, blur: 14, dim: 0.55, tint: 0.25 } },   // desktop: soft fill behind the framed 9:16 panel
-      feature: { scale: 1.08, x: -2, y: -4, blur: 0,  dim: 0.55, saturate: 1.05, brightness: 0.95, tint: 0.35 },
-      content: { scale: 1.18, x: 2,  y: 4,  blur: 5,  dim: 0.68, saturate: 0.85, brightness: 0.9,  tint: 0.12 },
-      shelf:   { scale: 1.25, x: 0,  y: 8,  blur: 10, dim: 0.80, saturate: 0.6,  brightness: 0.85, tint: 0.05 }, // product grids — calmest
-      footer:  { scale: 1.32, x: 0,  y: -6, blur: 6,  dim: 0.82, saturate: 0.8,  brightness: 0.8,  tint: 0.45 },
+      hero:    { brightness: 1,    blur: 0, dim: 0.10, tint: 0.10 },
+      feature: { brightness: 0.95, blur: 0, dim: 0.30, tint: 0.30 },
+      content: { brightness: 0.85, blur: 2, dim: 0.45, tint: 0.08 },
+      shelf:   { brightness: 0.75, blur: 6, dim: 0.60, tint: 0.00 },  // product grids: calmest
+      footer:  { brightness: 0.80, blur: 3, dim: 0.55, tint: 0.40 },
     },
-    sceneMap: {
-      "hero": "hero",
-      "shop-header": "feature",
-      "gear-doctor-header": "feature",
-      "cta-band": "feature",
-      "about": "feature",
-      "404": "hero",
-      "footer": "footer",
-    },
+
+    // Motion-design layer on top of the canvas. Every switch can be turned off.
     motion: {
-      sceneDuration: 1.4,     // seconds a scene change takes
-      scrollDrift: 6,         // % the video drifts vertically across the whole page scroll (parallax)
-      pointerParallax: 14,    // px the video follows the mouse on desktop (0 = off)
-      lightSweep: true,       // slow diagonal light streak across the video
-      progressBar: true,      // thin red scroll-progress line at the top
-      splitHeadlines: true,   // section headlines reveal word by word
-      marquee: {              // tagline ticker over the video; speeds up with scroll velocity
+      sceneDuration: 1.2,    // seconds a section look takes to blend in
+      pointerParallax: 18,   // px the BLURRED FILL drifts with the mouse on desktop (main frame never moves); 0 = off
+      lightSweep: true,      // slow diagonal light streak
+      progressBar: true,     // thin red scroll-progress line at the top
+      splitHeadlines: true,  // section headlines reveal word by word
+      marquee: {             // tagline ticker; speeds up and skews with scroll velocity
         enabled: true,
         pages: ["home", "gear-doctor", "about"],
-        after: "first",       // insert after the first section of the page
+        after: "first",      // inserted after the first section of the page
         items: ["Ride. Learn. Repeat.", "Know your gear before you ride.", "Gear explained simply.", "Fury Moto × The Gear Doctor"],
       },
     },
   },
 
+  /* --------------------------------------------------------------------------
+   * VIDEO SLOTS: the small, separate videos (the background above is not one).
+   *   section        : matches data-video-slot="<section>" in the HTML
+   *   videoId        : an id from `videos` (null = the element says which, e.g. product.video)
+   *   mode           : "card" (plays on hover / when in view) | "inline" (gallery slide) | "none"
+   *   overlayOpacity : 0–1 dark gradient over the video
+   * ------------------------------------------------------------------------ */
   videoSlots: [
-    // mode "none" = no separate video; the section is a window onto the site-wide backdrop above.
-    { section: "hero",          videoId: "rider-hero", mode: "background", overlayOpacity: 0,    mobileMode: "none", desktopMode: "background" }, // desktop: framed 9:16 panel over the backdrop
-    { section: "built-for-ride",videoId: "rider-hero", mode: "scrub",      overlayOpacity: 0.55 },
-    { section: "category-cards",videoId: "rider-hero", mode: "card",       overlayOpacity: 0.35 },
-    { section: "shop-header",   videoId: "rider-hero", mode: "none",       overlayOpacity: 0.7, focalPoint: "50% 20%", start: 2 },
-    { section: "product-gallery", videoId: null,       mode: "inline",     overlayOpacity: 0 }, // uses product.video
-    { section: "gear-doctor-header", videoId: "rider-hero", mode: "none",  overlayOpacity: 0.65, focalPoint: "50% 25%", start: 4 },
-    { section: "cta-band",      videoId: "rider-hero", mode: "none",       overlayOpacity: 0.7, start: 3 },
-    { section: "about",         videoId: "rider-hero", mode: "scrub",      overlayOpacity: 0.55, mobileMode: "none" },
-    { section: "footer",        videoId: "rider-hero", mode: "none",       overlayOpacity: 0.85, playbackRate: 0.6, start: 5 },
-    { section: "404",           videoId: "rider-hero", mode: "none",       overlayOpacity: 0.7 },
+    { section: "category-cards",  videoId: "rider-hero", mode: "card",   overlayOpacity: 0.35 },
+    { section: "product-gallery", videoId: null,         mode: "inline", overlayOpacity: 0 }, // uses product.video
   ],
 
   /* --------------------------------------------------------------------------

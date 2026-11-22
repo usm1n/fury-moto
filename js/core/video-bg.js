@@ -1,18 +1,17 @@
 /**
- * VIDEO ENGINE — background / card / inline modes.            [API FROZEN — Phase 1]
+ * VIDEO ENGINE — card / inline (and background = cover) modes.            [API FROZEN — Phase 1]
  * Implementation is owned by the Video-engine agent (Phase 2). Callers never
  * create <video> elements themselves; they call mount() or let slots.js do it.
  *
  *   const handle = VideoBg.mount(el, {
  *     video,            // object from config.videos (required)
- *     mode,             // "background" | "card" | "inline"
+ *     mode,             // "card" | "inline" | "background" (cover)
  *     overlayOpacity,   // 0..1
  *     focalPoint,       // CSS object-position, overrides video.focalPoint
  *     start,            // seconds offset
  *     playbackRate,     // number
- *     layout,           // "cover" (default) | "hero-panel" (desktop 9:16 panel + blurFill behind)
  *     src,              // "main" (default) | "crop" (card clip)
- *     priority,         // true = load immediately (hero), skip lazy observer
+ *     priority,         // true = load immediately, skip lazy observer
  *   });
  *   handle.play(); handle.pause(); handle.destroy();
  *
@@ -26,7 +25,7 @@
  * Phase 2 additions (optional):
  *   opts.playPriority  number, overrides the budget priority (manager.PRIORITY scale)
  *   handle.isPlaying() boolean
- *   exports buildPoster(), focalOf(), aspectOf(), observeNear(), observeVisible() (shared with video-scrub.js)
+ *   exports buildPoster(), focalOf(), aspectOf(), makeVideo(), observeNear(), observeVisible()
  *
  * Notes:
  *   - `autoplay` is deliberately NOT set on the element: the engine calls play() itself
@@ -34,7 +33,7 @@
  *   - A missing/404 source leaves the poster in place silently (class "is-poster-only").
  */
 import {
-  canPlayMotion, isDesktop, hoverCapable, saveData,
+  canPlayMotion, hoverCapable, saveData,
   requestPlay, release, waitForSlot, cancelWait, PRIORITY,
 } from "./manager.js";
 import { emit } from "./bus.js";
@@ -162,8 +161,6 @@ export function makeVideo(sources, { preload = "auto", loop = true, onFail, labe
   return v;
 }
 
-const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
-
 const ICON_PLAY = '<svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 5.5v13l10.5-6.5z"/></svg>';
 const ICON_PAUSE = '<svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" focusable="false"><path fill="currentColor" d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>';
 
@@ -174,7 +171,6 @@ document.addEventListener("visibilitychange", () => players.forEach((p) => p.upd
 function createPlayer(el, opts) {
   const { video } = opts;
   const mode = ["background", "card", "inline"].includes(opts.mode) ? opts.mode : "background";
-  const layout = opts.layout || "cover";
   const focal = focalOf(opts, video);
   const start = Math.max(0, Number(opts.start) || 0);
   const rate = Number(opts.playbackRate) || 1;
@@ -189,9 +185,9 @@ function createPlayer(el, opts) {
     : PRIORITY[mode] ?? PRIORITY.background;
 
   // state
-  let media, overlay, toggle, mainHost, fillHost;
-  let mainVid = null, fillVid = null;
-  let panel = false, loaded = false, failed = false, destroyed = false;
+  let media, overlay, toggle;
+  let mainVid = null;
+  let loaded = false, failed = false, destroyed = false;
   let playingNow = false, visible = false, ratio = 0, intent = false;
   let manual = null; // null = auto, true = user/API wants play, false = user/API paused
   let api = null;    // assigned at the end; referenced by the card hand-off
@@ -199,7 +195,6 @@ function createPlayer(el, opts) {
 
   /* ---- DOM ---- */
   el.classList.add("vslot", `vslot--${mode}`);
-  if (layout === "hero-panel") el.classList.add("vslot--hero-panel");
   el.style.setProperty("--overlay", String(opts.overlayOpacity ?? 0.5));
   el.style.setProperty("--focal", focal);
   const [aw, ah] = aspectOf(video);
@@ -215,33 +210,7 @@ function createPlayer(el, opts) {
   overlay.className = "vslot__overlay";
   el.prepend(media, overlay);
 
-  function render() {
-    panel = layout === "hero-panel" && mode === "background" && isDesktop();
-    el.classList.toggle("vslot--panel", panel);
-    media.replaceChildren();
-    const alt = mode === "inline" ? video.alt || "" : "";
-    if (panel) {
-      // With the site-wide backdrop (js/core/backdrop.js) the backdrop itself is the fill — don't load a second one.
-      const backdrop = document.documentElement.classList.contains("has-backdrop");
-      mainHost = document.createElement("div");
-      mainHost.className = "vslot__panel";
-      mainHost.append(buildPoster(video, { focal, alt, priority: !!opts.priority }));
-      if (backdrop) {
-        fillHost = null;
-        media.append(mainHost);
-      } else {
-        fillHost = document.createElement("div");
-        fillHost.className = "vslot__fill";
-        fillHost.append(buildPoster(video, { focal, priority: !!opts.priority, className: "vslot__poster vslot__poster--blur" }));
-        media.append(fillHost, mainHost);
-      }
-    } else {
-      fillHost = null;
-      mainHost = media;
-      media.append(buildPoster(video, { focal, alt, priority: !!opts.priority }));
-    }
-  }
-  render();
+  media.append(buildPoster(video, { focal, alt: mode === "inline" ? video.alt || "" : "", priority: !!opts.priority }));
 
   if (mode === "inline" && motion) {
     toggle = document.createElement("button");
@@ -268,7 +237,7 @@ function createPlayer(el, opts) {
   function load() {
     if (loaded || failed || destroyed || !motion) return;
     loaded = true;
-    const sources = sourcesFor(video, srcKind, pickSize(mainHost, video));
+    const sources = sourcesFor(video, srcKind, pickSize(media, video));
     const preload = mode === "card" && hover && !intent ? "metadata" : "auto";
     const v = makeVideo(sources, {
       preload,
@@ -295,26 +264,14 @@ function createPlayer(el, opts) {
       el.classList.add("is-playing");
     });
     v.addEventListener("canplay", () => { if (playingNow && v === mainVid) v.classList.add("is-ready"); });
-    mainHost.append(v);
-
-    if (panel && fillHost && video.blurFill) {
-      const f = makeVideo([{ src: video.blurFill, type: "video/mp4" }], {
-        preload: "auto",
-        onFail: () => { if (f === fillVid) { f.remove(); fillVid = null; } },  // stay on the CSS-blurred poster
-      });
-      fillVid = f;
-      f.addEventListener("playing", () => f.classList.add("is-ready"));
-      f.addEventListener("loadedmetadata", () => { f.playbackRate = rate; }, { once: true });
-      fillHost.append(f);
-    }
+    media.append(v);
     update();
   }
 
   function unloadVideos() {
     stop(false);
     if (mainVid) { cancelWait(mainVid); release(mainVid); mainVid.removeAttribute("src"); mainVid.replaceChildren(); mainVid.load?.(); mainVid.remove(); }
-    if (fillVid) { fillVid.replaceChildren(); fillVid.load?.(); fillVid.remove(); }
-    mainVid = fillVid = null;
+    mainVid = null;
     loaded = false;
   }
 
@@ -358,14 +315,12 @@ function createPlayer(el, opts) {
       // autoplay blocked or aborted by a pause: stay on poster
       if (v === mainVid && playingNow) { playingNow = false; release(v); syncToggle(); }
     });
-    fillVid?.play().catch(() => {});
     syncToggle();
   }
 
   function onEvicted() {
     if (!playingNow) return;
     playingNow = false;
-    fillVid?.pause();
     el.classList.remove("is-playing");
     emit("video:pause", { el });
     syncToggle();
@@ -379,7 +334,6 @@ function createPlayer(el, opts) {
     if (playingNow) {
       playingNow = false;
       mainVid.pause();
-      fillVid?.pause();
       release(mainVid);
       el.classList.remove("is-playing");
       emit("video:pause", { el });
@@ -427,30 +381,8 @@ function createPlayer(el, opts) {
       el.addEventListener("focusout", focusOut);
       cleanups.push(() => { el.removeEventListener("focusin", enter); el.removeEventListener("focusout", focusOut); });
     }
-
-    if (layout === "hero-panel" && mode === "background") {
-      const onResize = debounce(() => {
-        if (destroyed || failed) return;
-        const next = isDesktop();
-        if (next === panel) return;
-        const wasLoaded = loaded;
-        unloadVideos();
-        render();
-        if (wasLoaded) load();
-      }, 180);
-      addEventListener("resize", onResize);
-      addEventListener("orientationchange", onResize);
-      cleanups.push(() => { removeEventListener("resize", onResize); removeEventListener("orientationchange", onResize); });
-    }
   } else {
     el.classList.add("is-poster-only");
-    // layout still has to follow the viewport (panel vs cover) even without motion
-    if (layout === "hero-panel" && mode === "background") {
-      const onResize = debounce(() => { if (!destroyed && isDesktop() !== panel) render(); }, 180);
-      addEventListener("resize", onResize);
-      addEventListener("orientationchange", onResize);
-      cleanups.push(() => { removeEventListener("resize", onResize); removeEventListener("orientationchange", onResize); });
-    }
   }
 
   api = {
@@ -470,7 +402,7 @@ function createPlayer(el, opts) {
       media.remove();
       overlay.remove();
       toggle?.remove();
-      el.classList.remove("vslot", `vslot--${mode}`, "vslot--panel", "vslot--hero-panel", "is-playing", "is-waiting", "is-poster-only");
+      el.classList.remove("vslot", `vslot--${mode}`, "is-playing", "is-waiting", "is-poster-only");
     },
   };
   players.add(api);

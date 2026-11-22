@@ -1,19 +1,16 @@
 /*
- * Video engine styles (js/core/video-bg.js, video-scrub.js).
- * Base positioning of .vslot__media / __overlay / __panel lives in base.css; this file adds
- * the layouts and states. Colours come from tokens only.
+ * Video engine styles (js/core/video-bg.js, js/core/slots.js).
+ * Base positioning of .vslot__media / __overlay lives in base.css; this file adds
+ * the modes and states. Colours come from tokens only. The site-wide background is
+ * the canvas in js/core/backdrop.js (styles in the SCROLL-DRIVEN BACKDROP section below).
  *
  * DOM produced by the engine:
- *   .vslot.vslot--<background|card|inline|scrub>[.vslot--hero-panel][.vslot--panel]
+ *   .vslot.vslot--<card|inline|background>
  *     .vslot__media            (aria-hidden unless inline)
- *       picture.vslot__poster > img          — cover layout
- *       video / canvas.vslot__canvas
- *       — or, desktop hero-panel —
- *       .vslot__fill  > picture.vslot__poster--blur, video (blurFill)
- *       .vslot__panel > picture.vslot__poster, video / canvas
+ *       picture.vslot__poster > img, video
  *     .vslot__overlay
  *     button.vslot__toggle     (inline only)
- * States on the slot: .is-playing .is-waiting .is-poster-only .is-static ; on media: .is-ready
+ * States on the slot: .is-playing .is-waiting .is-poster-only ; on media: .is-ready
  */
 
 /* ---------- common ---------- */
@@ -29,49 +26,6 @@
 .vslot__media canvas { object-position: var(--focal, 50% 50%); }
 .vslot__media canvas { opacity: 0; transition: opacity var(--dur-slow) var(--ease-out); }
 .vslot__media canvas.is-ready { opacity: 1; }
-
-/* ---------- hero-panel layout ---------- */
-.vslot--hero-panel { min-height: 100vh; min-height: 100svh; }
-
-/* full-bleed blurred fill behind the panel: blurFill video, or the poster blurred by CSS */
-.vslot__fill {
-  position: absolute; inset: 0; overflow: hidden;
-  transform: scale(1.12);
-}
-.vslot__fill img,
-.vslot__fill video {
-  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
-}
-.vslot__poster--blur img {
-  filter: blur(40px) brightness(0.55) saturate(1.15);
-  transform: scale(1.15);
-}
-.vslot__fill video { filter: brightness(0.85); }
-
-/* the framed 9:16 panel, centred in the right ~40% of the viewport */
-.vslot--panel .vslot__panel {
-  top: 50%;
-  left: 80%;
-  height: min(86%, 86vh, 1200px);
-  width: auto;
-  max-width: 36vw;
-  aspect-ratio: 9 / 16;
-  transform: translate(-50%, -50%);
-  background: var(--color-surface);
-}
-.vslot--panel .vslot__panel img,
-.vslot--panel .vslot__panel video,
-.vslot--panel .vslot__panel canvas { object-position: var(--focal, 50% 50%); }
-.vslot--panel .vslot__panel canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-
-/* text lives on the left: shade the left strongly, keep the panel side light */
-.vslot--panel > .vslot__overlay {
-  background: linear-gradient(90deg,
-    rgba(var(--color-overlay), calc(var(--overlay, 0.5) + 0.3)) 0%,
-    rgba(var(--color-overlay), var(--overlay, 0.5)) 40%,
-    rgba(var(--color-overlay), calc(var(--overlay, 0.5) * 0.5)) 60%,
-    rgba(var(--color-overlay), 0.12) 100%);
-}
 
 /* ---------- card mode ---------- */
 .vslot--card { background: var(--color-surface); }
@@ -108,39 +62,29 @@
 .vslot__toggle:focus-visible { outline: none; }
 .vslot__toggle:focus-visible svg { outline: 2px solid var(--color-accent); outline-offset: 3px; }
 
-/* ---------- scrub mode ---------- */
-.vslot--scrub:not(.is-static) { min-height: 100vh; min-height: 100svh; }
-.vslot--scrub:not(.is-static) .vslot__beat {
-  opacity: var(--beat, 0);
-  transform: translate3d(0, calc((1 - var(--beat, 0)) * var(--space-6)), 0);
-  will-change: opacity, transform;
-}
-.vslot--scrub.is-static .vslot__beat { opacity: 1; transform: none; }
-
 /* ---------- reduced motion: stills only, no movement ---------- */
 html.reduced-motion .vslot__media video { display: none; }
-html.reduced-motion .vslot__beat { opacity: 1 !important; transform: none !important; }
 html.reduced-motion .vslot--card .vslot__media img { transition: none; transform: none; }
 @media (prefers-reduced-motion: reduce) {
   .vslot__media video, .vslot__media canvas, .vslot__toggle svg { transition: none; }
 }
 
 /* =====================================================================
- * SITE-WIDE BACKDROP + MOTION LAYER (js/core/backdrop.js)
+ * SCROLL-DRIVEN BACKDROP (js/core/backdrop.js)
+ * One fixed canvas behind every page. The 9:16 frame is never cropped;
+ * section looks only change brightness, blur, dim and red tint.
  * ===================================================================== */
 .backdrop {
   position: fixed; inset: 0; z-index: -1;            /* behind all in-flow content, above the page colour */
   overflow: hidden; pointer-events: none;
   background: var(--color-bg);
 }
-.backdrop__drift { position: absolute; inset: -8%; will-change: transform; }
-.backdrop__stage.backdrop__stage {
-  position: absolute; inset: 0;
-  transform-origin: 50% 40%;
-  will-change: transform, filter;
+.backdrop__canvas {
+  position: absolute; top: -32px; left: -32px;       /* matches MARGIN in backdrop.js */
+  width: calc(100% + 64px); height: calc(100% + 64px);
+  will-change: filter;
 }
-.backdrop__stage .vslot__overlay { display: none; }
-.backdrop__dim { position: absolute; inset: 0; background: rgb(var(--color-overlay)); opacity: 0.6; }
+.backdrop__dim { position: absolute; inset: 0; background: rgb(var(--color-overlay)); opacity: 0.3; }
 .backdrop__tint {
   position: absolute; inset: 0; opacity: 0; mix-blend-mode: screen;
   background:
@@ -149,7 +93,7 @@ html.reduced-motion .vslot--card .vslot__media img { transition: none; transform
 }
 .backdrop__vignette {
   position: absolute; inset: 0;
-  background: radial-gradient(ellipse 120% 90% at 50% 45%, transparent 45%, rgba(var(--color-overlay), 0.85) 100%);
+  background: radial-gradient(ellipse 130% 100% at 50% 45%, transparent 55%, rgba(var(--color-overlay), 0.7) 100%);
 }
 .backdrop__sweep { display: none; }
 html.has-sweep .backdrop__sweep {
@@ -163,23 +107,67 @@ html.has-sweep .backdrop__sweep {
   100% { transform: translateX(55%); }
 }
 
-/* sections that used to carry their own video are now windows onto the backdrop */
-html.has-backdrop footer[data-video-slot],
-html.has-backdrop .contact-head { background: transparent; }
+/* ---------- readability: sections carry their own translucent panels ----------
+   backdrop.js tags each section with .bd-scene--<scene>. */
+html.has-backdrop .bd-scene--content,
+html.has-backdrop .bd-scene--shelf {
+  background: linear-gradient(180deg,
+    rgba(var(--color-overlay), 0) 0,
+    rgba(var(--color-overlay), 0.8) 96px,
+    rgba(var(--color-overlay), 0.8) calc(100% - 96px),
+    rgba(var(--color-overlay), 0) 100%);
+}
+html.has-backdrop .bd-scene--shelf { --shelf: 0.86; background: linear-gradient(180deg,
+    rgba(var(--color-overlay), 0) 0, rgba(var(--color-overlay), 0.86) 96px,
+    rgba(var(--color-overlay), 0.86) calc(100% - 96px), rgba(var(--color-overlay), 0) 100%); }
+html.has-backdrop .bd-scene--footer {
+  background: linear-gradient(180deg, rgba(var(--color-overlay), 0) 0, rgba(var(--color-overlay), 0.88) 140px);
+}
+/* hero / feature: the frame is the point — shade only behind the text */
+html.has-backdrop .bd-scene--hero,
+html.has-backdrop .bd-scene--feature {
+  background: linear-gradient(0deg, rgba(var(--color-overlay), 0.85) 0%, rgba(var(--color-overlay), 0.35) 55%, rgba(var(--color-overlay), 0) 100%);
+}
+@media (min-width: 900px) and (orientation: landscape) {
+  html.has-backdrop .bd-scene--hero,
+  html.has-backdrop .bd-scene--feature {
+    background: linear-gradient(90deg, rgba(var(--color-overlay), 0.8) 0%, rgba(var(--color-overlay), 0.45) 40%, rgba(var(--color-overlay), 0) 62%);
+  }
+}
+html.has-backdrop .hero__title,
+html.has-backdrop .bd-scene--feature h1,
+html.has-backdrop .bd-scene--feature h2 { text-shadow: 0 4px 30px rgba(0, 0, 0, 0.6); }
 
-/* scroll progress line */
+/* sections that were painted solid let the backdrop through (they get panels above instead) */
+html.has-backdrop footer.footer,
+html.has-backdrop .contact-head,
+html.has-backdrop .shop-head,
+html.has-backdrop .gd-header,
+html.has-backdrop .gd-hero,
+html.has-backdrop .gd-cta { background-color: transparent; }
+/* surfaces sitting on the frames read as frosted glass */
+html.has-backdrop .testimonial,
+html.has-backdrop .igstrip__follow,
+html.has-backdrop .c-card,
+html.has-backdrop .c-form,
+html.has-backdrop .faq__list {
+  background: color-mix(in srgb, var(--color-surface) 72%, transparent);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+
+/* ---------- scroll progress line ---------- */
 .backdrop-progress {
   position: fixed; top: 0; left: 0; right: 0; height: 2px; z-index: calc(var(--z-header) + 5);
   background: var(--color-accent); box-shadow: 0 0 12px var(--color-accent);
   transform: scaleX(0); transform-origin: 0 50%; pointer-events: none;
 }
 
-/* tagline marquee */
+/* ---------- tagline marquee ---------- */
 .marquee {
   position: relative; overflow: hidden;
   padding-block: var(--space-5);
   border-block: 1px solid var(--color-line);
-  background: color-mix(in srgb, var(--color-bg) 30%, transparent);
+  background: color-mix(in srgb, var(--color-bg) 45%, transparent);
   -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
 }
 .marquee__track { display: flex; width: max-content; will-change: transform; }
@@ -194,31 +182,10 @@ html.has-backdrop .contact-head { background: transparent; }
   background: var(--color-accent); box-shadow: 0 0 14px var(--color-accent);
 }
 
-/* word-by-word headline reveal */
+/* ---------- word-by-word headline reveal ---------- */
 .sw { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: 0.08em; margin-bottom: -0.08em; }
 .sw__i { display: inline-block; transform-origin: 0 100%; will-change: transform; }
 
 @media (prefers-reduced-motion: reduce) {
   html.has-sweep .backdrop__sweep { animation: none; display: none; }
-}
-
-/* With the backdrop on, a full-bleed slot's media box must not paint a solid colour over it
-   (cards/inline/panel keep their own surface colour as a loading placeholder). */
-html.has-backdrop .vslot--background > .vslot__media { background: transparent; }
-html.has-backdrop .vslot--panel > .vslot__overlay { opacity: 0.6; }
-
-/* page headers & bands that were painted solid now let the backdrop through */
-html.has-backdrop .shop-head,
-html.has-backdrop .gd-hero,
-html.has-backdrop .gd-header,
-html.has-backdrop [data-video-slot="gear-doctor-header"],
-html.has-backdrop .gd-cta { background: transparent; }
-/* surfaces sitting on the video read as glass rather than flat boxes */
-html.has-backdrop .testimonial,
-html.has-backdrop .igstrip__follow,
-html.has-backdrop .c-card,
-html.has-backdrop .c-form,
-html.has-backdrop .faq__list {
-  background: color-mix(in srgb, var(--color-surface) 72%, transparent);
-  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
 }

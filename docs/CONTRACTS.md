@@ -17,10 +17,10 @@ Every Phase 2 agent reads this first. If you need something that isn't here, **d
 | Path | Owner | Notes |
 |---|---|---|
 | `js/site.config.js` | Orchestrator (schema). Placeholder-data agent fills `products`, `brands`, `guides`, `sizeGuides`, `testimonials`, `faqs` **arrays only** | Others: read only (may append keys under `config.ui`, and must report them) |
-| `js/core/*` | Orchestrator; **video-bg.js, video-scrub.js, manager.js → Video-engine agent** | Frozen API: read only for everyone else |
+| `js/core/*` | Orchestrator; **backdrop.js → Orchestrator**; **video-bg.js, slots.js, manager.js → Video-engine agent** | Frozen API: read only for everyone else |
 | `js/data/products.js`, `js/data/cart.js` | Orchestrator | Read only |
 | `css/tokens.css`, `css/base.css` | Orchestrator | Read only. Use the variables; never hard-code colours |
-| `css/video.css` | Video-engine agent | |
+| `css/video.css` | Video-engine agent (backdrop section: Orchestrator) | |
 | `js/components/header.js`, `search.js`, `css/components/header.css` | Header agent | |
 | `js/components/footer.js`, `css/components/footer.css` | About/Contact/Footer agent | |
 | `js/components/cart-drawer.js`, `css/components/cart.css`, `js/pages/cart.js`, `cart.html` | Cart agent | |
@@ -140,14 +140,24 @@ import { VideoBg } from "../core/video-bg.js"; // only for product gallery inlin
 | Attribute | Meaning |
 |---|---|
 | `data-component="header\|footer\|cart-drawer"` | mount point for shared component |
-| `data-video-slot="<section>"` | wired by `slots.js` from `config.videoSlots` (sections: `hero`, `built-for-ride`, `category-cards`, `shop-header`, `product-gallery`, `gear-doctor-header`, `cta-band`, `about`, `footer`, `404`) |
-| `data-video-start`, `data-video-id`, `data-video-src="crop"`, `data-video-layout="hero-panel"`, `data-video-priority` | per-element slot overrides |
-| `data-beat` | text beat inside a scrub section, revealed in sequence |
+| `data-video-slot="<section>"` | wired by `slots.js` from `config.videoSlots` (sections: `category-cards`, `product-gallery`; modes `card`, `inline`, `none`) |
+| `data-video-start`, `data-video-id`, `data-video-src="crop"` | per-element slot overrides |
+| `data-scene="<hero\|feature\|content\|shelf\|footer>"` | backdrop look for a section (see §6a) |
 | `data-reveal`, `data-reveal-delay="0.1"` | GSAP fade-up on scroll (handled by app.js) |
 | `data-magnetic` | magnetic hover on primary buttons |
 | `data-cart-open`, `data-cart-count` | any button that opens the drawer / shows count |
 | `data-search-open` | opens search overlay |
 | `data-product-id` | on every product card root |
+
+## 6a. Scroll-driven backdrop (`js/core/backdrop.js`)
+- One fixed full-screen `<canvas`> behind every page, drawing a WebP frame sequence of the rider clip. It is not a video slot and is owned by the orchestrator.
+- `boot()` calls `mountBackdrop(page)` before the page module renders (sets `html.has-backdrop`). It calls `initMotionLayer(page)` after render (scenes, headline splits, progress line, tagline marquee).
+- Frame is chosen by scroll: page top = frame 1, page bottom = last frame (`config.backdrop.scroll.mapping: "page"`). Never cropped; desktop uses `desktopAlign`, the rest of the screen is a blurred fill of the same frame.
+- `config.backdrop`: `enabled`, `pages`, `frames {desktop, mobile, count}`, `alt`, `scroll {mapping, smoothing, startOffset, endOffset, screensPerLoop, pingpong}`, `desktopAlign`, `blurFill {blur, darken}`, `stillFrame`, `defaultScene`, `scenes {hero, feature, content, shelf, footer}`, `motion {…}`.
+- Scenes may change only brightness, blur, dim and red tint. Never zoom or crop.
+- `data-scene="<hero|feature|content|shelf|footer>"` on a section picks its scene. Sections without it use `defaultScene`. Any element containing `.pcard` (product grids) uses `shelf` automatically.
+- backdrop.js adds `.bd-scene bd-scene--<name>` to every section; CSS (`css/video.css`) uses these classes for the readability panels.
+- Reduced motion / Save-Data: only `stillFrame` is loaded and drawn.
 
 ## 7. Shared UI classes (from `css/base.css`)
 `.container .section .stack .grid .btn .btn--primary .btn--ghost .btn--block .pill .pill--cert .pill--badge .pill-row .price .price__compare .eyebrow .muted .visually-hidden`.
@@ -156,7 +166,7 @@ Certification badges are always `<span class="pill pill--cert">ECE 22.06</span>`
 ## 8. Naming
 - Files: kebab-case. CSS classes: BEM-ish `block__el--mod`. One CSS file per owner as listed above.
 - Images: `assets/img/<group>/<name>-<width>.(webp|jpg)` (widths 800/1600/2400). Product placeholders: `assets/img/products/<category>-<n>-1x1.webp` and `-4x5.webp`.
-- Videos: `assets/video/<id>-720.mp4|webm`, `-1080.*`, `-scrub.mp4`, `-blurfill.mp4`, `-crop.mp4`, `-poster.webp|jpg`, frames `assets/video/frames/<id>/f_001.webp`.
+- Videos: `assets/video/<id>-720.mp4|webm`, `-1080.*`, `-crop.mp4`, `-poster.webp|jpg`. Backdrop frames: `assets/frames/desktop|mobile/frame_0001.webp` (other clips: `assets/frames/<name>/desktop|mobile/`).
 
 ## 9. Accessibility & motion (every agent)
 - Keyboard reachable; visible focus; drawers/modals trap focus, ESC closes, focus returns to the opener.

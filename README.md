@@ -21,7 +21,7 @@ Alternatives: `python -m http.server 8080` or the VS Code "Live Server" extensio
 
 Pages: `index.html` · `shop.html` (`?cat=helmets`, filters in the URL) · `product.html?id=…` · `cart.html` · `gear-doctor.html` · `guide.html?id=…` · `about.html` · `contact.html` · `404.html`.
 
-Dev helpers: `dev/viewports.html?page=shop.html` previews any page at 375 px and 768 px side by side. `dev/video-test.html` exercises every video mode.
+Dev helpers: `dev/viewports.html?page=shop.html` previews any page at 375 px and 768 px side by side.
 
 ## 2. Edit the config
 
@@ -42,31 +42,40 @@ Open `js/site.config.js`. Every field has a comment. Common edits:
 
 **Placeholders.** Anything still unknown is written `"[PLACEHOLDER: …]"`. With `devMode: true` (top of the config) every placeholder on the page gets a yellow dashed outline, and the browser console lists the remaining ones. **Set `devMode: false` before launch.**
 
-## 3. Add a video
+## 3. Add a video, or change the background
 
-1. Drop the clip in `assets/source/<name>.mp4` (9:16 works best).
-2. Run the media script. It needs ffmpeg (`winget install Gyan.FFmpeg`):
+### Small videos (category cards, product gallery)
+These use `videos` and `videoSlots`.
+1. Drop the clip in `assets/source/<name>.mp4` (9:16 works best) and run the media script. It needs ffmpeg (`winget install Gyan.FFmpeg`):
    ```bash
    bash tools/media.sh <name>
    ```
-   It writes 720/1080 MP4 + WebM loops, an all-keyframe scrub file, poster stills, a blurred desktop fill, a 60-frame iOS fallback sequence and a short card clip into `assets/video/`. Full commands and options are in [`docs/MEDIA.md`](docs/MEDIA.md).
-3. Add an entry to `videos` in the config. Copy the `rider-hero` entry and replace `rider-hero` with `<name>` in every path.
-4. Assign it in `videoSlots`: set `videoId: "<name>"` on whichever section should use it. You can also change a section's `mode` (`background` · `scrub` · `card` · `inline` · `none`), `overlayOpacity`, `focalPoint`, `start` or `playbackRate`. No code edits are needed.
+   It writes 720/1080 MP4 + WebM, a poster still and a short card clip into `assets/video/`. Full commands and options are in [`docs/MEDIA.md`](docs/MEDIA.md).
+2. Add an entry to `videos` in the config. Copy the `rider-hero` entry and replace `rider-hero` with `<name>` in every path.
+3. Assign it in `videoSlots`: set `videoId: "<name>"` on the slot. `mode` is `card` (plays on hover or when in view), `inline` (gallery slide with a play button) or `none`. `overlayOpacity`, `focalPoint`, `start` and `playbackRate` are here too. No code edits are needed.
 
-### The site-wide backdrop (motion design)
-One video plays as a **fixed, full-screen background behind every page** (`backdrop` in the config). With `playback: "scroll"` (the default) **its frames are driven by your scroll**: scroll down and it plays forward, scroll up and it rewinds, stop and it holds the frame. `backdrop.scroll` sets how many screens one pass takes (`screensPerLoop`), whether it reverses at the end (`pingpong`), and how floaty it feels (`smoothing`). `mapping: "page"` ties the whole page to the clip once, top to bottom. `playback: "loop"` makes it autoplay instead. As visitors scroll, each section changes the backdrop with a **scene** that is tweened smoothly: zoom, drift, blur, darkness, saturation and red tint. `hero` is sharp, `feature` (call-to-action band, page headers) zooms in, `content` is softer, `shelf` (product grids) is calmest, and `footer` gets a red glow. On top of that:
-- the video drifts as you scroll and follows the mouse on desktop
-- a light sweep crosses it every few seconds
-- a red progress line runs along the top
-- a tagline ticker speeds up and skews with scroll speed
-- headlines reveal word by word
+Video sections: `category-cards` · `product-gallery` (uses `product.video`).
 
-Change scenes or motion in `backdrop.scenes`, `backdrop.sceneMap` and `backdrop.motion`. Point `backdrop.videoId` at any clip in `videos`, or set `enabled: false` to switch it off. Visitors with reduced motion or Save-Data get the poster still with no movement.
+### The site background (scroll-driven)
+The background is a fixed, full-screen canvas behind every page, drawn from a sequence of WebP frames of the rider clip. Nothing autoplays. Your scroll position picks the frame: the top of the page shows frame 1, the bottom shows the last frame, and scrolling down or up moves forward or backward through the clip. Stop scrolling and it holds.
 
-Video sections: `hero` · `built-for-ride` · `category-cards` · `shop-header` · `product-gallery` (uses `product.video`) · `gear-doctor-header` · `cta-band` · `about` · `footer` · `404`.
-The engine lazy-loads videos, never plays more than 2 at once, and shows posters only for reduced-motion or Save-Data visitors. On desktop the hero shows the 9:16 clip as a framed panel over a blurred fill, so there are no black bars.
+To change the background clip:
+1. Drop the clip in `assets/source/<name>.mp4` and run `bash tools/media.sh <name>`. The script writes the frame sequence (150 frames by default, `FRAME_COUNT`) as 1080×1920 desktop and 720×1280 mobile WebP into `assets/frames/`. Other clips go into `assets/frames/<name>/`.
+2. In `config.backdrop`, point `frames.desktop`, `frames.mobile` and `frames.count` at the new set, and update `alt`. No code edits are needed.
 
-Photos: `bash tools/media.sh photos <in.jpg> <name>` → WebP + JPG at 2400/1600/800 in `assets/img/photos/`.
+How it looks:
+- The 9:16 frame is never cropped or zoomed. On landscape screens it fills the height and sits at `desktopAlign` (`"right"` leaves the headline room on the left, or `"center"`). On portrait screens the whole frame is shown, centred.
+- The rest of the screen is filled with a blurred, darkened copy of the same current frame (`blurFill.blur`, `blurFill.darken`), so there are no black bars.
+- Sections change only the look of the frame: brightness, blur, dim and a red tint. Pick a look per section with `data-scene="hero" | "feature" | "content" | "shelf" | "footer"` in the HTML. Sections without one use `defaultScene`. Product grids use `shelf` automatically. The looks are in `backdrop.scenes`; they never zoom or crop.
+- Visitors with reduced motion or Save-Data get one still frame (`stillFrame`) and no movement.
+
+Config fields in `config.backdrop`:
+- `enabled`, `pages`: turn it on or off, and choose the pages that get it.
+- `frames`: `desktop` and `mobile` folder patterns (`%04d` numbering) and `count`.
+- `scroll.mapping`: `"page"` (default) plays the whole clip once, top to bottom. `"distance"` makes one pass every `screensPerLoop` screens, and `pingpong` reverses at the end.
+- `scroll.smoothing` (0.05 floaty … 1 no easing), `scroll.startOffset` and `scroll.endOffset` (px).
+- `desktopAlign`, `blurFill`, `stillFrame`.
+- `scenes`, `defaultScene`, and `motion` (scene blend time, pointer parallax, light sweep, red progress line, word-by-word headlines, tagline ticker).
 
 ## 4. Orders
 
@@ -106,7 +115,7 @@ js/components/           header, search, footer, cart drawer, product card, size
 js/pages/                one module per page
 css/tokens.css base.css video.css components/ pages/
 assets/source/           original media (untouched)
-assets/video/ assets/img/  generated media
+assets/video/ assets/frames/ assets/img/  generated media
 tools/                   media.sh, placeholders.sh, sitemap.mjs
 docs/                    CONTRACTS.md, MEDIA.md, BUILD_LOG.md, SEO_HEAD.html, Instagram TODOs
 dev/                     test/preview pages (not linked from the site)
