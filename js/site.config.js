@@ -107,8 +107,9 @@ const config = {
    * the frame shown is decided by your scroll position.
    *   top of the page = first frame (still), scroll down = forward,
    *   scroll up = backward, stop = hold, bottom of the page = last frame.
-   * The 9:16 frame is NEVER cropped or zoomed. On wide screens the rest of the
-   * screen is filled with a blurred, darkened copy of the same current frame.
+   * The frame always FILLS THE WHOLE SCREEN (cover) on every device: no bars and no
+   * side panels. Where the screen is wider/taller than 9:16 the frame is cropped
+   * around `focalPoint`, which is kept centred on screen so the rider stays in shot.
    * ------------------------------------------------------------------------ */
   backdrop: {
     enabled: true,                 // false = plain dark background, no canvas
@@ -133,12 +134,12 @@ const config = {
       pingpong: false,     // only for mapping "distance": run backwards at the end instead of jumping
     },
 
-    // Layout of the uncropped 9:16 frame.
-    desktopAlign: "right", // wide screens: "right" = frame flush with the right edge (headline on the left), or "center"
-    blurFill: {            // the blurred copy of the frame that fills the rest of the screen
-      blur: 40,            // softness in px
-      darken: 0.6,         // 0 = as bright as the frame, 1 = black
-    },
+    // Full-screen crop. x / y are fractions of the 9:16 frame (0 = left/top, 1 = right/bottom).
+    // The focal point is centred on screen (then clamped so no edge shows), so whatever sits
+    // there is never cropped away. Default aims at the helmet / upper chest.
+    focalPoint: { x: 0.5, y: 0.35 },
+    focalPointMobile: null, // optional override for phones / portrait screens, e.g. { x: 0.5, y: 0.4 }; null = use focalPoint
+    overscale: 1.04,        // draw slightly larger than the screen so mouse parallax never reveals an edge
     stillFrame: 1,         // frame shown (and nothing else loaded) for reduced-motion visitors
 
     // Section looks. Each section the visitor scrolls into tints the backdrop.
@@ -157,7 +158,7 @@ const config = {
     // Motion-design layer on top of the canvas. Every switch can be turned off.
     motion: {
       sceneDuration: 1.2,    // seconds a section look takes to blend in
-      pointerParallax: 18,   // px the BLURRED FILL drifts with the mouse on desktop (main frame never moves); 0 = off
+      pointerParallax: 0.02, // how far the mouse nudges the focal point on desktop (fraction of the frame, max ~0.02); 0 = off
       lightSweep: true,      // slow diagonal light streak
       progressBar: true,     // thin red scroll-progress line at the top
       splitHeadlines: true,  // section headlines reveal word by word

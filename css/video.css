@@ -71,7 +71,7 @@ html.reduced-motion .vslot--card .vslot__media img { transition: none; transform
 
 /* =====================================================================
  * SCROLL-DRIVEN BACKDROP (js/core/backdrop.js)
- * One fixed canvas behind every page. The 9:16 frame is never cropped;
+ * One fixed canvas behind every page. The frame covers the whole screen (cropped around config.backdrop.focalPoint);
  * section looks only change brightness, blur, dim and red tint.
  * ===================================================================== */
 .backdrop {

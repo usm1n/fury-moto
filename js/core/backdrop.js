@@ -6,13 +6,12 @@
  *   page top -> frame 1 (still), scroll down -> forward, up -> backward,
  *   stop -> hold, page bottom -> last frame. Light lerp smoothing.
  *
- * Layout never crops the 9:16 frame:
- *   - portrait screens: frame drawn "contain" (full frame visible, centred)
- *   - landscape screens: frame at full viewport height, aligned per
- *     config.backdrop.desktopAlign ("right" | "center")
- *   - everywhere else on the canvas: a blurred, darkened, scaled-up copy of the
- *     SAME current frame (so it scrubs too) — no black bars. Mouse parallax moves
- *     this fill only; the main frame never moves.
+ * Layout: the frame always FILLS THE WHOLE SCREEN (cover) on every device — no
+ * bars, no side fill. Where the screen's shape differs from 9:16 the frame is
+ * cropped around config.backdrop.focalPoint {x,y} (0–1 of the frame; mobile can
+ * override with focalPointMobile): that point is centred on screen, then clamped
+ * so no edge ever shows. Mouse parallax nudges the focal point (max ~2 %) over a
+ * slight overscale (`overscale`, default 1.04).
  *
  * Section looks (config.backdrop.scenes) may only change brightness, blur, dim and
  * red tint. Sections pick one with data-scene="<name>".
@@ -63,7 +62,6 @@ export function mountBackdrop(page) {
   B = {
     root, canvas,
     ctx: canvas.getContext("2d", { alpha: false }),
-    small: document.createElement("canvas"),         // downscaled copy -> cheap, smooth blur fill
     dim: root.querySelector(".backdrop__dim"),
     tint: root.querySelector(".backdrop__tint"),
     count: b.frames.count,
@@ -71,13 +69,12 @@ export function mountBackdrop(page) {
     imgs: new Array(b.frames.count),
     target: 0, smooth: 0,                            // position in the clip, 0..1
     drawn: -1, dirty: true,
-    px: 0, py: 0, tpx: 0, tpy: 0,                    // pointer parallax (fill only), current/target
+    px: 0, py: 0, tpx: 0, tpy: 0,                    // pointer parallax: focal-point offset (fraction of frame), current/target
     raf: 0, lastT: 0,
     scene: { ...SCENE_NEUTRAL, ...resolveScene(b.defaultScene) },
     sceneName: null, sceneTween: null,
     W: 0, H: 0, dpr: 1,
   };
-  B.sctx = B.small.getContext("2d");
 
   sizeCanvas();
   applyScene();
@@ -97,12 +94,30 @@ export function mountBackdrop(page) {
   return B;
 }
 
-/** desktop (1080×1920) set for large screens on a decent connection, else mobile (720×1280). */
+/**
+ * Pick the frame set by the width the frame is actually drawn at when covering the
+ * viewport (cover = the larger of viewport width and height×9/16, × overscale, × DPR).
+ * Mobile set (720 wide) only if it covers that without upscaling much, or on a slow
+ * connection; otherwise the desktop set (1080 wide).
+ */
 function pickFrameSet(frames) {
   const c = navigator.connection;
   const slow = !!(c && (c.saveData || /(^|-)(2g|3g)$/.test(c.effectiveType || "")));
-  const px = Math.max(innerWidth, innerHeight) * Math.min(devicePixelRatio || 1, 2);
-  return (!slow && px >= 1400 && frames.desktop) ? frames.desktop : (frames.mobile || frames.desktop);
+  const W = document.documentElement.clientWidth || innerWidth;
+  const H = document.documentElement.clientHeight || innerHeight;
+  const needed = Math.max(W + 2 * MARGIN, (H + 2 * MARGIN) * (9 / 16)) * overscale() * Math.min(devicePixelRatio || 1, 2);
+  const mobileW = Number(frames.mobileWidth) || 720;
+  if (slow || !frames.desktop || needed <= mobileW * 1.1) return frames.mobile || frames.desktop;
+  return frames.desktop;
+}
+
+const overscale = () => Math.max(1, Number(cfg().overscale) || 1.04);
+
+/** focal point {x,y} in 0..1 of the frame, per device. */
+function focal() {
+  const b = cfg();
+  const f = (!isDesktop() && b.focalPointMobile) || b.focalPoint || {};
+  return { x: Number.isFinite(f.x) ? f.x : 0.5, y: Number.isFinite(f.y) ? f.y : 0.35 };
 }
 
 /** "frame_%04d.webp", 0 -> "frame_0001.webp" */
@@ -176,7 +191,7 @@ function tick(now) {
   if (Math.abs(B.target - B.smooth) < 0.0004) B.smooth = B.target;
   B.px += (B.tpx - B.px) * k(0.08);
   B.py += (B.tpy - B.py) * k(0.08);
-  const pointerMoving = Math.abs(B.tpx - B.px) > 0.2 || Math.abs(B.tpy - B.py) > 0.2;
+  const pointerMoving = Math.abs(B.tpx - B.px) > 0.0002 || Math.abs(B.tpy - B.py) > 0.0002;
 
   const i = frameIndex();
   if (i !== B.drawn || B.dirty || pointerMoving) draw(i);
@@ -200,46 +215,25 @@ function draw(want) {
   if (i < 0) return;
   const img = B.imgs[i];
   const { ctx, W, H, dpr } = B;
-  const b = cfg();
-  const fill = b.blurFill || {};
   const iw = img.naturalWidth, ih = img.naturalHeight;
-  const CW = W + 2 * MARGIN, CH = H + 2 * MARGIN;   // canvas size in css px
+  const CW = W + 2 * MARGIN, CH = H + 2 * MARGIN;   // canvas size in css px (viewport + margin)
+
+  // cover: scale so the frame fills the whole canvas, plus a slight overscale for parallax room
+  const s = Math.max(CW / iw, CH / ih) * overscale();
+  const w = iw * s, h = ih * s;
+
+  // centre the focal point (nudged by the pointer) on the viewport centre, then clamp so no edge shows
+  const f = focal();
+  const fx = clamp01(f.x + B.px), fy = clamp01(f.y + B.py);
+  const x = Math.min(0, Math.max(CW - w, CW / 2 - fx * w));
+  const y = Math.min(0, Math.max(CH - h, CH / 2 - fy * h));
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-  // 1) blurred fill: same frame, cover the whole canvas (+10% for parallax room), via a tiny
-  //    downscaled copy that is smoothed back up. Pointer parallax moves only this layer.
-  const blur = Math.max(1, Number(fill.blur) || 40);
-  const sw = Math.max(8, Math.round(CW / (blur * 0.8)));
-  const sh = Math.max(8, Math.round(CH / (blur * 0.8)));
-  if (B.small.width !== sw || B.small.height !== sh) { B.small.width = sw; B.small.height = sh; }
-  const cs = Math.max(sw / iw, sh / ih);
-  B.sctx.imageSmoothingQuality = "low";
-  B.sctx.drawImage(img, (sw - iw * cs) / 2, (sh - ih * cs) / 2, iw * cs, ih * cs);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
-  const over = 1.12;
-  ctx.drawImage(B.small, (CW - CW * over) / 2 + B.px, (CH - CH * over) / 2 + B.py, CW * over, CH * over);
-  ctx.fillStyle = `rgba(0,0,0,${clamp01(Number(fill.darken ?? 0.6))})`;
-  ctx.fillRect(0, 0, CW, CH);
+  ctx.drawImage(img, x, y, w, h);
 
-  // 2) main 9:16 frame, uncropped
-  const landscape = W / H > (iw / ih) * 1.25;
-  let w, h, x, y;
-  if (landscape) {
-    h = H; w = h * (iw / ih); y = 0;
-    if (b.desktopAlign === "center") x = (W - w) / 2;
-    else x = Math.max(0, W - w);           // "right": flush with the right edge of the screen
-  } else {
-    const s = Math.min(W / iw, H / ih);   // contain: the whole frame is always visible
-    w = iw * s; h = ih * s; x = (W - w) / 2; y = (H - h) / 2;
-  }
-  ctx.save();
-  ctx.shadowColor = "rgba(0,0,0,0.55)";
-  ctx.shadowBlur = 60;
-  ctx.drawImage(img, MARGIN + x, MARGIN + y, w, h);
-  ctx.restore();
-
+  B.layout = { x: x - MARGIN, y: y - MARGIN, w, h, iw, ih, W, H, upscale: (w * dpr) / iw }; // viewport coords (QA)
   B.drawn = i === want ? i : -2;      // -2 = showing a stand-in; redraw when the real frame arrives
   B.dirty = false;
   B.root.dataset.frame = String(i + 1);
@@ -333,11 +327,11 @@ function watchMotion() {
     addEventListener("scroll", () => { if (!queued) { queued = true; requestAnimationFrame(update); } }, { passive: true });
     update();
   }
-  const pp = Number(m.pointerParallax) || 0;
+  const pp = Math.min(0.05, Math.max(0, Number(m.pointerParallax) || 0)); // fraction of the frame
   if (pp && !still() && hoverCapable() && isDesktop()) {
     addEventListener("pointermove", (e) => {
-      B.tpx = -((e.clientX / innerWidth) * 2 - 1) * pp;
-      B.tpy = -((e.clientY / innerHeight) * 2 - 1) * pp;
+      B.tpx = ((e.clientX / innerWidth) * 2 - 1) * pp;   // focal offset, fraction of the frame
+      B.tpy = ((e.clientY / innerHeight) * 2 - 1) * pp;
       kick();
     }, { passive: true });
   }
@@ -432,4 +426,4 @@ export function initMotionLayer(page) {
 }
 
 /** QA helpers: current frame (1-based) and scene. */
-export const backdropState = () => (B ? { frame: B.drawn + 1, target: B.target, scene: B.sceneName, set: B.pattern } : null);
+export const backdropState = () => (B ? { frame: B.drawn + 1, target: B.target, scene: B.sceneName, set: B.pattern, layout: B.layout } : null);

@@ -25,7 +25,7 @@
 
 @media (min-width: 900px) and (orientation: landscape) {
   .hero { align-items: center; padding-bottom: var(--space-8); }
-  /* headline lives in the left ~55%; the 9:16 panel sits on the right ~40% (video.css) */
+  /* headline lives in the left ~55% of the full-screen background */
   .hero__inner > * { max-width: min(56vw, 760px); }
 }
 

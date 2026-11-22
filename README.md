@@ -64,9 +64,10 @@ To change the background clip:
 2. In `config.backdrop`, point `frames.desktop`, `frames.mobile` and `frames.count` at the new set, and update `alt`. No code edits are needed.
 
 How it looks:
-- The 9:16 frame is never cropped or zoomed. On landscape screens it fills the height and sits at `desktopAlign` (`"right"` leaves the headline room on the left, or `"center"`). On portrait screens the whole frame is shown, centred.
-- The rest of the screen is filled with a blurred, darkened copy of the same current frame (`blurFill.blur`, `blurFill.darken`), so there are no black bars.
-- Sections change only the look of the frame: brightness, blur, dim and a red tint. Pick a look per section with `data-scene="hero" | "feature" | "content" | "shelf" | "footer"` in the HTML. Sections without one use `defaultScene`. Product grids use `shelf` automatically. The looks are in `backdrop.scenes`; they never zoom or crop.
+- The frame **fills the whole screen on every device** (cover), with no bars and no side panels. Where the screen's shape differs from 9:16 (desktop and ultrawide especially), the frame is cropped around `focalPoint` `{ x, y }` (fractions of the frame, default `{ x: 0.5, y: 0.35 }`, the helmet and upper chest). That point is kept centred on screen, so the rider stays in shot. `focalPointMobile` can override it on phones.
+- Mouse parallax on desktop nudges the focal point slightly (`motion.pointerParallax`, max about 0.02). The frame is drawn at `overscale` (1.04), so that movement never shows an edge.
+- Sections change only the look of the frame: brightness, blur, dim and a red tint. Pick a look per section with `data-scene="hero" | "feature" | "content" | "shelf" | "footer"` in the HTML. Sections without one use `defaultScene`. Product grids use `shelf` automatically. Text sections keep their own dark translucent panels, so text stays readable over the full-screen frame.
+- Resolution: the 1080×1920 set is loaded whenever the 720 set would have to be enlarged to cover the screen. On wide desktops even the 1080 set is enlarged about 1.9× (1920 px) to 2.5× (2560 px), so it looks softer there. Sharper desktop frames need a higher-resolution source clip (see `docs/MEDIA.md`).
 - Visitors with reduced motion or Save-Data get one still frame (`stillFrame`) and no movement.
 
 Config fields in `config.backdrop`:
@@ -74,7 +75,7 @@ Config fields in `config.backdrop`:
 - `frames`: `desktop` and `mobile` folder patterns (`%04d` numbering) and `count`.
 - `scroll.mapping`: `"page"` (default) plays the whole clip once, top to bottom. `"distance"` makes one pass every `screensPerLoop` screens, and `pingpong` reverses at the end.
 - `scroll.smoothing` (0.05 floaty … 1 no easing), `scroll.startOffset` and `scroll.endOffset` (px).
-- `desktopAlign`, `blurFill`, `stillFrame`.
+- `focalPoint`, `focalPointMobile`, `overscale`, `stillFrame`.
 - `scenes`, `defaultScene`, and `motion` (scene blend time, pointer parallax, light sweep, red progress line, word-by-word headlines, tagline ticker).
 
 ## 4. Orders

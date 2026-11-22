@@ -152,9 +152,12 @@ import { VideoBg } from "../core/video-bg.js"; // only for product gallery inlin
 ## 6a. Scroll-driven backdrop (`js/core/backdrop.js`)
 - One fixed full-screen `<canvas`> behind every page, drawing a WebP frame sequence of the rider clip. It is not a video slot and is owned by the orchestrator.
 - `boot()` calls `mountBackdrop(page)` before the page module renders (sets `html.has-backdrop`). It calls `initMotionLayer(page)` after render (scenes, headline splits, progress line, tagline marquee).
-- Frame is chosen by scroll: page top = frame 1, page bottom = last frame (`config.backdrop.scroll.mapping: "page"`). Never cropped; desktop uses `desktopAlign`, the rest of the screen is a blurred fill of the same frame.
-- `config.backdrop`: `enabled`, `pages`, `frames {desktop, mobile, count}`, `alt`, `scroll {mapping, smoothing, startOffset, endOffset, screensPerLoop, pingpong}`, `desktopAlign`, `blurFill {blur, darken}`, `stillFrame`, `defaultScene`, `scenes {hero, feature, content, shelf, footer}`, `motion {…}`.
-- Scenes may change only brightness, blur, dim and red tint. Never zoom or crop.
+- Frame is chosen by scroll: page top = frame 1, page bottom = last frame (`config.backdrop.scroll.mapping: "page"`).
+- Layout: the frame always covers the whole viewport (no bars, no side fill). It is cropped around `focalPoint {x, y}` (0–1 of the frame), which is centred on screen and then clamped so no edge shows. `focalPointMobile` overrides it when not `isDesktop()`. It is drawn at `overscale` (1.04). Pointer parallax offsets the focal point by at most `motion.pointerParallax` (a fraction, ~0.02).
+- Frame set: desktop (1080 wide) is used whenever the mobile set (720) would need upscaling to cover the viewport at the device's DPR, unless the connection is slow.
+- `config.backdrop`: `enabled`, `pages`, `frames {desktop, mobile, count}`, `alt`, `scroll {mapping, smoothing, startOffset, endOffset, screensPerLoop, pingpong}`, `focalPoint {x,y}`, `focalPointMobile`, `overscale`, `stillFrame`, `defaultScene`, `scenes {hero, feature, content, shelf, footer}`, `motion {…}`.
+- Scenes may change only brightness, blur, dim and red tint (no zoom). Content sections carry their own dark panels (`.bd-scene--content/shelf/footer` in `css/video.css`).
+- QA hook: `backdropState()` returns `{ frame, target, scene, set, layout }`. `layout` holds the drawn rectangle in viewport px and the upscale factor.
 - `data-scene="<hero|feature|content|shelf|footer>"` on a section picks its scene. Sections without it use `defaultScene`. Any element containing `.pcard` (product grids) uses `shelf` automatically.
 - backdrop.js adds `.bd-scene bd-scene--<name>` to every section; CSS (`css/video.css`) uses these classes for the readability panels.
 - Reduced motion / Save-Data: only `stillFrame` is loaded and drawn.
