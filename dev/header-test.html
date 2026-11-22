@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Header test</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="../css/tokens.css">
+  <link rel="stylesheet" href="../css/base.css">
+  <link rel="stylesheet" href="../css/components/header.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"></script>
+  <script type="module">import { boot } from "../js/core/app.js"; addEventListener("DOMContentLoaded", () => boot(""));</script>
+</head>
+<body data-page="home">
+  <a class="skip-link" href="#main">Skip</a>
+  <div data-component="header"></div>
+  <main id="main" data-page="home">
+    <section style="height:100vh;background:linear-gradient(#300,#000);display:grid;place-items:center"><h1>Hero</h1></section>
+    <section style="height:200vh;padding:2rem"><p>Tall content</p></section>
+  </main>
+</body>
+</html>
