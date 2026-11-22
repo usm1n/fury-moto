@@ -34,6 +34,7 @@ function row(l) {
 export default function mount(main) {
   const root = main.querySelector("[data-cart-root]");
   fill(main, { ui });
+  document.title = (config.seo?.titleTemplate || "%s").replace("%s", ui.cartTitle || "Cart");
 
   function render() {
     const { items, subtotal } = cart.summary();

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Viewport preview</title>
+<style>
+  body { margin: 0; background: #222; color: #ddd; font: 13px system-ui, sans-serif; }
+  header { padding: 8px 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  input { width: 360px; padding: 4px 6px; }
+  .row { display: flex; gap: 16px; padding: 12px; align-items: flex-start; overflow-x: auto; }
+  figure { margin: 0; }
+  figcaption { margin-bottom: 4px; }
+  iframe { border: 1px solid #555; background: #000; }
+</style>
+</head>
+<body>
+<!-- Dev tool: preview a page at phone / tablet widths. Usage: dev/viewports.html?page=shop.html -->
+<header>
+  <label>Page <input id="page" value="index.html"></label>
+  <button id="go">Load</button>
+</header>
+<div class="row" id="row"></div>
+<script>
+  const sizes = [[375, 812], [768, 1024]];
+  const params = new URLSearchParams(location.search);
+  const input = document.getElementById("page");
+  input.value = params.get("page") || "index.html";
+  function load() {
+    const row = document.getElementById("row");
+    row.innerHTML = "";
+    for (const [w, h] of sizes) {
+      const f = document.createElement("figure");
+      f.innerHTML = `<figcaption>${w}×${h}</figcaption><iframe width="${w}" height="${h}" src="../${input.value}"></iframe>`;
+      row.append(f);
+    }
+  }
+  document.getElementById("go").onclick = load;
+  load();
+</script>
+</body>
+</html>

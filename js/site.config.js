@@ -24,7 +24,7 @@ const config = {
    * STORE — identity & contact
    * ------------------------------------------------------------------------ */
   store: {
-    name: "[PLACEHOLDER: store name — default 'The Gear Doctor']",
+    name: "The Gear Doctor",                // default from the brief — confirm final store name
     shortName: "Gear Doctor",               // used in tight spaces (mobile header, PWA)
     tagline: "Know Your Gear Before You Ride.",
     secondaryTaglines: ["Ride. Learn. Repeat.", "Gear explained simply."],
