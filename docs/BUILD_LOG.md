@@ -25,3 +25,10 @@
 | - | 2 | Product-detail (MID) | `product-card.js`, `size-guide.js`, `product.html` + `js/pages/product.js`, `css/components/product.css`, `css/pages/product.css`; added `config.ui` pd*/certInfo/quickView keys. Tested desktop (gallery, size validation, cart:add/open, size guide modal, JSON-LD, related, 404); mobile viewport not resizable in test browser. |
 | - | 2 | Placeholder-data agent (haiku) | `js/site.config.js` arrays only: 9 brands, 28 products (all 7 categories, `[PLACEHOLDER]` testimonials), 7 size guides, 8 guides (4 required + 4 from reel captions; body text drafted from first-line captions, needs owner review), 4 testimonials, 6 FAQs. Validated: unique ids, brand/category/video/relatedProducts refs OK |
 | - | 2 | Video engine (HIGH) | `js/core/video-bg.js` (background/card/inline, lazy IO, hero-panel blur fill + 9:16 panel w/ resize re-layout, 720/1080 pick, start/rate, 404 → poster), `video-scrub.js` (ScrollTrigger pin + lerped seek, beats via `--beat`, canvas frame fallback on iOS/slow seeks, static fallback), `manager.js` (max-2 budget w/ priorities, eviction + wait queue), `css/video.css`, `dev/video-test.html`; added `config.ui.videoPlay/videoPause`. Verified in Chrome desktop: hero panel, card hand-off, inline toggle, scrub + frames, broken source, budget ≤ 2 |
+
+## Phase 3 — Integration (Orchestrator, HIGH / opus)
+- Homepage + 404 built against contracts; SEO/icon head block injected into all 9 pages; home sets store JSON-LD.
+- Fixes found in browser QA: hero container width; `[data-video-slot]` child rule given zero specificity (was breaking absolute tile images); cart page title; skip-link binding; About image → video still; store name set to the brief's default.
+- **Bug fixed:** `waLink()` extracted the example digits from the WhatsApp placeholder and linked `wa.me/923001234567`; placeholders now produce a recipient-less link.
+- Verified at 1920 (desktop) and 375/768 (iframe harness `dev/viewports.html`): no horizontal overflow, no console errors, no images without alt, ≤ 2 videos playing, scrub pins and beats, card videos, add-to-cart → drawer → localStorage persistence → WhatsApp message.
+- README written.
