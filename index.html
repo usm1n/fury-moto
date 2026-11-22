@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title></title>
+  <meta name="description" content="">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" as="image" href="assets/video/rider-hero-poster.webp" type="image/webp" fetchpriority="high">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/video.css">
+  <link rel="stylesheet" href="css/components/header.css">
+  <link rel="stylesheet" href="css/components/footer.css">
+  <link rel="stylesheet" href="css/components/cart.css">
+  <link rel="stylesheet" href="css/components/product.css">
+  <link rel="stylesheet" href="css/pages/gear-doctor.css">
+  <link rel="stylesheet" href="css/pages/home.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"></script>
+  <script type="module">import { boot } from "./js/core/app.js"; addEventListener("DOMContentLoaded", () => boot("home"));</script>
+</head>
+<body>
+  <a class="skip-link" href="#main" data-bind="ui.skip">Skip to content</a>
+  <div data-component="header"></div>
+
+  <main id="main" data-page="home">
+    <section class="hero" data-video-slot="hero" data-video-layout="hero-panel" data-video-priority>
+      <div class="hero__inner container">
+        <p class="eyebrow hero__eyebrow" data-hero="eyebrow"></p>
+        <h1 class="hero__title" data-hero="title"></h1>
+        <p class="hero__tagline" data-hero="tagline"></p>
+        <div class="hero__ctas" data-hero="ctas"></div>
+        <ul class="hero__taglines" data-hero="taglines"></ul>
+      </div>
+    </section>
+
+    <section class="section categories" aria-labelledby="cat-title">
+      <div class="container">
+        <h2 id="cat-title" class="section__title" data-reveal data-home="categoriesTitle"></h2>
+        <div class="categories__grid" data-home="categories"></div>
+      </div>
+    </section>
+
+    <section class="ride" data-video-slot="built-for-ride" aria-labelledby="ride-title">
+      <div class="ride__inner container">
+        <h2 id="ride-title" class="ride__title" data-home="rideTitle"></h2>
+        <div class="ride__beats" data-home="beats"></div>
+      </div>
+    </section>
+
+    <section class="section featured" aria-labelledby="feat-title">
+      <div class="container">
+        <div class="section__head">
+          <h2 id="feat-title" class="section__title" data-reveal data-home="featuredTitle"></h2>
+          <a class="btn btn--ghost" href="shop.html" data-home="shopAll"></a>
+        </div>
+        <div class="featured__grid" data-home="featured"></div>
+      </div>
+    </section>
+
+    <section class="cta-band" data-video-slot="cta-band" aria-labelledby="cta-title">
+      <div class="cta-band__inner container" data-reveal>
+        <h2 id="cta-title" data-home="ctaTitle"></h2>
+        <p data-home="ctaText"></p>
+        <a class="btn btn--primary" data-magnetic target="_blank" rel="noopener" data-home="ctaButton"></a>
+      </div>
+    </section>
+
+    <section class="section guides-teaser" aria-labelledby="gd-title">
+      <div class="container">
+        <div class="section__head">
+          <h2 id="gd-title" class="section__title" data-reveal data-home="guidesTitle"></h2>
+          <a class="btn btn--ghost" href="gear-doctor.html" data-home="guidesAll"></a>
+        </div>
+        <div class="guides-teaser__grid" data-home="guides"></div>
+      </div>
+    </section>
+
+    <section class="section testimonials" aria-labelledby="t-title" data-home="testimonialsWrap">
+      <div class="container">
+        <h2 id="t-title" class="section__title" data-reveal data-home="testimonialsTitle"></h2>
+        <div class="testimonials__grid" data-home="testimonials"></div>
+      </div>
+    </section>
+
+    <section class="section insta" aria-label="Instagram" data-home="instagram"></section>
+
+    <section class="section faq" aria-labelledby="faq-title" data-home="faqWrap">
+      <div class="container faq__inner">
+        <h2 id="faq-title" class="section__title" data-reveal data-home="faqTitle"></h2>
+        <div class="faq__list" data-home="faqs"></div>
+      </div>
+    </section>
+  </main>
+
+  <div data-component="footer"></div>
+  <div data-component="cart-drawer"></div>
+</body>
+</html>
