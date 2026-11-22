@@ -102,24 +102,35 @@ const config = {
 
   /* --------------------------------------------------------------------------
    * BACKDROP: the scroll-driven background of the whole site.
-   * The 9:16 rider clip is extracted to an image sequence (docs/MEDIA.md) and drawn
-   * on one fixed full-screen <canvas> behind every page. Nothing plays on its own:
+   * The rider clips are extracted to image sequences (docs/MEDIA.md) and drawn on
+   * one fixed full-screen <canvas> behind every page. Nothing plays on its own:
    * the frame shown is decided by your scroll position.
    *   top of the page = first frame (still), scroll down = forward,
    *   scroll up = backward, stop = hold, bottom of the page = last frame.
-   * The frame always FILLS THE WHOLE SCREEN (cover) on every device: no bars and no
-   * side panels. Where the screen is wider/taller than 9:16 the frame is cropped
-   * around `focalPoint`, which is kept centred on screen so the rider stays in shot.
+   * Two sequences, picked by screen ORIENTATION: landscape screens (wider than tall)
+   * get the 16:9 clip, portrait screens get the 9:16 clip. Rotating or resizing
+   * switches sequence and keeps the same scroll progress. Only the active one loads.
+   * The frame always fills the whole screen (cover); with matching aspect ratios
+   * there's almost no crop.
    * ------------------------------------------------------------------------ */
   backdrop: {
     enabled: true,                 // false = plain dark background, no canvas
     pages: "all",                  // "all", or a list of page names, e.g. ["home","shop"]
 
-    // Image sequence. %04d = 4-digit frame number starting at 0001.
-    frames: {
-      desktop: "assets/frames/desktop/frame_%04d.webp",  // 1080×1920: large screens on a good connection
-      mobile: "assets/frames/mobile/frame_%04d.webp",    // 720×1280: phones, small screens, slow connections / Save-Data
-      count: 150,                                        // number of frames in each folder (must match)
+    // Image sequences. %04d = 4-digit frame number starting at 0001.
+    sequences: {
+      landscape: {                                            // screens wider than tall (laptops, desktops, ultrawide)
+        path: "assets/frames/16x9/1920/frame_%04d.webp",      // 1920×1080 frames: large screens on a good connection
+        pathSmall: "assets/frames/16x9/1280/frame_%04d.webp", // 1280×720 frames: smaller laptops / slow connections / Save-Data
+        count: 180,                                           // frames in each of the two folders (they must match)
+        focalPoint: { x: 0.5, y: 0.5 },                       // centre of the small crop on odd shapes (0–1 of the frame)
+      },
+      portrait: {                                             // screens taller than wide (phones, portrait tablets)
+        path: "assets/frames/9x16/1080/frame_%04d.webp",      // 1080×1920 frames: large / high-DPI portrait screens
+        pathSmall: "assets/frames/9x16/720/frame_%04d.webp",  // 720×1280 frames: phones / slow connections / Save-Data
+        count: 150,                                           // frames in each of the two folders (they must match)
+        focalPoint: { x: 0.5, y: 0.5 },                       // centre of the small crop on tall phones (0–1 of the frame)
+      },
     },
     alt: "Rider in a red and black race suit in a hazy pit garage", // described once for screen readers
 
@@ -134,13 +145,8 @@ const config = {
       pingpong: false,     // only for mapping "distance": run backwards at the end instead of jumping
     },
 
-    // Full-screen crop. x / y are fractions of the 9:16 frame (0 = left/top, 1 = right/bottom).
-    // The focal point is centred on screen (then clamped so no edge shows), so whatever sits
-    // there is never cropped away. Default aims at the helmet / upper chest.
-    focalPoint: { x: 0.5, y: 0.35 },
-    focalPointMobile: null, // optional override for phones / portrait screens, e.g. { x: 0.5, y: 0.4 }; null = use focalPoint
-    overscale: 1.04,        // draw slightly larger than the screen so mouse parallax never reveals an edge
-    stillFrame: 1,         // frame shown (and nothing else loaded) for reduced-motion visitors
+    overscale: 1.04,       // draw slightly larger than the screen so mouse parallax never reveals an edge
+    stillFrame: 1,         // frame shown (and nothing else loaded) for reduced-motion / Save-Data visitors
 
     // Section looks. Each section the visitor scrolls into tints the backdrop.
     // Allowed: brightness (1 = normal), blur (px, whole backdrop), dim (0–1 dark overlay),

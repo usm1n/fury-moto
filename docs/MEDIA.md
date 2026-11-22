@@ -15,84 +15,152 @@ Do not hand-edit the outputs; change the script and re-run it.
   (ffprobe.exe sits beside it). Any other install works: `FF=/path/to/ffmpeg.exe tools/media.sh <name>`,
   or put `ffmpeg` on PATH.
 
-## Adding a new video clip
+## Two frame sequences (canvas background)
 
-1. **Drop the file** in `assets/source/<name>.mp4` (the original stays untouched).
-2. **Run the pipeline** from the repo root:
-   ```bash
-   tools/media.sh <name>
-   ```
-   This writes:
-   - `assets/video/<name>-1080.mp4/.webm`, `<name>-720.mp4/.webm` (product-gallery loops)
-   - `assets/video/<name>-poster.webp/.jpg`, `<name>-crop.mp4` (3 s card crop)
-   - the scroll-driven frame sequences (see below): `assets/frames/desktop/` and `assets/frames/mobile/`
-     for `rider-hero`, or `assets/frames/<name>/desktop/` and `assets/frames/<name>/mobile/` for any other clip
-   - the category stills and About stills (see below)
-3. **Set the backdrop** in `js/site.config.js`:
-   ```js
-   backdrop: {
-     frames: { desktop: 'assets/frames/<name>/desktop', mobile: 'assets/frames/<name>/mobile', count: 150 }
-   }
-   ```
-   (For `rider-hero` the paths are `assets/frames/desktop` and `assets/frames/mobile`.)
-4. **Add an entry** to `videos` in `js/site.config.js` pointing at the new files.
-5. **Assign it** in `videoSlots` in `js/site.config.js`.
+The site background is a scroll-driven canvas that draws WebP frame sequences. There are two sequences,
+one per orientation of the viewport:
 
-Category stills (`assets/img/categories/*.webp`) and About stills (`assets/img/stills/rider-{1,2,3}-*`)
-are written by the same run. They are **fixed to the rider-hero crop timestamps**, so for a new clip either
-edit the `still` lines in `tools/media.sh` first or copy the old files aside, since they will be overwritten.
+| Sequence | Source | Frame folders | Sizes (quality) | Frames |
+|---|---|---|---|---|
+| **9:16** (portrait) | `assets/source/rider-hero.mp4` (1080x1920, 7.85 s) | `assets/frames/9x16/1080/` and `assets/frames/9x16/720/` | 1080x1920 (q72), 720x1280 (q70) | 150 |
+| **16:9** (landscape) | `assets/source/rider-hero-16x9.mp4` (1920x1080, 10.0 s, 24 fps) | `assets/frames/16x9/1920/` and `assets/frames/16x9/1280/` | 1920x1080 (q72), 1280x720 (q70) | 180 |
 
-## Scroll-driven frame sequence (canvas background)
+Which set the site uses is decided by the viewport: a **landscape viewport uses the 16:9 sequence, a portrait
+viewport uses the 9:16 sequence**. The small set (1280/720 or 720/1280) is for smaller screens or slow
+connections; the large set is for desktop-class screens.
 
-The site draws a scroll-driven canvas background from a sequence of WebP frames. Scrolling moves through
-the sequence: **page top = frame 0001, page bottom = the last frame (0150)**. The frames are
-decoded and drawn in order by the canvas, so every frame must be a standalone image (no video seeking).
+Both sequences use the same rules:
 
-- **Count:** `FRAME_COUNT=150` by default (`FRAME_COUNT=<n> tools/media.sh <name>` overrides it).
-  The frames are spread evenly over the **whole** clip, from the very first video frame to the final moment.
-  The script fails if the folder does not contain exactly `FRAME_COUNT` files.
-- **Naming:** `frame_0001.webp` … `frame_0150.webp` (1-based, 4-digit, no gaps).
-- **Folders:** `assets/frames/desktop/` and `assets/frames/mobile/` for `rider-hero`;
-  `assets/frames/<name>/desktop/` and `assets/frames/<name>/mobile/` for other clips.
-- **Framing:** full 9:16, no cropping. The source is already 1080x1920 so the scale is a straight resize.
-- **Size budget:** the desktop set should total **under ~22 MB**. If it goes over, lower the desktop
-  quality in steps of 5 (not below 55) in `tools/media.sh` and re-run. The mobile set has no hard budget but
-  should stay well below the desktop set.
+- **Span:** frames are spread evenly over the **whole** clip. Frame 0001 is the first video frame and the last
+  frame is the clip's final moment. The canvas plays page top = frame 0001, page bottom = the last frame.
+- **Naming:** `frame_0001.webp` … `frame_NNNN.webp` (1-based, 4-digit, no gaps). Every frame is a standalone
+  image, so the canvas never seeks a video.
+- **Framing:** no cropping. The clip is only scaled to the target size (lanczos).
+- **Density:** the default frame count is `round(duration * 150 / 7.85)`, i.e. about 19.1 frames per second of
+  clip. The 9:16 clip gets 150; a 10 s clip gets 191 by default. The 16:9 set was built with **180** frames
+  (`FRAME_COUNT=180`), which is the count to use for that clip.
+- **Verification:** the script fails if a folder does not contain exactly the expected number of files.
 
-Commands (rider-hero run; the script builds these with the `frames` function):
+### Sharpness
+
+The large sets are only as sharp as their source. The 1080-wide (9:16) and 1920-wide (16:9) frames are straight
+scales of the current sources, so a sharper desktop result needs a higher-resolution source in `assets/source/`
+(for example a 2160 or 3840 pixel-wide clip), re-run through the pipeline.
+
+### Size budget
+
+- The large set of each sequence should total **under ~30 MB**. If it goes over, lower that set's quality in
+  steps of 5 (not below 55) in `tools/media.sh` and re-run. Measured sizes are listed below.
+- The small set has no hard budget but should stay well below its large set.
+
+### Commands: 9:16 set (rider-hero)
+
+```bash
+tools/media.sh rider-hero        # writes the 9:16 set (and the other rider-hero outputs)
+```
+
+The frame part of that run is equivalent to:
 
 ```bash
 SRC=assets/source/rider-hero.mp4
 DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 $SRC)   # 7.850000
 FPS=$(awk -v d=$DUR -v n=150 'BEGIN{printf "%.6f", n/d}')                # 19.108280 = 150 / 7.85
 
-# desktop 1080x1920, WebP q72
+# 1080x1920, WebP q72
 ffmpeg -y -v error -i $SRC -vf "fps=$FPS,scale=1080:1920:flags=lanczos" \
   -frames:v 150 -start_number 1 -c:v libwebp -quality 72 -compression_level 6 \
-  assets/frames/desktop/frame_%04d.webp
+  assets/frames/9x16/1080/frame_%04d.webp
 
-# mobile 720x1280, WebP q70
+# 720x1280, WebP q70
 ffmpeg -y -v error -i $SRC -vf "fps=$FPS,scale=720:1280:flags=lanczos" \
   -frames:v 150 -start_number 1 -c:v libwebp -quality 70 -compression_level 6 \
-  assets/frames/mobile/frame_%04d.webp
+  assets/frames/9x16/720/frame_%04d.webp
 ```
 
-Why these choices:
-- `fps = 150 / duration` spreads the 150 frames evenly over the whole clip, so the first frame is the
-  first video frame and the last frame is the clip's final moment.
-- `-compression_level 6` is the slowest, smallest WebP setting; the frames are encoded once and read many times.
-- Mobile is 720x1280 to save bandwidth on phones, where the canvas is also smaller.
+### Commands: 16:9 set (rider-hero-16x9)
 
-Current output (rider-hero, verified after the run):
+The 16:9 set was built with 180 frames over the 10.0 s clip (fps = 180 / 10 = 18):
+
+```bash
+FRAME_COUNT=180 bash tools/media.sh rider-hero-16x9
+```
+
+The script detects the landscape source and writes only the two frame sequences (the video, poster and still
+outputs are 9:16 crops and are skipped for landscape clips). The same frames by hand:
+
+```bash
+SRC=assets/source/rider-hero-16x9.mp4
+DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 $SRC)   # 10.000000
+FPS=$(awk -v d=$DUR -v n=180 'BEGIN{printf "%.6f", n/d}')                # 18.000000 = 180 / 10
+
+# 1920x1080, WebP q72
+ffmpeg -y -v error -i $SRC -vf "fps=$FPS,scale=1920:1080:flags=lanczos" \
+  -frames:v 180 -start_number 1 -c:v libwebp -quality 72 -compression_level 6 \
+  assets/frames/16x9/1920/frame_%04d.webp
+
+# 1280x720, WebP q70
+ffmpeg -y -v error -i $SRC -vf "fps=$FPS,scale=1280:720:flags=lanczos" \
+  -frames:v 180 -start_number 1 -c:v libwebp -quality 70 -compression_level 6 \
+  assets/frames/16x9/1280/frame_%04d.webp
+```
+
+Running `tools/media.sh rider-hero-16x9` without `FRAME_COUNT=180` would produce the default 191 frames, which
+does not match the 180-frame set in the site config.
+
+### Output of the last run
 
 | Folder | Frames | Quality | Total size | Average per frame |
 |---|---|---|---|---|
-| `assets/frames/desktop/` | 150 (0001–0150) | q72 | 16,496,998 bytes (~16.5 MB) | ~110 KB |
-| `assets/frames/mobile/` | 150 (0001–0150) | q70 | 9,260,546 bytes (~9.3 MB) | ~62 KB |
+| `assets/frames/9x16/1080/` | 150 (0001–0150) | q72 | 16,496,998 bytes (~16.5 MB) | ~110 KB |
+| `assets/frames/9x16/720/` | 150 (0001–0150) | q70 | 9,260,546 bytes (~9.3 MB) | ~62 KB |
+| `assets/frames/16x9/1920/` | 180 (0001–0180) | q72 | 10,397,152 bytes (~10.4 MB) | ~58 KB |
+| `assets/frames/16x9/1280/` | 180 (0001–0180) | q70 | 6,079,704 bytes (~6.1 MB) | ~34 KB |
 
-The desktop set is under the 22 MB budget, so the quality was not lowered.
+The 16:9 large set is under the 30 MB budget, so its quality was not lowered. The 9:16 sizes are from the
+earlier run of the same settings.
 
-## What the video commands do
+### Why these choices
+
+- `fps = frames / duration` spreads the frames evenly over the whole clip, so the first frame is the first video
+  frame and the last frame is the clip's final moment.
+- `-compression_level 6` is the slowest, smallest WebP setting; the frames are encoded once and read many times.
+- The small set is there to save bandwidth on phones and slow connections.
+
+## Adding a new clip
+
+1. **Drop the file** in `assets/source/<name>.mp4` (the original stays untouched). Orientation is detected
+   from the file: taller than wide is a portrait clip, wider than tall is a landscape clip.
+2. **Run the pipeline** from the repo root:
+   ```bash
+   bash tools/media.sh <name>
+   ```
+   For a portrait clip this writes the 9:16 frame sequence, the MP4/WebM product loops, poster, 3 s crop and
+   stills. For a landscape clip it writes only the 16:9 frame sequence. The frame count is printed; set
+   `FRAME_COUNT=<n>` to override the default.
+   Frame folders:
+   - portrait: `assets/frames/9x16/1080/` and `assets/frames/9x16/720/` for `rider-hero`;
+     `assets/frames/<name>/9x16/1080/` and `assets/frames/<name>/9x16/720/` for any other clip
+   - landscape: `assets/frames/16x9/1920/` and `assets/frames/16x9/1280/` for `rider-hero-16x9`;
+     `assets/frames/<name>/16x9/1920/` and `assets/frames/<name>/16x9/1280/` for any other clip
+3. **Set the backdrop** in `js/site.config.js`, under `backdrop.sequences.landscape` or
+   `backdrop.sequences.portrait` (whichever matches the clip's orientation). Each entry takes `path`,
+   `pathSmall`, `count` (and `focalPoint`). The current values are:
+   ```js
+   backdrop: { sequences: {
+     landscape: { path: "assets/frames/16x9/1920/frame_%04d.webp", pathSmall: "assets/frames/16x9/1280/frame_%04d.webp", count: 180 },
+     portrait:  { path: "assets/frames/9x16/1080/frame_%04d.webp", pathSmall: "assets/frames/9x16/720/frame_%04d.webp", count: 150 },
+   } }
+   ```
+   For a new clip, point `path` and `pathSmall` at its folders and set `count` to the number of frames it produced.
+4. **Add an entry** to `videos` in `js/site.config.js` pointing at the new files.
+5. **Assign it** in `videoSlots` in `js/site.config.js`.
+
+Category stills (`assets/img/categories/*.webp`) and About stills (`assets/img/stills/rider-{1,2,3}-*`)
+are written by the same run for portrait clips. They are **fixed to the rider-hero crop timestamps**, so for a
+new clip either edit the `still` lines in `tools/media.sh` first or copy the old files aside, since they will
+be overwritten.
+
+## Video and still outputs (portrait clips)
 
 Target specs:
 
@@ -103,46 +171,14 @@ Target specs:
 | `<name>-1080.webm` / `-720.webm` | as above | VP9 `-crf 33 -b:v 0 -an` |
 | `<name>-poster.webp` / `.jpg` | 1080x1920, first frame | WebP q80 / JPG `-q:v 3` |
 | `<name>-crop.mp4` | 540x960, 3 s from t=2 s | H.264 CRF 26, `-an`, faststart |
-| `frames/.../frame_NNNN.webp` | 1080x1920 (desktop, q72) and 720x1280 (mobile, q70), 150 frames | `fps=150/duration`, `-compression_level 6` (see above) |
+| category and About stills | 800 wide (1600 for About) | WebP q78 / JPG `-q:v 3` |
 
-Any source is first fitted to 9:16 for the MP4s and posters (scale to cover, then crop keeping the **top** area,
-where the helmet is). For the 1080x1920 rider-hero source this is a no-op. The frame sequences are a plain
-scale and do not crop.
+Any portrait source is fitted to 9:16 for the MP4s and posters (scale to cover, then crop keeping the **top**
+area, where the helmet is). For the 1080x1920 rider-hero source this is a no-op.
 
-## Photos (not yet supplied)
-
-No photos exist yet. When they arrive, drop the original in `assets/source/` and run:
+Commands for the still outputs of rider-hero (the script builds these):
 
 ```bash
-tools/media.sh photos assets/source/<photo>.jpg <name>
-```
-
-This writes `assets/img/photos/<name>-2400.webp/.jpg`, `-1600.webp/.jpg` and `-800.webp/.jpg`
-(WebP q80, JPG `-q:v 3`). Widths are capped at the source width, so small photos are never upscaled.
-The originals are not modified.
-
-## Commands (the rider-hero run)
-
-These are the exact commands in `tools/media.sh`. Run them via the script, not by hand.
-
-```bash
-SRC=assets/source/rider-hero.mp4
-V=assets/video; C=assets/img/categories; ST=assets/img/stills
-DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 $SRC)   # 7.85 s
-FPS=$(awk -v d=$DUR -v n=150 'BEGIN{printf "%.6f", n/d}')                # 19.108280
-
-ffmpeg -y -i $SRC -vf "scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920:(iw-ow)/2:0" -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p -an -movflags +faststart $V/rider-hero-1080.mp4
-ffmpeg -y -i $SRC -vf "scale=720:1280:force_original_aspect_ratio=increase:flags=lanczos,crop=720:1280:(iw-ow)/2:0" -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p -an -movflags +faststart $V/rider-hero-720.mp4
-ffmpeg -y -i $SRC -vf "<1080 fit>" -c:v libvpx-vp9 -crf 33 -b:v 0 -row-mt 1 -cpu-used 4 -pix_fmt yuv420p -an $V/rider-hero-1080.webm
-ffmpeg -y -i $SRC -vf "<720 fit>"  -c:v libvpx-vp9 -crf 33 -b:v 0 -row-mt 1 -cpu-used 4 -pix_fmt yuv420p -an $V/rider-hero-720.webm
-ffmpeg -y -i $SRC -frames:v 1 -vf "<1080 fit>" -c:v libwebp -quality 80 $V/rider-hero-poster.webp
-ffmpeg -y -i $SRC -frames:v 1 -vf "<1080 fit>" -q:v 3 $V/rider-hero-poster.jpg
-ffmpeg -y -ss 2 -t 3 -i $SRC -vf "scale=540:960:flags=lanczos" -c:v libx264 -preset veryfast -crf 26 -pix_fmt yuv420p -an -movflags +faststart $V/rider-hero-crop.mp4
-
-# frame sequences (see "Scroll-driven frame sequence" above)
-ffmpeg -y -v error -i $SRC -vf "fps=$FPS,scale=1080:1920:flags=lanczos" -frames:v 150 -start_number 1 -c:v libwebp -quality 72 -compression_level 6 assets/frames/desktop/frame_%04d.webp
-ffmpeg -y -v error -i $SRC -vf "fps=$FPS,scale=720:1280:flags=lanczos"  -frames:v 150 -start_number 1 -c:v libwebp -quality 70 -compression_level 6 assets/frames/mobile/frame_%04d.webp
-
 # stills: ffmpeg -y -ss <t> -i $SRC -frames:v 1 -vf "crop=<w:h:x:y>,scale=<W>:-2:flags=lanczos" -c:v libwebp -quality 78 <out>.webp
 #                                                  ... and  -q:v 3 <out>.jpg
 #   helmets      t=5.0  crop 840:840:120:260    W=800
@@ -157,11 +193,19 @@ ffmpeg -y -v error -i $SRC -vf "fps=$FPS,scale=720:1280:flags=lanczos"  -frames:
 #   rider-3      t=6.5  crop 1080:1350:0:300    W=800 and W=1600
 ```
 
-The `<1080 fit>` and `<720 fit>` filters are `scale=W:H:force_original_aspect_ratio=increase:flags=lanczos,crop=W:H:(iw-ow)/2:0`.
+## Photos (not yet supplied)
 
-## Size budget
+No photos exist yet. When they arrive, drop the original in `assets/source/` and run:
+
+```bash
+tools/media.sh photos assets/source/<photo>.jpg <name>
+```
+
+This writes `assets/img/photos/<name>-2400.webp/.jpg`, `-1600.webp/.jpg` and `-800.webp/.jpg`
+(WebP q80, JPG `-q:v 3`). Widths are capped at the source width, so small photos are never upscaled.
+The originals are not modified.
+
+## Size budget (video)
 
 - The 720 H.264 MP4 should be under 3 MB. Current build (rider-hero, 7.85 s): `rider-hero-720.mp4` = 1.84 MB.
   If it grows over budget, raise `-crf` by 1 or 2 in `tools/media.sh` and re-run.
-- The desktop frame sequence should total under ~22 MB (currently ~16.5 MB at q72). Lower the quality in steps
-  of 5, not below 55, if it goes over.

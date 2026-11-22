@@ -150,14 +150,15 @@ import { VideoBg } from "../core/video-bg.js"; // only for product gallery inlin
 | `data-product-id` | on every product card root |
 
 ## 6a. Scroll-driven backdrop (`js/core/backdrop.js`)
-- One fixed full-screen `<canvas`> behind every page, drawing a WebP frame sequence of the rider clip. It is not a video slot and is owned by the orchestrator.
+- One fixed full-screen `<canvas>` behind every page, drawing WebP frame sequences of the rider clips. It is not a video slot and is owned by the orchestrator.
 - `boot()` calls `mountBackdrop(page)` before the page module renders (sets `html.has-backdrop`). It calls `initMotionLayer(page)` after render (scenes, headline splits, progress line, tagline marquee).
 - Frame is chosen by scroll: page top = frame 1, page bottom = last frame (`config.backdrop.scroll.mapping: "page"`).
-- Layout: the frame always covers the whole viewport (no bars, no side fill). It is cropped around `focalPoint {x, y}` (0–1 of the frame), which is centred on screen and then clamped so no edge shows. `focalPointMobile` overrides it when not `isDesktop()`. It is drawn at `overscale` (1.04). Pointer parallax offsets the focal point by at most `motion.pointerParallax` (a fraction, ~0.02).
-- Frame set: desktop (1080 wide) is used whenever the mobile set (720) would need upscaling to cover the viewport at the device's DPR, unless the connection is slow.
-- `config.backdrop`: `enabled`, `pages`, `frames {desktop, mobile, count}`, `alt`, `scroll {mapping, smoothing, startOffset, endOffset, screensPerLoop, pingpong}`, `focalPoint {x,y}`, `focalPointMobile`, `overscale`, `stillFrame`, `defaultScene`, `scenes {hero, feature, content, shelf, footer}`, `motion {…}`.
+- Sequence by orientation: a landscape viewport (clientWidth > clientHeight) uses `sequences.landscape` (16:9); otherwise `sequences.portrait` (9:16). Only the active sequence is loaded. On resize or rotation `activateSequence()` switches and keeps the scroll progress (0..1). Frames already loaded are cached per path.
+- Size per sequence: `pathSmall` on slow connections / Save-Data, or when its width (read from the folder name, e.g. `/1280/`) covers the viewport × DPR without upscaling; otherwise `path`.
+- Layout: full-bleed cover. The small crop on odd shapes is centred on the sequence's `focalPoint {x, y}` (0–1), then clamped so no edge shows. It is drawn at `overscale` (1.04). Pointer parallax offsets the focal point by at most `motion.pointerParallax` (~0.02).
+- `config.backdrop`: `enabled`, `pages`, `sequences {landscape|portrait: {path, pathSmall, count, focalPoint}}`, `alt`, `scroll {mapping, smoothing, startOffset, endOffset, screensPerLoop, pingpong}`, `overscale`, `stillFrame`, `defaultScene`, `scenes {hero, feature, content, shelf, footer}`, `motion {…}`.
 - Scenes may change only brightness, blur, dim and red tint (no zoom). Content sections carry their own dark panels (`.bd-scene--content/shelf/footer` in `css/video.css`).
-- QA hook: `backdropState()` returns `{ frame, target, scene, set, layout }`. `layout` holds the drawn rectangle in viewport px and the upscale factor.
+- QA hook: `backdropState()` returns `{ frame, count, sequence, target, scene, set, layout }`. `layout` holds the drawn rectangle in viewport px and the upscale factor.
 - `data-scene="<hero|feature|content|shelf|footer>"` on a section picks its scene. Sections without it use `defaultScene`. Any element containing `.pcard` (product grids) uses `shelf` automatically.
 - backdrop.js adds `.bd-scene bd-scene--<name>` to every section; CSS (`css/video.css`) uses these classes for the readability panels.
 - Reduced motion / Save-Data: only `stillFrame` is loaded and drawn.
@@ -169,7 +170,7 @@ Certification badges are always `<span class="pill pill--cert">ECE 22.06</span>`
 ## 8. Naming
 - Files: kebab-case. CSS classes: BEM-ish `block__el--mod`. One CSS file per owner as listed above.
 - Images: `assets/img/<group>/<name>-<width>.(webp|jpg)` (widths 800/1600/2400). Product placeholders: `assets/img/products/<category>-<n>-1x1.webp` and `-4x5.webp`.
-- Videos: `assets/video/<id>-720.mp4|webm`, `-1080.*`, `-crop.mp4`, `-poster.webp|jpg`. Backdrop frames: `assets/frames/desktop|mobile/frame_0001.webp` (other clips: `assets/frames/<name>/desktop|mobile/`).
+- Videos: `assets/video/<id>-720.mp4|webm`, `-1080.*`, `-crop.mp4`, `-poster.webp|jpg`. Backdrop frames: `assets/frames/16x9/1920|1280/frame_0001.webp` and `assets/frames/9x16/1080|720/frame_0001.webp` (other clips: `assets/frames/<name>/16x9|9x16/<width>/`).
 
 ## 9. Accessibility & motion (every agent)
 - Keyboard reachable; visible focus; drawers/modals trap focus, ESC closes, focus returns to the opener.

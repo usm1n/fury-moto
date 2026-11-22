@@ -57,25 +57,30 @@ These use `videos` and `videoSlots`.
 Video sections: `category-cards` · `product-gallery` (uses `product.video`).
 
 ### The site background (scroll-driven)
-The background is a fixed, full-screen canvas behind every page, drawn from a sequence of WebP frames of the rider clip. Nothing autoplays. Your scroll position picks the frame: the top of the page shows frame 1, the bottom shows the last frame, and scrolling down or up moves forward or backward through the clip. Stop scrolling and it holds.
+The background is a fixed, full-screen canvas behind every page, drawn from WebP frame sequences of the rider clips. Nothing autoplays. Your scroll position picks the frame: the top of the page shows frame 1, the bottom shows the last frame, and scrolling down or up moves forward or backward through the clip. Stop scrolling and it holds.
 
-To change the background clip:
-1. Drop the clip in `assets/source/<name>.mp4` and run `bash tools/media.sh <name>`. The script writes the frame sequence (150 frames by default, `FRAME_COUNT`) as 1080×1920 desktop and 720×1280 mobile WebP into `assets/frames/`. Other clips go into `assets/frames/<name>/`.
-2. In `config.backdrop`, point `frames.desktop`, `frames.mobile` and `frames.count` at the new set, and update `alt`. No code edits are needed.
+There are **two sequences, picked by screen orientation**:
+- **Landscape screens** (wider than tall: laptops, desktops, ultrawide) use the **16:9 clip** (`assets/source/rider-hero-16x9.mp4`, 180 frames, 1920×1080 and a smaller 1280×720 set).
+- **Portrait screens** (phones, portrait tablets) use the **9:16 clip** (`assets/source/rider-hero.mp4`, 150 frames, 1080×1920 and a smaller 720×1280 set).
+- Only the active sequence loads. Rotating the phone or resizing the window across square switches sequence at the same scroll progress, so you stay at the same point in the animation.
+
+To change a background clip:
+1. Drop the clip in `assets/source/<name>.mp4` and run `bash tools/media.sh <name>`. The script detects whether the clip is landscape or portrait and writes both sizes into `assets/frames/16x9/…` or `assets/frames/9x16/…` (see `docs/MEDIA.md`).
+2. In `config.backdrop.sequences.landscape` or `.portrait`, set `path`, `pathSmall` and `count`, and update `alt`. No code edits are needed.
 
 How it looks:
-- The frame **fills the whole screen on every device** (cover), with no bars and no side panels. Where the screen's shape differs from 9:16 (desktop and ultrawide especially), the frame is cropped around `focalPoint` `{ x, y }` (fractions of the frame, default `{ x: 0.5, y: 0.35 }`, the helmet and upper chest). That point is kept centred on screen, so the rider stays in shot. `focalPointMobile` can override it on phones.
-- Mouse parallax on desktop nudges the focal point slightly (`motion.pointerParallax`, max about 0.02). The frame is drawn at `overscale` (1.04), so that movement never shows an edge.
+- The frame **fills the whole screen** (cover), with no bars and no side panels. Because each screen shape gets a clip of matching shape, there's almost no crop. The small crop on odd shapes (ultrawide, very tall phones) is centred on each sequence's `focalPoint` `{ x, y }` (default `{ x: 0.5, y: 0.5 }`).
+- Mouse parallax on desktop nudges that point slightly (`motion.pointerParallax`, max about 0.02). The frame is drawn at `overscale` (1.04), so that movement never shows an edge.
 - Sections change only the look of the frame: brightness, blur, dim and a red tint. Pick a look per section with `data-scene="hero" | "feature" | "content" | "shelf" | "footer"` in the HTML. Sections without one use `defaultScene`. Product grids use `shelf` automatically. Text sections keep their own dark translucent panels, so text stays readable over the full-screen frame.
-- Resolution: the 1080×1920 set is loaded whenever the 720 set would have to be enlarged to cover the screen. On wide desktops even the 1080 set is enlarged about 1.9× (1920 px) to 2.5× (2560 px), so it looks softer there. Sharper desktop frames need a higher-resolution source clip (see `docs/MEDIA.md`).
+- Resolution: each sequence has a full-size `path` and a smaller `pathSmall`. The small set is used on slow connections or when it already covers the screen at its pixel density without being enlarged. Otherwise the full-size set loads. A 1920-wide desktop shows the 16:9 frames at their native 1920 px. Wider screens (2560) enlarge them about 1.4×.
 - Visitors with reduced motion or Save-Data get one still frame (`stillFrame`) and no movement.
 
 Config fields in `config.backdrop`:
 - `enabled`, `pages`: turn it on or off, and choose the pages that get it.
-- `frames`: `desktop` and `mobile` folder patterns (`%04d` numbering) and `count`.
+- `sequences.landscape` / `sequences.portrait`: `path`, `pathSmall` (folder patterns with `%04d` numbering), `count`, `focalPoint`.
 - `scroll.mapping`: `"page"` (default) plays the whole clip once, top to bottom. `"distance"` makes one pass every `screensPerLoop` screens, and `pingpong` reverses at the end.
 - `scroll.smoothing` (0.05 floaty … 1 no easing), `scroll.startOffset` and `scroll.endOffset` (px).
-- `focalPoint`, `focalPointMobile`, `overscale`, `stillFrame`.
+- `overscale`, `stillFrame`.
 - `scenes`, `defaultScene`, and `motion` (scene blend time, pointer parallax, light sweep, red progress line, word-by-word headlines, tagline ticker).
 
 ## 4. Orders

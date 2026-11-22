@@ -7,7 +7,8 @@
 #
 # Environment overrides:
 #   FF=/path/to/ffmpeg.exe           ffmpeg location (ffprobe is looked up next to it)
-#   FRAME_COUNT=150                  number of frames in the scroll-driven frame sequence
+#   FRAME_COUNT=<n>                  frames in the scroll-driven sequence (default round(duration*150/7.85),
+#                                    i.e. 150 for a 7.85 s clip, 191 for 10 s; the 16:9 set was built with 180)
 #
 # Override the ffmpeg location with FF=/path/to/ffmpeg.exe (ffprobe is looked up next to it).
 set -euo pipefail
@@ -19,8 +20,6 @@ FF="${FF:-/c/Users/Dell/AppData/Local/Microsoft/WinGet/Packages/Gyan.FFmpeg_Micr
 if [ ! -f "$FF" ]; then FF=ffmpeg; fi
 FP="${FF%ffmpeg.exe}ffprobe.exe"
 if [ ! -f "$FP" ]; then FP=ffprobe; fi
-
-FRAME_COUNT="${FRAME_COUNT:-150}"
 
 # Fit any source to W x H (9:16 targets): scale to cover, then crop keeping the TOP
 # area (helmet). For a 9:16 source this is a no-op scale + crop.
@@ -55,8 +54,10 @@ mkdir -p "$V" "$C" "$ST"
 
 DUR="$("$FP" -v error -show_entries format=duration -of csv=p=0 "$SRC")"
 # Frame sequence: FRAME_COUNT evenly spread over the whole clip (first frame = first video frame,
-# last frame = final moment of the clip).
+# last frame = final moment of the clip). Default keeps the 150-frames-per-7.85 s density.
+FRAME_COUNT="${FRAME_COUNT:-$(awk -v d="$DUR" 'BEGIN{printf "%d", int(d*150/7.85+0.5)}')}"
 FPS="$(awk -v d="$DUR" -v n="$FRAME_COUNT" 'BEGIN{printf "%.6f", n/d}')"
+echo "== frame count: $FRAME_COUNT (duration ${DUR}s, fps $FPS)"
 
 VF1080="$(fit 1080 1920)"
 VF720="$(fit 720 1280)"
@@ -88,6 +89,33 @@ still() {
 
 echo "== source: $SRC  duration=${DUR}s  frames=$FRAME_COUNT  fps-for-frames=$FPS"
 
+# ---------------------------------------------------------------- frame sequences (run first)
+# Orientation from the source: portrait (taller than wide) -> 9x16 set, landscape -> 16x9 set.
+#   portrait: assets/frames/9x16/1080 (1080x1920 q72) and assets/frames/9x16/720 (720x1280 q70)
+#   landscape: assets/frames/16x9/1920 (1920x1080 q72) and assets/frames/16x9/1280 (1280x720 q70)
+# Default clips rider-hero (portrait) and rider-hero-16x9 (landscape) use the plain folders above;
+# any other clip uses assets/frames/<name>/9x16|16x9/<width>.
+SRC_W="$("$FP" -v error -select_streams v:0 -show_entries stream=width -of csv=p=0 "$SRC")"
+SRC_H="$("$FP" -v error -select_streams v:0 -show_entries stream=height -of csv=p=0 "$SRC")"
+if [ "$SRC_H" -gt "$SRC_W" ]; then
+  ORIENT=9x16; BIG_W=1080; BIG_H=1920; SMALL_W=720; SMALL_H=1280
+else
+  ORIENT=16x9; BIG_W=1920; BIG_H=1080; SMALL_W=1280; SMALL_H=720
+fi
+if [ "$NAME" = "rider-hero" ] || [ "$NAME" = "rider-hero-16x9" ]; then BASE="assets/frames/$ORIENT"
+else BASE="assets/frames/$NAME/$ORIENT"; fi
+FD="$BASE/$BIG_W"; FM="$BASE/$SMALL_W"
+echo "== orientation: $ORIENT (${SRC_W}x${SRC_H})  ->  $FD (q72), $FM (q70)"
+frames "$FD" "$BIG_W" "$BIG_H" 72   # large, WebP q72 (step down by 5 if the set exceeds ~30 MB, not below 55)
+frames "$FM" "$SMALL_W" "$SMALL_H" 70   # small, WebP q70
+
+if [ "$ORIENT" = 16x9 ]; then
+  # Video, poster and still outputs below are 9:16 crops of a portrait source; landscape clips stop here.
+  echo "== landscape clip: frame sequences written, video/poster/still outputs skipped"
+  echo "frames: $(ls "$FD" | grep -c '^frame_[0-9]\{4\}\.webp$') in $FD, $(ls "$FM" | grep -c '^frame_[0-9]\{4\}\.webp$') in $FM"
+  echo "ALL OK"; exit 0
+fi
+
 # 1080x1920 H.264
 "$FF" -y -v error -i "$SRC" -vf "$VF1080" -c:v libx264 -preset veryfast -crf 23 \
   -pix_fmt yuv420p -an -movflags +faststart "$V/$NAME-1080.mp4"
@@ -109,13 +137,6 @@ echo "== source: $SRC  duration=${DUR}s  frames=$FRAME_COUNT  fps-for-frames=$FP
 # 3 s crop clip (from t=2 s), 540x960
 "$FF" -y -v error -ss 2 -t 3 -i "$SRC" -vf "scale=540:960:flags=lanczos" -c:v libx264 \
   -preset veryfast -crf 26 -pix_fmt yuv420p -an -movflags +faststart "$V/$NAME-crop.mp4"
-
-# Scroll-driven canvas frame sequences (page top = frame 1, page bottom = frame FRAME_COUNT).
-# rider-hero keeps the short paths assets/frames/{desktop,mobile}; other clips get assets/frames/<name>/...
-if [ "$NAME" = "rider-hero" ]; then FD="assets/frames/desktop"; FM="assets/frames/mobile"
-else FD="assets/frames/$NAME/desktop"; FM="assets/frames/$NAME/mobile"; fi
-frames "$FD" 1080 1920 72   # desktop, WebP q72 (step down by 5 if the set exceeds ~22 MB, not below 55)
-frames "$FM"  720 1280 70   # mobile,  WebP q70
 
 # Category stills (1:1 = 1080x1080 or 840x840 crop, 4:5 = 1080x1350), 800 wide
 still 5.0 "840:840:120:260"  "$C/helmets"      800   # helmet close-up

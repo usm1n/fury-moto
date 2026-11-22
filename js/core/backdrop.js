@@ -1,25 +1,31 @@
 /**
- * SCROLL-DRIVEN BACKDROP (canvas image sequence) + motion layer
+ * SCROLL-DRIVEN BACKDROP (canvas image sequences) + motion layer
  * ----------------------------------------------------------------------------
- * The 9:16 rider clip, pre-extracted to WebP frames (docs/MEDIA.md), is drawn on
- * ONE fixed full-screen <canvas> behind every page. Scroll position = timeline:
- *   page top -> frame 1 (still), scroll down -> forward, up -> backward,
- *   stop -> hold, page bottom -> last frame. Light lerp smoothing.
+ * The rider clip, pre-extracted to WebP frames (docs/MEDIA.md), is drawn on ONE
+ * fixed full-screen <canvas> behind every page. Scroll position = timeline:
+ *   page top -> first frame (still), scroll down -> forward, up -> backward,
+ *   stop -> hold, page bottom -> last frame. Light lerp smoothing. Nothing autoplays.
  *
- * Layout: the frame always FILLS THE WHOLE SCREEN (cover) on every device — no
- * bars, no side fill. Where the screen's shape differs from 9:16 the frame is
- * cropped around config.backdrop.focalPoint {x,y} (0–1 of the frame; mobile can
- * override with focalPointMobile): that point is centred on screen, then clamped
- * so no edge ever shows. Mouse parallax nudges the focal point (max ~2 %) over a
- * slight overscale (`overscale`, default 1.04).
+ * Two sequences, chosen by ORIENTATION (config.backdrop.sequences):
+ *   landscape viewport (width > height) -> 16:9 frames
+ *   portrait viewport                   -> 9:16 frames
+ * Each has a full-size `path` and a `pathSmall` (smaller screens / slow connections).
+ * Only the active sequence is loaded. On resize/rotation the engine switches
+ * sequence and keeps the same scroll progress (0..1), so you stay at the same
+ * point in the animation.
  *
- * Section looks (config.backdrop.scenes) may only change brightness, blur, dim and
- * red tint. Sections pick one with data-scene="<name>".
+ * Layout: full-bleed cover. With matching aspect ratios there is almost no crop;
+ * on odd shapes (ultrawide, tall phones) the small crop is centred on the
+ * sequence's focalPoint {x,y}. Mouse parallax nudges that point a little over a
+ * slight overscale, so no edge ever shows.
+ *
+ * Section looks (config.backdrop.scenes) only change brightness, blur, dim and red
+ * tint. Sections pick one with data-scene="<name>".
  *
  *   mountBackdrop(page)   -> before page modules render (sets html.has-backdrop)
  *   initMotionLayer(page) -> after the page has rendered (scenes, marquee, headlines)
  *
- * Reduced motion / Save-Data: only `stillFrame` is loaded and drawn; no scrubbing.
+ * Reduced motion / Save-Data: only `stillFrame` of the active sequence is loaded and drawn.
  */
 import { config } from "./config.js";
 import { prefersReducedMotion, saveData, isDesktop, hoverCapable } from "./manager.js";
@@ -33,6 +39,11 @@ const motionCfg = () => cfg().motion || {};
 const gsap = () => window.gsap || null;
 const still = () => prefersReducedMotion() || saveData();
 const clamp01 = (n) => Math.min(1, Math.max(0, n));
+const viewport = () => ({
+  W: document.documentElement.clientWidth || innerWidth,
+  H: document.documentElement.clientHeight || innerHeight,
+});
+const orientation = () => { const { W, H } = viewport(); return W > H ? "landscape" : "portrait"; };
 
 let B = null;                  // engine state, null when the backdrop is off
 
@@ -41,7 +52,8 @@ let B = null;                  // engine state, null when the backdrop is off
 export function mountBackdrop(page) {
   if (B) return B;
   const b = cfg();
-  if (!b.enabled || !b.frames?.count) return null;
+  const seqs = b.sequences || {};
+  if (!b.enabled || !(seqs.landscape?.count || seqs.portrait?.count)) return null;
   if (b.pages !== "all" && !(Array.isArray(b.pages) && b.pages.includes(page))) return null;
 
   const html = document.documentElement;
@@ -64,60 +76,92 @@ export function mountBackdrop(page) {
     ctx: canvas.getContext("2d", { alpha: false }),
     dim: root.querySelector(".backdrop__dim"),
     tint: root.querySelector(".backdrop__tint"),
-    count: b.frames.count,
-    pattern: pickFrameSet(b.frames),
-    imgs: new Array(b.frames.count),
-    target: 0, smooth: 0,                            // position in the clip, 0..1
+    cache: {},                                       // frames per sequence path, kept if you rotate back
+    seqName: null, seq: null, pattern: null, count: 0, imgs: [], loadToken: 0,
+    target: 0, smooth: 0,                            // position in the clip, 0..1 (shared by both sequences)
     drawn: -1, dirty: true,
-    px: 0, py: 0, tpx: 0, tpy: 0,                    // pointer parallax: focal-point offset (fraction of frame), current/target
+    px: 0, py: 0, tpx: 0, tpy: 0,                    // pointer parallax: focal-point offset (fraction of frame)
     raf: 0, lastT: 0,
     scene: { ...SCENE_NEUTRAL, ...resolveScene(b.defaultScene) },
     sceneName: null, sceneTween: null,
     W: 0, H: 0, dpr: 1,
+    orient: orientation(),                           // last orientation, to detect rotation
+    history: [],                                     // [{t, p}] progress at recent scroll events (rotation restore)
   };
 
   sizeCanvas();
   applyScene();
   addEventListener("resize", onResize, { passive: true });
 
-  if (still()) {
-    const i = Math.min(B.count, Math.max(1, Number(b.stillFrame) || 1)) - 1;
-    B.target = B.smooth = B.count > 1 ? i / (B.count - 1) : 0;
-    loadFrames([i]);
-  } else {
+  if (!still()) {
     B.target = B.smooth = scrollPosition();
-    loadFrames(loadOrder(B.count, Math.round(B.smooth * (B.count - 1))));
     addEventListener("scroll", onScroll, { passive: true });
-    // page height changes as sections render / images load -> remap
-    if ("ResizeObserver" in window) new ResizeObserver(onScroll).observe(document.body);
+    // page height changes as sections render / images load -> remap (not a user scroll)
+    if ("ResizeObserver" in window) new ResizeObserver(() => onScroll()).observe(document.body);
   }
+  activateSequence(orientation());
   return B;
 }
 
+/* ================================================================== sequences */
+
+/** The configured sequence for an orientation, falling back to the other one if missing. */
+function sequenceFor(name) {
+  const s = cfg().sequences || {};
+  const other = name === "landscape" ? "portrait" : "landscape";
+  if (s[name]?.count) return { name, ...s[name] };
+  return { name: other, ...s[other] };
+}
+
+/** The frame width of a set, read from its folder name ("…/16x9/1920/…" -> 1920). */
+const widthFromPath = (p) => Math.max(0, ...String(p || "").split("/").map((x) => (/^\d{3,4}$/.test(x) ? Number(x) : 0)));
+
 /**
- * Pick the frame set by the width the frame is actually drawn at when covering the
- * viewport (cover = the larger of viewport width and height×9/16, × overscale, × DPR).
- * Mobile set (720 wide) only if it covers that without upscaling much, or on a slow
- * connection; otherwise the desktop set (1080 wide).
+ * Full-size `path`, or `pathSmall` when the connection is slow or when the small set
+ * already covers the viewport at this DPR without noticeable upscaling.
  */
-function pickFrameSet(frames) {
+function pickPath(seq) {
+  if (!seq.pathSmall) return seq.path;
   const c = navigator.connection;
   const slow = !!(c && (c.saveData || /(^|-)(2g|3g)$/.test(c.effectiveType || "")));
-  const W = document.documentElement.clientWidth || innerWidth;
-  const H = document.documentElement.clientHeight || innerHeight;
-  const needed = Math.max(W + 2 * MARGIN, (H + 2 * MARGIN) * (9 / 16)) * overscale() * Math.min(devicePixelRatio || 1, 2);
-  const mobileW = Number(frames.mobileWidth) || 720;
-  if (slow || !frames.desktop || needed <= mobileW * 1.1) return frames.mobile || frames.desktop;
-  return frames.desktop;
+  if (slow || !seq.path) return seq.pathSmall;
+  const { W, H } = viewport();
+  const [aw, ah] = seq.name === "landscape" ? [16, 9] : [9, 16];
+  const coverW = Math.max(W + 2 * MARGIN, (H + 2 * MARGIN) * (aw / ah)) * overscale() * Math.min(devicePixelRatio || 1, 2);
+  const smallW = Number(seq.widthSmall) || widthFromPath(seq.pathSmall) || 0;
+  return smallW && coverW <= smallW * 1.1 ? seq.pathSmall : seq.path;
+}
+
+/** Switch to the sequence for this orientation; keeps B.smooth/B.target (scroll progress). */
+function activateSequence(orient) {
+  const seq = sequenceFor(orient);
+  const pattern = pickPath(seq);
+  if (B.pattern === pattern) return;
+  B.seqName = seq.name;
+  B.seq = seq;
+  B.pattern = pattern;
+  B.count = seq.count;
+  B.imgs = B.cache[pattern] ||= new Array(seq.count);
+  B.drawn = -1;
+  B.dirty = true;
+  B.root.dataset.sequence = seq.name;
+  const token = ++B.loadToken;                     // stops the previous sequence's loader
+  if (still()) {
+    const i = Math.min(B.count, Math.max(1, Number(cfg().stillFrame) || 1)) - 1;
+    B.target = B.smooth = B.count > 1 ? i / (B.count - 1) : 0;
+    loadFrames([i], token);
+  } else {
+    loadFrames(loadOrder(B.count, Math.round(B.smooth * (B.count - 1))), token);
+  }
+  kick();
 }
 
 const overscale = () => Math.max(1, Number(cfg().overscale) || 1.04);
 
-/** focal point {x,y} in 0..1 of the frame, per device. */
+/** focal point {x,y} (0..1 of the frame) of the active sequence. */
 function focal() {
-  const b = cfg();
-  const f = (!isDesktop() && b.focalPointMobile) || b.focalPoint || {};
-  return { x: Number.isFinite(f.x) ? f.x : 0.5, y: Number.isFinite(f.y) ? f.y : 0.35 };
+  const f = B.seq?.focalPoint || {};
+  return { x: Number.isFinite(f.x) ? f.x : 0.5, y: Number.isFinite(f.y) ? f.y : 0.5 };
 }
 
 /** "frame_%04d.webp", 0 -> "frame_0001.webp" */
@@ -133,18 +177,34 @@ function loadOrder(count, first) {
   return out;
 }
 
-function loadFrames(order) {
-  let next = 0;
+function loadFrames(order, token, attempt = 0) {
+  const pattern = B.pattern;
+  const imgs = B.imgs;
+  const failed = [];
+  let next = 0, inFlight = 0;
   const one = () => {
-    if (!B || next >= order.length) return;
+    if (!B || token !== B.loadToken) return;                            // sequence switched: stop
+    if (next >= order.length) {
+      // all requested: retry frames that failed (network hiccup, files still uploading) with back-off,
+      // otherwise the animation would stick on the last loaded frame
+      if (inFlight === 0 && failed.length && attempt < 5) {
+        setTimeout(() => loadFrames(failed, token, attempt + 1), 1000 * 2 ** attempt);
+      }
+      return;
+    }
     const i = order[next++];
+    if (imgs[i]) return one();
+    inFlight++;
     const img = new Image();
     img.decoding = "async";
-    img.src = frameUrl(B.pattern, i);
+    img.src = frameUrl(pattern, i) + (attempt ? `?r=${attempt}` : "");
     (img.decode ? img.decode() : new Promise((res, rej) => { img.onload = res; img.onerror = rej; }))
-      .then(() => { B.imgs[i] = img; if (Math.abs(i - frameIndex()) < 12 || B.drawn < 0) { B.dirty = true; kick(); } })
-      .catch(() => {})
-      .finally(one);
+      .then(() => {
+        imgs[i] = img;
+        if (B.imgs === imgs && (Math.abs(i - frameIndex()) < 12 || B.drawn < 0)) { B.dirty = true; kick(); }
+      })
+      .catch(() => failed.push(i))
+      .finally(() => { inFlight--; one(); });
   };
   for (let k = 0; k < 6; k++) one();   // 6 in flight
 }
@@ -165,9 +225,13 @@ function scrollPosition() {
   return end > start ? clamp01((scrollY - start) / (end - start)) : 0;
 }
 
-function onScroll() {
+function onScroll(e) {
   if (!B) return;
   const next = scrollPosition();
+  if (e?.type === "scroll") {                 // a real scroll: remember where the visitor is
+    B.history.push({ t: performance.now(), p: next });
+    if (B.history.length > 20) B.history.shift();
+  }
   const sc = cfg().scroll || {};
   if (sc.mapping === "distance" && !sc.pingpong && Math.abs(next - B.smooth) > 0.5) B.smooth = next; // hard wrap: jump
   B.target = next;
@@ -253,14 +317,45 @@ let resizeQueued = false;
 function onResize() {
   if (resizeQueued) return;
   resizeQueued = true;
+  // where the visitor was before the layout changed: the last scroll-event progress older than
+  // ~200 ms (reflow on rotation fires layout/scroll callbacks with already-shifted values)
+  const now = performance.now();
+  const before = B?.history.filter((h) => now - h.t > 200).pop();
+  const progress = before ? before.p : (B ? B.target : 0);
   requestAnimationFrame(() => {
     resizeQueued = false;
     if (!B) return;
     sizeCanvas();
+    const o = orientation();
+    const rotated = o !== B.orient;
+    B.orient = o;
+    activateSequence(o);                       // rotation / resize: other sequence (or other size)
     if (B.sceneName) { const n = B.sceneName; B.sceneName = null; goTo(n, true); }
-    onScroll();
+    if (rotated && !still() && (cfg().scroll?.mapping || "page") === "page") {
+      // The page reflows on rotation, so the same scrollY would be a different point in the
+      // animation. Put the visitor back at the same progress instead.
+      requestAnimationFrame(() => {
+        if (!B) return;
+        window.scrollTo(0, scrollYFor(progress));
+        B.target = B.smooth = progress;
+        B.history.push({ t: performance.now() - 1000, p: progress });   // a second resize in the same burst keeps it
+        B.dirty = true;
+        kick();
+      });
+    } else {
+      onScroll();
+    }
     kick();
   });
+}
+
+/** inverse of scrollPosition() for mapping "page": the scrollY that shows progress p (0..1). */
+function scrollYFor(p) {
+  const sc = cfg().scroll || {};
+  const max = document.documentElement.scrollHeight - (innerHeight || 1);
+  const start = Number(sc.startOffset) || 0;
+  const end = max - (Number(sc.endOffset) || 0);
+  return Math.max(0, start + clamp01(p) * Math.max(0, end - start));
 }
 
 /* ===================================================================== scenes */
@@ -426,4 +521,4 @@ export function initMotionLayer(page) {
 }
 
 /** QA helpers: current frame (1-based) and scene. */
-export const backdropState = () => (B ? { frame: B.drawn + 1, target: B.target, scene: B.sceneName, set: B.pattern, layout: B.layout } : null);
+export const backdropState = () => (B ? { frame: B.drawn + 1, count: B.count, sequence: B.seqName, target: B.target, scene: B.sceneName, set: B.pattern, layout: B.layout } : null);
