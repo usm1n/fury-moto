@@ -1,0 +1,126 @@
+/*
+ * Video engine styles (js/core/video-bg.js, video-scrub.js).
+ * Base positioning of .vslot__media / __overlay / __panel lives in base.css; this file adds
+ * the layouts and states. Colours come from tokens only.
+ *
+ * DOM produced by the engine:
+ *   .vslot.vslot--<background|card|inline|scrub>[.vslot--hero-panel][.vslot--panel]
+ *     .vslot__media            (aria-hidden unless inline)
+ *       picture.vslot__poster > img          — cover layout
+ *       video / canvas.vslot__canvas
+ *       — or, desktop hero-panel —
+ *       .vslot__fill  > picture.vslot__poster--blur, video (blurFill)
+ *       .vslot__panel > picture.vslot__poster, video / canvas
+ *     .vslot__overlay
+ *     button.vslot__toggle     (inline only)
+ * States on the slot: .is-playing .is-waiting .is-poster-only .is-static ; on media: .is-ready
+ */
+
+/* ---------- common ---------- */
+/* base.css keys these on [data-video-slot]; direct VideoBg.mount() callers (product gallery)
+   may not have that attribute, so .vslot carries them too. :where() keeps specificity at 0
+   so page CSS can still position its own children (e.g. absolute labels). */
+:where(.vslot) { position: relative; isolation: isolate; overflow: hidden; }
+:where(.vslot) > :where(:not(.vslot__media, .vslot__overlay)) { position: relative; z-index: var(--z-content); }
+.vslot__media { background: var(--color-surface); }
+.vslot__media img { user-select: none; -webkit-user-drag: none; }
+.vslot__media img.is-missing { visibility: hidden; }
+.vslot__media video,
+.vslot__media canvas { object-position: var(--focal, 50% 50%); }
+.vslot__media canvas { opacity: 0; transition: opacity var(--dur-slow) var(--ease-out); }
+.vslot__media canvas.is-ready { opacity: 1; }
+
+/* ---------- hero-panel layout ---------- */
+.vslot--hero-panel { min-height: 100vh; min-height: 100svh; }
+
+/* full-bleed blurred fill behind the panel: blurFill video, or the poster blurred by CSS */
+.vslot__fill {
+  position: absolute; inset: 0; overflow: hidden;
+  transform: scale(1.12);
+}
+.vslot__fill img,
+.vslot__fill video {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+}
+.vslot__poster--blur img {
+  filter: blur(40px) brightness(0.55) saturate(1.15);
+  transform: scale(1.15);
+}
+.vslot__fill video { filter: brightness(0.85); }
+
+/* the framed 9:16 panel, centred in the right ~40% of the viewport */
+.vslot--panel .vslot__panel {
+  top: 50%;
+  left: 80%;
+  height: min(86%, 86vh, 1200px);
+  width: auto;
+  max-width: 36vw;
+  aspect-ratio: 9 / 16;
+  transform: translate(-50%, -50%);
+  background: var(--color-surface);
+}
+.vslot--panel .vslot__panel img,
+.vslot--panel .vslot__panel video,
+.vslot--panel .vslot__panel canvas { object-position: var(--focal, 50% 50%); }
+.vslot--panel .vslot__panel canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+/* text lives on the left: shade the left strongly, keep the panel side light */
+.vslot--panel > .vslot__overlay {
+  background: linear-gradient(90deg,
+    rgba(var(--color-overlay), calc(var(--overlay, 0.5) + 0.3)) 0%,
+    rgba(var(--color-overlay), var(--overlay, 0.5)) 40%,
+    rgba(var(--color-overlay), calc(var(--overlay, 0.5) * 0.5)) 60%,
+    rgba(var(--color-overlay), 0.12) 100%);
+}
+
+/* ---------- card mode ---------- */
+.vslot--card { background: var(--color-surface); }
+.vslot--card .vslot__media img { transition: transform var(--dur-slow) var(--ease-out); }
+.vslot--card .vslot__media video { transition: opacity var(--dur-med) var(--ease-out); }
+.vslot--card > .vslot__overlay { transition: opacity var(--dur-med) var(--ease-out); }
+.vslot--card.is-playing > .vslot__overlay { opacity: 0.75; }
+@media (hover: hover) and (pointer: fine) {
+  .vslot--card:hover .vslot__media img { transform: scale(1.04); }
+}
+
+/* ---------- inline mode (product gallery slide) ---------- */
+.vslot--inline { background: var(--color-surface); }
+.vslot--inline > button.vslot__toggle.vslot__toggle {
+  position: absolute; inset: 0; z-index: var(--z-content);
+  display: grid; place-items: center;
+  width: 100%; height: 100%; margin: 0; padding: 0;
+  background: transparent; border: 0; color: var(--color-text);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.vslot__toggle svg {
+  box-sizing: content-box;
+  width: 28px; height: 28px; padding: 14px;            /* 56px tap target */
+  border-radius: var(--radius-pill);
+  background: rgba(var(--color-overlay), 0.6);
+  outline: 1px solid var(--color-line);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: opacity var(--dur-med) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+.vslot__toggle.is-on svg { opacity: 0; }
+.vslot__toggle:hover svg,
+.vslot__toggle:focus-visible svg { opacity: 1; transform: scale(1.06); }
+.vslot__toggle:focus-visible { outline: none; }
+.vslot__toggle:focus-visible svg { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+
+/* ---------- scrub mode ---------- */
+.vslot--scrub:not(.is-static) { min-height: 100vh; min-height: 100svh; }
+.vslot--scrub:not(.is-static) .vslot__beat {
+  opacity: var(--beat, 0);
+  transform: translate3d(0, calc((1 - var(--beat, 0)) * var(--space-6)), 0);
+  will-change: opacity, transform;
+}
+.vslot--scrub.is-static .vslot__beat { opacity: 1; transform: none; }
+
+/* ---------- reduced motion: stills only, no movement ---------- */
+html.reduced-motion .vslot__media video { display: none; }
+html.reduced-motion .vslot__beat { opacity: 1 !important; transform: none !important; }
+html.reduced-motion .vslot--card .vslot__media img { transition: none; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .vslot__media video, .vslot__media canvas, .vslot__toggle svg { transition: none; }
+}

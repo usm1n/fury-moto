@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <base href="../">
+  <title>Video engine test</title>
+  <meta name="robots" content="noindex">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/video.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+  <style>
+    /* dev-only page styles */
+    .t-sec { padding: var(--space-7) var(--gutter); border-top: 1px solid var(--color-line); }
+    .t-label { position: absolute; top: var(--space-3); left: var(--space-3); font: 600 var(--fs-xs)/1 var(--font-body); background: var(--color-accent); color: var(--color-accent2); padding: var(--space-1) var(--space-2); border-radius: var(--radius); }
+    .t-hero { display: flex; align-items: center; }
+    .t-hero h1 { font: var(--fs-hero)/var(--lh-tight) var(--font-display); max-width: 55vw; }
+    .t-bg { min-height: 60vh; display: grid; place-items: center; }
+    .t-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); }
+    .t-card { display: block; border-radius: var(--radius); color: var(--color-text); }
+    .t-card span { position: absolute; bottom: var(--space-3); left: var(--space-3); font: var(--fs-xl) var(--font-display); }
+    .t-inline { max-width: 360px; border-radius: var(--radius); }
+    .t-scrub { display: grid; align-content: center; gap: var(--space-5); padding: var(--gutter); }
+    .t-scrub [data-beat] { font: var(--fs-3xl)/var(--lh-tight) var(--font-display); }
+    .t-hud { position: fixed; right: var(--space-3); bottom: var(--space-3); z-index: var(--z-modal); background: var(--color-surface); border: 1px solid var(--color-line); padding: var(--space-2) var(--space-3); font: var(--fs-xs)/1.5 ui-monospace, monospace; border-radius: var(--radius); white-space: pre; }
+    @media (max-width: 600px) { .t-cards { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main id="main">
+    <section class="t-sec t-hero" id="hero"><span class="t-label">hero · background · hero-panel · priority</span><h1>Ride. Learn. Repeat.</h1></section>
+    <section class="t-sec t-bg" id="bg"><span class="t-label">background · cover · start 3</span><p>Background section</p></section>
+    <section class="t-sec">
+      <div class="t-cards">
+        <a class="t-card" href="#c1" id="c1"><span class="t-label">card · crop</span><span>Helmets</span></a>
+        <a class="t-card" href="#c2" id="c2"><span class="t-label">card · crop · start 1</span><span>Suits</span></a>
+        <a class="t-card" href="#c3" id="c3"><span class="t-label">card · main · start 2</span><span>Gloves</span></a>
+      </div>
+    </section>
+    <section class="t-sec"><div class="t-inline" id="inline"></div></section>
+    <section class="t-scrub" id="scrub">
+      <div data-beat>Protection</div>
+      <div data-beat>Fit</div>
+      <div data-beat>Confidence</div>
+    </section>
+    <section class="t-sec t-bg" id="broken"><span class="t-label">background · 404 sources → poster</span><p>Broken source stays on poster</p></section>
+    <section class="t-sec t-bg" id="source"><span class="t-label">background · raw assets/source mp4</span><p>Source file</p></section>
+    <footer class="t-sec t-bg" id="foot"><span class="t-label">footer · rate 0.6 · lowest priority</span><p>Footer</p></footer>
+  </main>
+  <div class="t-hud" id="hud"></div>
+
+  <script type="module">
+    import { getVideo, applyTheme } from "./js/core/config.js";
+    import { VideoBg } from "./js/core/video-bg.js";
+    import { VideoScrub } from "./js/core/video-scrub.js";
+    import { playingCount, prefersReducedMotion } from "./js/core/manager.js";
+    import { on } from "./js/core/bus.js";
+
+    addEventListener("DOMContentLoaded", () => {
+      applyTheme();
+      if (prefersReducedMotion()) document.documentElement.classList.add("reduced-motion");
+      const base = getVideo("rider-hero");
+      const raw = { ...base, mp4: { "720": "assets/source/rider-hero.mp4" }, webm: null, crop: "assets/source/rider-hero.mp4" };
+      const broken = { ...base, mp4: { "720": "assets/video/nope-720.mp4" }, webm: { "720": "assets/video/nope-720.webm" } };
+      const $ = (id) => document.getElementById(id);
+      const H = (window.__handles = {});
+
+      H.hero = VideoBg.mount($("hero"), { video: base, mode: "background", layout: "hero-panel", priority: true, overlayOpacity: 0.45 });
+      H.bg = VideoBg.mount($("bg"), { video: base, mode: "background", start: 3, overlayOpacity: 0.6 });
+      H.c1 = VideoBg.mount($("c1"), { video: base, mode: "card", src: "crop", overlayOpacity: 0.35 });
+      H.c2 = VideoBg.mount($("c2"), { video: base, mode: "card", src: "crop", start: 1, overlayOpacity: 0.35 });
+      H.c3 = VideoBg.mount($("c3"), { video: base, mode: "card", src: "main", start: 2, overlayOpacity: 0.35 });
+      H.inline = VideoBg.mount($("inline"), { video: base, mode: "inline", overlayOpacity: 0 });
+      if (window.gsap && window.ScrollTrigger) gsap.registerPlugin(ScrollTrigger);
+      H.scrub = VideoScrub.mount($("scrub"), { video: base, overlayOpacity: 0.55, beats: $("scrub").querySelectorAll("[data-beat]"), layout: "hero-panel" });
+      H.broken = VideoBg.mount($("broken"), { video: broken, mode: "background", overlayOpacity: 0.5 });
+      H.source = VideoBg.mount($("source"), { video: raw, mode: "background", overlayOpacity: 0.4 });
+      H.foot = VideoBg.mount($("foot"), { video: base, mode: "background", playbackRate: 0.6, start: 5, overlayOpacity: 0.85 });
+
+      let events = 0;
+      on("video:play", () => events++);
+      on("video:pause", () => events++);
+      const hud = $("hud");
+      let max = 0;
+      setInterval(() => {
+        const n = playingCount();
+        const actual = [...document.querySelectorAll("video")].filter((v) => !v.paused && !v.closest(".vslot__fill") && !v.closest(".vslot--scrub")).length;
+        max = Math.max(max, actual);
+        hud.textContent = `budget playing: ${n}\nactual playing: ${actual} (max ${max})\nscrub: ${H.scrub.mode?.()} ${(H.scrub.progress?.() ?? 0).toFixed(2)}\nbus events: ${events}`;
+      }, 250);
+    });
+  </script>
+</body>
+</html>

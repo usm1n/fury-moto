@@ -216,7 +216,8 @@ const config = {
       { value: "3", label: "Superbikes ridden" },
       { value: "[PLACEHOLDER]", label: "Track days" },
     ],
-    image: "assets/source/fury_moto_2026-05-21_1.jpg",
+    // [PLACEHOLDER: swap for a real portrait, e.g. assets/img/photos/fury_moto_2026-05-21_1-1600.webp after running tools/media.sh photos]
+    image: "assets/img/stills/rider-1-1600.webp",
   },
   gearDoctor: {
     pageTitle: "Gear Doctor",
