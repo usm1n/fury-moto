@@ -6,7 +6,7 @@
   display: flex; align-items: flex-end;
   padding-block: calc(var(--header-h) + var(--space-6)) calc(var(--space-8) + var(--bottom-bar-h));
 }
-.hero__inner { width: 100%; }
+.hero__inner { flex: 0 0 auto; } /* keep .container's width + gutters inside the flex row */
 .hero__title {
   font-size: var(--fs-hero);
   line-height: 0.88;

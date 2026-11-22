@@ -109,7 +109,8 @@ h3 { font-size: var(--fs-xl); }
     rgba(var(--color-overlay), var(--overlay, 0.5)) 55%,
     rgba(var(--color-overlay), calc(var(--overlay, 0.5) + 0.25)) 100%);
 }
-[data-video-slot] > :not(.vslot__media):not(.vslot__overlay) { position: relative; z-index: var(--z-content); }
+/* zero specificity so section CSS can still position its own children (e.g. absolute tile images) */
+:where([data-video-slot]) > :where(:not(.vslot__media, .vslot__overlay)) { position: relative; z-index: var(--z-content); }
 
 /* desktop 9:16 framed panel + blurred fill (hero) */
 .vslot__fill { filter: none; transform: scale(1.1); }
