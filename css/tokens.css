@@ -1,0 +1,82 @@
+/*
+ * Design tokens. Colour/font/radius values here are DEFAULTS only —
+ * js/core/config.js overwrites them at load from site.config.js `theme`.
+ * Never hard-code a colour elsewhere: always use these variables.
+ */
+:root {
+  /* colours (overwritten from config.theme.colors) */
+  --color-bg: #0A0A0C;
+  --color-surface: #141418;
+  --color-accent: #E10600;
+  --color-accent2: #FFFFFF;
+  --color-text: #F5F5F7;
+  --color-muted: #8A8A93;
+
+  /* derived */
+  --color-surface-2: color-mix(in srgb, var(--color-surface) 80%, white 6%);
+  --color-line: color-mix(in srgb, var(--color-text) 12%, transparent);
+  --color-accent-hover: color-mix(in srgb, var(--color-accent) 85%, white);
+  --color-overlay: 10, 10, 12;            /* rgb triplet for overlays */
+
+  /* fonts (overwritten from config.theme.fonts) */
+  --font-display: "Anton", "Impact", "Arial Narrow", sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* type scale (fluid) */
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.875rem;
+  --fs-md: 1rem;
+  --fs-lg: 1.25rem;
+  --fs-xl: clamp(1.5rem, 1.2rem + 1.2vw, 2rem);
+  --fs-2xl: clamp(2rem, 1.4rem + 2.6vw, 3.25rem);
+  --fs-3xl: clamp(2.75rem, 1.6rem + 5vw, 5.5rem);
+  --fs-hero: clamp(3.5rem, 2rem + 8vw, 9rem);
+  --lh-tight: 0.95;
+  --lh-body: 1.6;
+
+  /* spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4.5rem;
+  --space-9: 7rem;
+  --gutter: clamp(1rem, 0.5rem + 2.5vw, 2.5rem);
+  --container: 1320px;
+  --section-y: clamp(4rem, 3rem + 5vw, 8rem);
+
+  /* shape & depth */
+  --radius: 6px;                          /* overwritten from config.theme.radius */
+  --radius-pill: 999px;
+  --shadow-1: 0 2px 10px rgba(0, 0, 0, 0.35);
+  --shadow-2: 0 20px 60px rgba(0, 0, 0, 0.55);
+
+  /* motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 160ms;
+  --dur-med: 320ms;
+  --dur-slow: 700ms;
+
+  /* layers */
+  --z-video: 0;
+  --z-content: 1;
+  --z-header: 50;
+  --z-drawer: 80;
+  --z-modal: 90;
+  --z-grain: 100;
+
+  /* layout */
+  --header-h: 64px;
+  --bottom-bar-h: 64px;                   /* mobile thumb bar */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur-med: 0ms;
+    --dur-slow: 0ms;
+  }
+}
