@@ -12,7 +12,10 @@ async function loadModule(path, name) {
 
 export default async function mount(main) {
   const { store, home, ui = {} } = config;
-  document.title = config.seo?.defaultTitle || store.name;
+  const seo = await loadModule("../core/seo.js", "setSeo");
+  const storeLd = await loadModule("../core/seo.js", "storeJsonLd");
+  if (seo) seo({ jsonLd: storeLd?.() });
+  else document.title = config.seo?.defaultTitle || store.name;
 
   // ---- hero
   text($('[data-hero="eyebrow"]', main), home.hero.eyebrow);
@@ -44,7 +47,7 @@ export default async function mount(main) {
 
   // ---- featured products
   text(h("featuredTitle"), home.featuredTitle);
-  text(h("shopAll"), ui.shopAll || "Shop all");
+  text(h("shopAll"), ui.shopAll);
   const all = await getProducts();
   let featured = home.featuredIds?.length
     ? home.featuredIds.map((id) => all.find((p) => p.id === id)).filter(Boolean)
@@ -63,14 +66,15 @@ export default async function mount(main) {
   ctaBtn.href = waLink(home.ctaBand.message);
 
   // ---- guides teaser
-  text(h("guidesTitle"), home.guidesTitle || ui.gearDoctorTitle || "Gear Doctor");
-  text(h("guidesAll"), ui.allGuides || "All guides");
+  text(h("guidesTitle"), home.guidesTitle);
+  text(h("guidesAll"), home.guidesAll);
+  const typeLabels = config.gearDoctor?.typeLabels || {};
   const guides = (config.guides || []).slice(0, 3);
   if (guides.length) {
     renderList(h("guides"), guides, (g, i) => html`
       <a class="guide-teaser" href="guide.html?id=${g.id}" data-reveal data-reveal-delay="${i * 0.08}">
         <span class="guide-teaser__media"><img src="${g.cover}" alt="" loading="lazy" decoding="async"></span>
-        <span class="pill">${(ui.guideTypes && ui.guideTypes[g.type]) || g.type}</span>
+        <span class="pill">${typeLabels[g.type] || g.type}</span>
         <h3>${g.title}</h3>
         <p class="muted">${g.excerpt}</p>
       </a>`);

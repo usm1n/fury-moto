@@ -42,6 +42,11 @@ export async function boot(page) {
   if (window.gsap && window.ScrollTrigger) window.gsap.registerPlugin(window.ScrollTrigger);
 
   if (!document.title) document.title = config.seo?.defaultTitle || config.store?.name || "";
+  // static ui.* bindings in page shells (skip link etc.)
+  document.querySelectorAll('[data-bind^="ui."]').forEach((el) => {
+    const v = config.ui?.[el.dataset.bind.slice(3)];
+    if (typeof v === "string") el.textContent = v;
+  });
 
   const comps = [...document.querySelectorAll("[data-component]")];
   await Promise.all(comps.map((el) => load(`../components/${el.dataset.component}.js`, el)));

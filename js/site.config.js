@@ -193,6 +193,8 @@ const config = {
       message: "Hi Gear Doctor! I need help choosing gear. Height: , Weight: , Bike: ",
     },
     instagramTitle: "On Instagram",
+    guidesTitle: "From the Gear Doctor",
+    guidesAll: "All guides",
     testimonialsTitle: "Riders say",
     faqTitle: "Questions",
   },
@@ -302,6 +304,8 @@ const config = {
     cart: "Cart",
     shop: "Shop",
     skip: "Skip to content",
+    videoPlay: "Play video",   // video engine (inline gallery video)
+    videoPause: "Pause video",
     homeLabel: "Go to home page",
     mainNav: "Main navigation",
     mobileNav: "Quick navigation",
