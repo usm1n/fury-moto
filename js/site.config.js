@@ -138,6 +138,17 @@ const config = {
     videoId: "rider-hero",
     pages: "all",
     focalPoint: "50% 30%",
+    // "scroll" = the video is animated BY your scroll: scroll down → it plays forward,
+    //            scroll up → it rewinds, stop scrolling → it holds the frame.
+    // "loop"   = it plays on its own as a muted loop.
+    playback: "scroll",
+    scroll: {
+      mapping: "distance",    // "distance" = one pass through the clip per `screensPerLoop` screens scrolled
+                              // "page"     = top of the page = first frame, bottom = last frame
+      screensPerLoop: 4,      // bigger = slower, more cinematic
+      pingpong: true,         // at the end of the clip, run it backwards instead of jumping to the start
+      smoothing: 0.12,        // 0.05 = floaty/slow catch-up … 0.3 = tight
+    },
     defaultScene: "content",
     scenes: {
       hero:    { scale: 1.0,  x: 0,  y: 0,  blur: 0,  dim: 0.30, saturate: 1.15, brightness: 1,    tint: 0.15,

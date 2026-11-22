@@ -15,8 +15,9 @@
  * sweep, marquee movement or split headlines.
  */
 import { config, getVideo } from "./config.js";
-import { VideoBg } from "./video-bg.js";
-import { canPlayMotion, isDesktop, hoverCapable, prefersReducedMotion } from "./manager.js";
+import { VideoBg, buildPoster, makeVideo } from "./video-bg.js";
+import { frameUrl } from "./video-scrub.js";
+import { canPlayMotion, isDesktop, hoverCapable, prefersReducedMotion, isIOS } from "./manager.js";
 
 const KEYS = ["scale", "x", "y", "blur", "dim", "saturate", "brightness", "tint"];
 const NEUTRAL = { scale: 1.1, x: 0, y: 0, blur: 0, dim: 0.6, saturate: 1, brightness: 1, tint: 0 };
@@ -65,16 +66,177 @@ export function mountBackdrop(page) {
     progress: null,
   };
 
-  // The engine handles lazy load, poster, reduced-motion and the 2-video budget.
-  // Priority 90: above cards/inline (60/80), below the hero panel (100).
-  VideoBg.mount(els.stage, {
-    video, mode: "background", overlayOpacity: 0, focalPoint: b.focalPoint || video.focalPoint,
-    priority: true, playPriority: 90,
-  });
+  if (b.playback === "scroll" && animated() && (video.scrubMp4 || video.frames)) {
+    // Video frames follow the scroll position. Never calls play(), so it doesn't use the 2-video budget.
+    mountScrollVideo(els.stage, video, b);
+  } else {
+    // Autoplay loop. The engine handles lazy load, poster, reduced-motion and the 2-video budget.
+    // Priority 90: above cards/inline (60/80), below the hero panel (100).
+    VideoBg.mount(els.stage, {
+      video, mode: "background", overlayOpacity: 0, focalPoint: b.focalPoint || video.focalPoint,
+      priority: true, playPriority: 90,
+    });
+  }
 
   state = { ...NEUTRAL, ...resolveScene(b.defaultScene) };
   apply();
   return els;
+}
+
+/* ------------------------------------------------- scroll-driven playback */
+
+/**
+ * The backdrop's video time is a function of scroll position:
+ *   u = position in the clip, 0..1 (from config.backdrop.scroll)
+ * Seeks an all-keyframe MP4 (scrubMp4) with lerp smoothing; on iOS, or if seeking
+ * turns out to be slow, it switches to drawing the pre-extracted frame sequence
+ * on a canvas.
+ */
+function mountScrollVideo(stage, video, b) {
+  const sc = b.scroll || {};
+  const focal = b.focalPoint || video.focalPoint || "50% 50%";
+  const frames = video.frames?.pattern && video.frames?.count > 0 ? video.frames : null;
+  const lerp = Math.min(1, Math.max(0.02, Number(sc.smoothing) || 0.12));
+
+  stage.classList.add("vslot", "vslot--background", "vslot--scroll");
+  const media = document.createElement("div");
+  media.className = "vslot__media";
+  media.append(buildPoster(video, { focal, priority: true }));
+  stage.append(media);
+
+  let target = 0, smooth = 0, raf = 0;
+  let vid = null, duration = 0, seeking = false, seekT0 = 0, slowSeeks = 0;
+  let canvas = null, ctx = null, imgs = null, lastFrame = -1, useFrames = false;
+
+  /* where in the clip (0..1) the current scroll position maps to */
+  function position() {
+    const vh = innerHeight || 1;
+    if (sc.mapping === "page") {
+      const max = document.documentElement.scrollHeight - vh;
+      return max > 0 ? Math.min(1, Math.max(0, scrollY / max)) : 0;
+    }
+    const loops = scrollY / vh / (Number(sc.screensPerLoop) || 4);
+    if (sc.pingpong !== false) {
+      const m = loops % 2;
+      return m <= 1 ? m : 2 - m;
+    }
+    return loops % 1;
+  }
+
+  function onScroll() {
+    const next = position();
+    // a hard wrap (non-pingpong) should jump, not sweep backwards through the clip
+    if (Math.abs(next - smooth) > 0.5 && sc.pingpong === false) smooth = next;
+    target = next;
+    kick();
+  }
+
+  let lastT = 0;
+  function kick() { if (!raf) raf = requestAnimationFrame(tick); }
+
+  function tick(now) {
+    raf = 0;
+    // frame-rate independent easing: `lerp` is the catch-up per 60fps frame
+    const dt = lastT ? Math.min(250, now - lastT) : 16.7;
+    lastT = now;
+    smooth += (target - smooth) * (1 - Math.pow(1 - lerp, dt / 16.7));
+    if (Math.abs(target - smooth) < 0.0005) smooth = target;
+    let busy = smooth !== target;
+    if (useFrames) drawFrame(smooth);
+    else busy = seek(smooth) || busy;
+    if (busy) kick(); else lastT = 0;
+  }
+
+  /* ---- video seeking ---- */
+  function seek(u) {
+    if (!vid || !duration) return false;
+    const t = Math.min(duration - 0.04, Math.max(0, u * duration));
+    if (seeking) return true;
+    if (Math.abs(vid.currentTime - t) < 1 / 30) return false;
+    seeking = true;
+    seekT0 = performance.now();
+    vid.currentTime = t;
+    return true;
+  }
+
+  function startVideo() {
+    if (!video.scrubMp4) return frames ? startFrames() : null;
+    vid = makeVideo([{ src: video.scrubMp4, type: "video/mp4" }], {
+      preload: "auto", loop: false,
+      onFail: () => { vid?.remove(); vid = null; if (frames) startFrames(); },
+    });
+    vid.style.objectPosition = focal;
+    vid.addEventListener("loadedmetadata", () => { duration = vid.duration || 0; vid.pause(); kick(); });
+    vid.addEventListener("loadeddata", () => vid.classList.add("is-ready"), { once: true });
+    vid.addEventListener("seeked", () => {
+      seeking = false;
+      if (performance.now() - seekT0 > 120 && ++slowSeeks >= 3 && frames) startFrames();
+      kick();
+    });
+    media.append(vid);
+  }
+
+  /* ---- canvas frame sequence (iOS / slow seeking) ---- */
+  function startFrames() {
+    if (useFrames || !frames) return;
+    useFrames = true;
+    canvas = document.createElement("canvas");
+    canvas.className = "is-ready";
+    ctx = canvas.getContext("2d");
+    media.append(canvas);
+    if (vid) { vid.remove(); vid = null; }
+    sizeCanvas();
+    imgs = new Array(frames.count);
+    // coarse-to-fine so the whole range is roughly covered early
+    const order = [];
+    for (const step of [16, 8, 4, 2, 1]) for (let i = 0; i < frames.count; i += step) if (!order.includes(i)) order.push(i);
+    let next = 0;
+    const loadOne = () => {
+      if (next >= order.length) return;
+      const i = order[next++];
+      const img = new Image();
+      img.decoding = "async";
+      img.onload = () => { imgs[i] = img; lastFrame = -1; kick(); loadOne(); };
+      img.onerror = loadOne;
+      img.src = frameUrl(frames.pattern, i);
+    };
+    for (let k = 0; k < 4; k++) loadOne();
+    addEventListener("resize", sizeCanvas, { passive: true });
+  }
+
+  function sizeCanvas() {
+    if (!canvas) return;
+    const r = media.getBoundingClientRect();
+    const dpr = Math.min(devicePixelRatio || 1, 1.5);
+    canvas.width = Math.round(r.width * dpr);
+    canvas.height = Math.round(r.height * dpr);
+    lastFrame = -1;
+    kick();
+  }
+
+  function drawFrame(u) {
+    const want = Math.round(u * (frames.count - 1));
+    let i = want;
+    // nearest loaded frame
+    for (let d = 0; d < frames.count && !imgs[i]; d++) {
+      if (imgs[want - d]) { i = want - d; break; }
+      if (imgs[want + d]) { i = want + d; break; }
+    }
+    const img = imgs[i];
+    if (!img || i === lastFrame) return;
+    lastFrame = i;
+    const [fx, fy] = String(focal).split(/\s+/).map((p) => (p?.endsWith("%") ? parseFloat(p) / 100 : 0.5));
+    const cw = canvas.width, ch = canvas.height;
+    const s = Math.max(cw / img.naturalWidth, ch / img.naturalHeight);
+    const w = img.naturalWidth * s, h = img.naturalHeight * s;
+    ctx.drawImage(img, (cw - w) * (fx ?? 0.5), (ch - h) * (fy ?? 0.5), w, h);
+  }
+
+  if (isIOS() && frames) startFrames(); else startVideo();
+  addEventListener("scroll", onScroll, { passive: true });
+  addEventListener("resize", onScroll, { passive: true });
+  target = smooth = position();
+  kick();
 }
 
 /* ----------------------------------------------------------------- scenes */
