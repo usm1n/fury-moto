@@ -3,6 +3,7 @@ import { config, getGuide, waLink, formatPrice } from "../core/config.js";
 import { esc, renderTemplate } from "../core/render.js";
 import { getProduct } from "../data/products.js";
 import { mdLite } from "../components/markdown.js";
+import { instagramEmbed, activateEmbeds } from "../components/instagram-strip.js";
 import { readingTime } from "./gear-doctor.js";
 
 const T = () => config.gearDoctor || {};
@@ -85,7 +86,7 @@ export default async function mount(el) {
       ${hero}${cover}
       <section class="section gd-article" data-reveal><div class="container gd-article__inner">
         <div class="gd-prose">${mdLite(guide.body)}</div>
-        ${guide.source ? `<p class="gd-source"><a class="btn btn--ghost" href="${esc(guide.source)}" target="_blank" rel="noopener noreferrer">${esc(g.source)}</a></p>` : ""}
+        ${guide.source ? `<div class="gd-source">${/instagram\.com\//.test(guide.source) && config.instagram?.embeds !== false ? `<div class="gd-source__embed">${instagramEmbed(guide.source, { account: "@fury_the_gear_doc" })}</div>` : ""}<p><a class="btn btn--ghost" href="${esc(guide.source)}" target="_blank" rel="noopener noreferrer">${esc(g.source)}</a></p></div>` : ""}
         <div class="gd-share"><span class="eyebrow">${esc(g.share)}</span>
           <a class="btn btn--ghost" target="_blank" rel="noopener noreferrer" href="${esc(waLink(`${guide.title} ${url}`))}">${esc(g.shareWhatsapp)}</a>
           <a class="btn btn--ghost" target="_blank" rel="noopener noreferrer" href="https://www.facebook.com/sharer/sharer.php?u=${enc(url)}">${esc(g.shareFacebook)}</a>
@@ -105,4 +106,5 @@ export default async function mount(el) {
       setTimeout(() => (copy.textContent = g.copyLink), 2000);
     } catch { /* ignore */ }
   });
+  activateEmbeds(el);   // the source reel, if the guide is based on one
 }

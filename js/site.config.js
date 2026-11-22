@@ -486,6 +486,8 @@ const config = {
     formErrorPhone: "Please enter a valid phone number.",
     formErrorMessage: "Please write a short message.",
     contactFaqTitle: "Quick answers",
+    igView: "View this post on Instagram",
+    igPost: "Instagram post",
   },
 
   /* --------------------------------------------------------------------------
@@ -1476,7 +1478,38 @@ Choose gloves with a protective palm, a CE rating and a fit you can live with. H
    * INSTAGRAM STRIP — latest posts shown on home + Gear Doctor.
    * Each { image, url, caption, account }. Generated from assets/instagram/manifest.json.
    * ------------------------------------------------------------------------ */
-  instagramPosts: [],
+  // How Instagram content is shown.
+  instagram: {
+    embeds: true,      // posts without an `image` show as Instagram's official embed (real post, plays reels).
+                       // false = never load Instagram's script; those posts become plain links instead.
+    embedCount: 6,     // max embeds in a strip (they're heavy: each is a full Instagram post)
+    stripCount: 8,     // max image tiles in a strip, once posts have downloaded `image` files
+  },
+  // Your posts. Newest first per account; the home strip alternates the two accounts.
+  //   url     : the post / reel link
+  //   account : "@fury__moto" or "@fury_the_gear_doc" (must match socials.instagram handles)
+  //   date    : YYYY-MM-DD if known
+  //   caption : short caption (used as alt text / fallback text)
+  //   image   : OPTIONAL path to a downloaded image/cover in assets/instagram/… -> shows a light
+  //             image tile instead of the embed. Fill these in after dropping your media files in.
+  instagramPosts: [
+    // Skipped on purpose (collabs with other creators, brief says own posts only): p/DTyGbAXE-Gb (with another account), reel/Df7itwqxl80 (with another rider).
+    { url: "https://www.instagram.com/reel/DfrdLg9R37w/", account: "@fury__moto", date: null, caption: "", image: "" },
+    { url: "https://www.instagram.com/reel/DfUlgkcRfGo/", account: "@fury__moto", date: null, caption: "", image: "" },
+    { url: "https://www.instagram.com/reel/DfR5GvAx_fx/", account: "@fury__moto", date: null, caption: "", image: "" },
+    { url: "https://www.instagram.com/reel/DfPbQZmRLe9/", account: "@fury__moto", date: null, caption: "", image: "" },
+    { url: "https://www.instagram.com/p/DfHVRRaEQuC/",    account: "@fury__moto", date: null, caption: "", image: "" },
+    { url: "https://www.instagram.com/reel/Dey98XiIHPE/", account: "@fury__moto", date: null, caption: "", image: "" },
+    // landscape reel: Instagram's embed draws it awkwardly, so it sits last (it only shows when there's room)
+    { url: "https://www.instagram.com/reel/Dfzk7X9x-ll/", account: "@fury__moto", date: null, caption: "", image: "" },
+    { url: "https://www.instagram.com/reel/DfhP8xDth6A/", account: "@fury_the_gear_doc", date: "2026-11-09", caption: "DOT vs FIM: which helmet is actually safer?", image: "" },
+    { url: "https://www.instagram.com/reel/DfXGz1ANrQI/", account: "@fury_the_gear_doc", date: "2026-11-05", caption: "Cowhide vs kangaroo leather for racing suits", image: "" },
+    { url: "https://www.instagram.com/reel/Deo2hpMNL9h/", account: "@fury_the_gear_doc", date: "2026-10-18", caption: "Seam strength is really important", image: "" },
+    { url: "https://www.instagram.com/reel/Dejg9DNth0X/", account: "@fury_the_gear_doc", date: "2026-10-16", caption: "CE Level 2 armour: does it stay in place?", image: "" },
+    { url: "https://www.instagram.com/reel/Deg4RHotNXf/", account: "@fury_the_gear_doc", date: "2026-10-15", caption: "Riding jacket for 1 lakh: is it actually safer?", image: "" },
+    { url: "https://www.instagram.com/reel/DebWdnaNZ-S/", account: "@fury_the_gear_doc", date: "2026-10-13", caption: "Hard knuckles, but are your gloves protective?", image: "" },
+    { url: "https://www.instagram.com/reel/DeY06pItxph/", account: "@fury_the_gear_doc", date: "2026-10-12", caption: "CE Level 2 armour, but is your jacket certified too?", image: "" },
+  ],
 
   testimonials: [
     { name: "[PLACEHOLDER: real customer] Ahmed R.", bike: "Suzuki GSX-R150", quote: "The WhatsApp sizing advice was spot on. The helmet felt right from the first ride, and the size chart matched what I actually wear.", rating: 5 },

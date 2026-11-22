@@ -38,7 +38,7 @@ Open `js/site.config.js`. Every field has a comment. Common edits:
 | Change a size chart | `sizeGuides.<category>` |
 | Change nav / footer links | `nav`, `footer` |
 | Change any button/label text | `ui`, or the page's section (`home`, `about`, `contact`, `gearDoctor`, `notFound`) |
-| Show Instagram posts | fill `instagramPosts` with `{ image, url, caption, account }`. While it's empty, the site shows "follow" cards for both accounts instead. |
+| Show Instagram posts | add `{ url, account, date, caption, image }` to `instagramPosts`. Posts without an `image` show as Instagram's official embed (the real post, reels play). Once you add a downloaded `image`, they become fast image tiles. `instagram.embeds: false` turns embeds off. With no posts at all, the site shows "follow" cards. |
 
 **Placeholders.** Anything still unknown is written `"[PLACEHOLDER: …]"`. With `devMode: true` (top of the config) every placeholder on the page gets a yellow dashed outline, and the browser console lists the remaining ones. **Set `devMode: false` before launch.**
 
@@ -101,11 +101,11 @@ Product data is read only through `js/data/products.js` (`getProducts()`, `getPr
 - `faqs`: delivery time, COD coverage, exchange window, authenticity answer
 - `products`: **all 28 are placeholders**. Models, prices, specs and certifications are realistic but unverified, and images are labelled placeholders in `assets/img/products/`.
 - `guides`: 8 drafts. The 4 reel-based guides were written from the reel titles only. Umair should review them all, especially **DOT vs FIM**.
-- `instagramPosts`: empty (see below)
+- `instagramPosts`: 14 posts shown as official embeds (7 per account). Add `image` paths after downloading the media (see below).
 
 **Media:**
 - `assets/source/fury_moto_2026-05-21_1.jpg`, `_2.jpg`, `fury_moto_2026-03-23_1–3.jpg`: the studio and haze photos from the brief haven't been added yet.
-- Instagram media couldn't be downloaded automatically (the browser tool blocks Instagram's media links). The post URLs to save by hand are listed in [`docs/INSTAGRAM_TODO_fury__moto.md`](docs/INSTAGRAM_TODO_fury__moto.md) and [`docs/INSTAGRAM_TODO_fury_the_gear_doc.md`](docs/INSTAGRAM_TODO_fury_the_gear_doc.md). Save them to `assets/instagram/<account>/`, run reels through `tools/media.sh`, and add them to `videos`/`instagramPosts`.
+- Instagram media couldn't be downloaded automatically (the browser tool blocks Instagram's media links). The site shows the posts as official embeds for now. To use the files across the site (tiles, About, guide covers, reels), follow [`docs/INSTAGRAM_TODO.md`](docs/INSTAGRAM_TODO.md): export or save the media into `assets/instagram/<account>/`, then ask Claude to process it.
 - Product photos to replace `assets/img/products/*`.
 
 **SEO:** after setting `store.siteUrl`, run `node tools/sitemap.mjs` (rebuilds `sitemap.xml`, `robots.txt`, `manifest.webmanifest`) and make the `og:image` URL in each page's `<head>` absolute.

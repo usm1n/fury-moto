@@ -117,3 +117,28 @@
 .gd-nav__title { font-family: var(--font-display); font-size: var(--fs-xl); text-transform: uppercase; }
 @media (min-width: 768px) { .gd-nav__inner { grid-template-columns: 1fr 1fr; } }
 .gd-notfound { padding-top: calc(var(--header-h) + var(--space-8)); min-height: 60vh; }
+
+/* ---------- official Instagram embeds (instagram-strip.js) ---------- */
+.igstrip--embeds .igstrip__item { flex: 0 0 min(340px, 86%); }
+.igstrip__item--embed { display: flex; }
+.igembed.instagram-media {
+  /* pre-script fallback card; Instagram's script replaces it with an iframe */
+  width: 100%; min-width: 0 !important; max-width: 540px; margin: 0 !important;
+  border: 1px solid var(--color-line) !important; border-radius: var(--radius) !important;
+  background: color-mix(in srgb, var(--color-surface) 80%, transparent) !important;
+  padding: 0 !important; box-shadow: none !important;
+}
+.igembed__fallback {
+  display: grid; gap: var(--space-2); align-content: end; min-height: 320px; padding: var(--space-5);
+  text-decoration: none; color: var(--color-text);
+}
+.igembed__acct { font-family: var(--font-display); font-size: var(--fs-xl); text-transform: uppercase; }
+.igembed__caption { color: var(--color-muted); }
+.igembed__cta { color: var(--color-accent); font-weight: 600; font-size: var(--fs-sm); letter-spacing: 0.06em; text-transform: uppercase; }
+.igstrip__item--embed iframe.instagram-media { border-radius: var(--radius) !important; min-width: 0 !important; }
+.igstrip__more { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-5); }
+@media (min-width: 900px) {
+  .igstrip--embeds .igstrip__list { grid-template-columns: repeat(3, 1fr); align-items: start; }
+}
+.gd-source { display: grid; gap: var(--space-4); justify-items: start; }
+.gd-source__embed { width: min(100%, 420px); }

@@ -2,7 +2,7 @@
 import { config, waLink, getVideo } from "../core/config.js";
 import { html, raw, esc, renderTemplate } from "../core/render.js";
 import { refresh } from "../core/app.js";
-import { instagramStrip } from "../components/instagram-strip.js";
+import { instagramStrip, activateEmbeds } from "../components/instagram-strip.js";
 
 const T = () => config.gearDoctor || {};
 const guides = () => config.guides || [];
@@ -74,7 +74,7 @@ export default async function mount(el) {
       </div>
     </section>
     <section class="section gd-ig" data-reveal>
-      <div class="container">${instagramStrip(config.instagramPosts, { title: config.home?.instagramTitle })}</div>
+      <div class="container">${instagramStrip(config.instagramPosts, { title: config.home?.instagramTitle, account: "@fury_the_gear_doc" })}</div>
     </section>
     <section class="section gd-cta" data-reveal data-scene="feature">
       <div class="container gd-cta__inner">
@@ -84,6 +84,7 @@ export default async function mount(el) {
       </div>
     </section>`);
 
+  activateEmbeds(el);
   const results = el.querySelector(".gd-results");
   el.querySelector(".gd-filters").addEventListener("click", (e) => {
     const b = e.target.closest("[data-type]");
