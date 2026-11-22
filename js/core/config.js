@@ -73,7 +73,9 @@ export const formatPrice = (n) => `${config.store?.currencySymbol || "Rs"} ${nf.
 
 /** wa.me link with pre-filled message. Returns "#" if the number is still a placeholder. */
 export function waLink(message = "") {
-  const num = String(config.store?.whatsapp || "").replace(/\D/g, "");
+  // Never pull digits out of a "[PLACEHOLDER: … e.g. 923001234567]" string — that would message a stranger.
+  const rawNum = config.store?.whatsapp;
+  const num = isPlaceholder(rawNum) ? "" : String(rawNum || "").replace(/\D/g, "");
   const base = num ? `https://wa.me/${num}` : "https://wa.me/";
   return message ? `${base}?text=${encodeURIComponent(message)}` : base;
 }
