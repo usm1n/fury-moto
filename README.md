@@ -53,6 +53,16 @@ Open `js/site.config.js`. Every field has a comment. Common edits:
 3. Add an entry to `videos` in the config. Copy the `rider-hero` entry and replace `rider-hero` with `<name>` in every path.
 4. Assign it in `videoSlots`: set `videoId: "<name>"` on whichever section should use it. You can also change a section's `mode` (`background` · `scrub` · `card` · `inline` · `none`), `overlayOpacity`, `focalPoint`, `start` or `playbackRate`. No code edits are needed.
 
+### The site-wide backdrop (motion design)
+One video plays as a **fixed, full-screen background behind every page** (`backdrop` in the config). As visitors scroll, each section changes the backdrop with a **scene** that is tweened smoothly: zoom, drift, blur, darkness, saturation and red tint. `hero` is sharp, `feature` (call-to-action band, page headers) zooms in, `content` is softer, `shelf` (product grids) is calmest, and `footer` gets a red glow. On top of that:
+- the video drifts as you scroll and follows the mouse on desktop
+- a light sweep crosses it every few seconds
+- a red progress line runs along the top
+- a tagline ticker speeds up and skews with scroll speed
+- headlines reveal word by word
+
+Change scenes or motion in `backdrop.scenes`, `backdrop.sceneMap` and `backdrop.motion`. Point `backdrop.videoId` at any clip in `videos`, or set `enabled: false` to switch it off. Visitors with reduced motion or Save-Data get the poster still with no movement.
+
 Video sections: `hero` · `built-for-ride` · `category-cards` · `shop-header` · `product-gallery` (uses `product.video`) · `gear-doctor-header` · `cta-band` · `about` · `footer` · `404`.
 The engine lazy-loads videos, never plays more than 2 at once, and shows posters only for reduced-motion or Save-Data visitors. On desktop the hero shows the 9:16 clip as a framed panel over a blurred fill, so there are no black bars.
 

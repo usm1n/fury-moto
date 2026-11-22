@@ -117,17 +117,73 @@ const config = {
    *   start          : optional start offset in seconds (use a different moment of the same clip)
    *   playbackRate   : optional, e.g. 0.6 for slow footer loop
    * ------------------------------------------------------------------------ */
+  /* --------------------------------------------------------------------------
+   * BACKDROP — one fixed, full-screen video behind the WHOLE site, on every page.
+   * As the visitor scrolls, each section "directs" the backdrop with a scene
+   * (zoom, blur, darkness, colour, red tint, drift), so the same footage keeps
+   * moving and changing under the content. Sections with mode "none" below are
+   * see-through windows onto this backdrop.
+   *   enabled     : false = no site-wide video (sections fall back to their own slots)
+   *   videoId     : an id from `videos`
+   *   pages       : "all" or a list of page names, e.g. ["home","shop"]
+   *   scenes      : named looks. Values: scale (1 = fit), x / y (% drift), blur (px),
+   *                 dim (0–1 darkness over the video), saturate, brightness, tint (0–1 red glow).
+   *                 Add `desktop: { … }` inside a scene to override values on wide screens.
+   *   sceneMap    : which scene a section uses, keyed by its data-video-slot name
+   *                 (or data-scene="<name>" on any element). Anything else uses `defaultScene`.
+   *   motion      : the motion-design layer on top. Each switch can be turned off.
+   * ------------------------------------------------------------------------ */
+  backdrop: {
+    enabled: true,
+    videoId: "rider-hero",
+    pages: "all",
+    focalPoint: "50% 30%",
+    defaultScene: "content",
+    scenes: {
+      hero:    { scale: 1.0,  x: 0,  y: 0,  blur: 0,  dim: 0.30, saturate: 1.15, brightness: 1,    tint: 0.15,
+                 desktop: { scale: 1.15, blur: 14, dim: 0.55, tint: 0.25 } },   // desktop: soft fill behind the framed 9:16 panel
+      feature: { scale: 1.08, x: -2, y: -4, blur: 0,  dim: 0.55, saturate: 1.05, brightness: 0.95, tint: 0.35 },
+      content: { scale: 1.18, x: 2,  y: 4,  blur: 5,  dim: 0.68, saturate: 0.85, brightness: 0.9,  tint: 0.12 },
+      shelf:   { scale: 1.25, x: 0,  y: 8,  blur: 10, dim: 0.80, saturate: 0.6,  brightness: 0.85, tint: 0.05 }, // product grids — calmest
+      footer:  { scale: 1.32, x: 0,  y: -6, blur: 6,  dim: 0.82, saturate: 0.8,  brightness: 0.8,  tint: 0.45 },
+    },
+    sceneMap: {
+      "hero": "hero",
+      "shop-header": "feature",
+      "gear-doctor-header": "feature",
+      "cta-band": "feature",
+      "about": "feature",
+      "404": "hero",
+      "footer": "footer",
+    },
+    motion: {
+      sceneDuration: 1.4,     // seconds a scene change takes
+      scrollDrift: 6,         // % the video drifts vertically across the whole page scroll (parallax)
+      pointerParallax: 14,    // px the video follows the mouse on desktop (0 = off)
+      lightSweep: true,       // slow diagonal light streak across the video
+      progressBar: true,      // thin red scroll-progress line at the top
+      splitHeadlines: true,   // section headlines reveal word by word
+      marquee: {              // tagline ticker over the video; speeds up with scroll velocity
+        enabled: true,
+        pages: ["home", "gear-doctor", "about"],
+        after: "first",       // insert after the first section of the page
+        items: ["Ride. Learn. Repeat.", "Know your gear before you ride.", "Gear explained simply.", "Fury Moto × The Gear Doctor"],
+      },
+    },
+  },
+
   videoSlots: [
-    { section: "hero",          videoId: "rider-hero", mode: "background", overlayOpacity: 0.45, mobileMode: "background", desktopMode: "background" },
+    // mode "none" = no separate video; the section is a window onto the site-wide backdrop above.
+    { section: "hero",          videoId: "rider-hero", mode: "background", overlayOpacity: 0,    mobileMode: "none", desktopMode: "background" }, // desktop: framed 9:16 panel over the backdrop
     { section: "built-for-ride",videoId: "rider-hero", mode: "scrub",      overlayOpacity: 0.55 },
     { section: "category-cards",videoId: "rider-hero", mode: "card",       overlayOpacity: 0.35 },
-    { section: "shop-header",   videoId: "rider-hero", mode: "background", overlayOpacity: 0.7, focalPoint: "50% 20%", start: 2 },
+    { section: "shop-header",   videoId: "rider-hero", mode: "none",       overlayOpacity: 0.7, focalPoint: "50% 20%", start: 2 },
     { section: "product-gallery", videoId: null,       mode: "inline",     overlayOpacity: 0 }, // uses product.video
-    { section: "gear-doctor-header", videoId: "rider-hero", mode: "background", overlayOpacity: 0.65, focalPoint: "50% 25%", start: 4 },
-    { section: "cta-band",      videoId: "rider-hero", mode: "background", overlayOpacity: 0.7, start: 3 },
-    { section: "about",         videoId: "rider-hero", mode: "scrub",      overlayOpacity: 0.55, mobileMode: "background" },
-    { section: "footer",        videoId: "rider-hero", mode: "background", overlayOpacity: 0.85, playbackRate: 0.6, start: 5 },
-    { section: "404",           videoId: "rider-hero", mode: "background", overlayOpacity: 0.7 },
+    { section: "gear-doctor-header", videoId: "rider-hero", mode: "none",  overlayOpacity: 0.65, focalPoint: "50% 25%", start: 4 },
+    { section: "cta-band",      videoId: "rider-hero", mode: "none",       overlayOpacity: 0.7, start: 3 },
+    { section: "about",         videoId: "rider-hero", mode: "scrub",      overlayOpacity: 0.55, mobileMode: "none" },
+    { section: "footer",        videoId: "rider-hero", mode: "none",       overlayOpacity: 0.85, playbackRate: 0.6, start: 5 },
+    { section: "404",           videoId: "rider-hero", mode: "none",       overlayOpacity: 0.7 },
   ],
 
   /* --------------------------------------------------------------------------

@@ -221,13 +221,20 @@ function createPlayer(el, opts) {
     media.replaceChildren();
     const alt = mode === "inline" ? video.alt || "" : "";
     if (panel) {
-      fillHost = document.createElement("div");
-      fillHost.className = "vslot__fill";
-      fillHost.append(buildPoster(video, { focal, priority: !!opts.priority, className: "vslot__poster vslot__poster--blur" }));
+      // With the site-wide backdrop (js/core/backdrop.js) the backdrop itself is the fill — don't load a second one.
+      const backdrop = document.documentElement.classList.contains("has-backdrop");
       mainHost = document.createElement("div");
       mainHost.className = "vslot__panel";
       mainHost.append(buildPoster(video, { focal, alt, priority: !!opts.priority }));
-      media.append(fillHost, mainHost);
+      if (backdrop) {
+        fillHost = null;
+        media.append(mainHost);
+      } else {
+        fillHost = document.createElement("div");
+        fillHost.className = "vslot__fill";
+        fillHost.append(buildPoster(video, { focal, priority: !!opts.priority, className: "vslot__poster vslot__poster--blur" }));
+        media.append(fillHost, mainHost);
+      }
     } else {
       fillHost = null;
       mainHost = media;

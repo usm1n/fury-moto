@@ -32,3 +32,9 @@
 - **Bug fixed:** `waLink()` extracted the example digits from the WhatsApp placeholder and linked `wa.me/923001234567`; placeholders now produce a recipient-less link.
 - Verified at 1920 (desktop) and 375/768 (iframe harness `dev/viewports.html`): no horizontal overflow, no console errors, no images without alt, ≤ 2 videos playing, scrub pins and beats, card videos, add-to-cart → drawer → localStorage persistence → WhatsApp message.
 - README written.
+
+## Change request — video as the site-wide background with motion design (Orchestrator, HIGH / opus)
+- New `js/core/backdrop.js` + `config.backdrop`: one fixed full-screen video behind every page; per-section scenes (scale/drift/blur/dim/saturate/brightness/red tint) tweened with GSAP as sections cross mid-viewport; scroll parallax, pointer parallax, light sweep, scroll progress line, velocity-reactive tagline marquee, word-by-word headline reveals. Reduced motion / Save-Data → poster, no movement.
+- `videoSlots`: shop-header, gear-doctor-header, cta-band, footer, 404 → `none` (windows onto the backdrop); hero mobile → `none`, desktop keeps the framed 9:16 panel (its blur fill is skipped when the backdrop is on); about mobile → `none`. Budget: backdrop priority 90 + hero panel 100 → still ≤ 2 playing.
+- CSS: backdrop layer at z-index −1; full-bleed slot media and solid page headers made transparent; testimonial / contact / FAQ / follow cards turned to frosted glass over the video.
+- Verified desktop + 375/768 on home, shop, gear-doctor, about: backdrop visible throughout, scenes switch (hero → feature → content/shelf → footer), no console errors, no horizontal overflow.

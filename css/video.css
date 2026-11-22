@@ -124,3 +124,101 @@ html.reduced-motion .vslot--card .vslot__media img { transition: none; transform
 @media (prefers-reduced-motion: reduce) {
   .vslot__media video, .vslot__media canvas, .vslot__toggle svg { transition: none; }
 }
+
+/* =====================================================================
+ * SITE-WIDE BACKDROP + MOTION LAYER (js/core/backdrop.js)
+ * ===================================================================== */
+.backdrop {
+  position: fixed; inset: 0; z-index: -1;            /* behind all in-flow content, above the page colour */
+  overflow: hidden; pointer-events: none;
+  background: var(--color-bg);
+}
+.backdrop__drift { position: absolute; inset: -8%; will-change: transform; }
+.backdrop__stage.backdrop__stage {
+  position: absolute; inset: 0;
+  transform-origin: 50% 40%;
+  will-change: transform, filter;
+}
+.backdrop__stage .vslot__overlay { display: none; }
+.backdrop__dim { position: absolute; inset: 0; background: rgb(var(--color-overlay)); opacity: 0.6; }
+.backdrop__tint {
+  position: absolute; inset: 0; opacity: 0; mix-blend-mode: screen;
+  background:
+    radial-gradient(110% 70% at 85% 0%, color-mix(in srgb, var(--color-accent) 70%, transparent), transparent 60%),
+    radial-gradient(90% 60% at 0% 100%, color-mix(in srgb, var(--color-accent) 45%, transparent), transparent 65%);
+}
+.backdrop__vignette {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse 120% 90% at 50% 45%, transparent 45%, rgba(var(--color-overlay), 0.85) 100%);
+}
+.backdrop__sweep { display: none; }
+html.has-sweep .backdrop__sweep {
+  display: block; position: absolute; inset: -50%; mix-blend-mode: screen;
+  background: linear-gradient(105deg, transparent 42%, rgba(255, 255, 255, 0.06) 47.5%,
+    color-mix(in srgb, var(--color-accent) 22%, transparent) 50%, transparent 56%);
+  animation: backdrop-sweep 12s cubic-bezier(0.6, 0, 0.3, 1) infinite;
+}
+@keyframes backdrop-sweep {
+  0%, 60% { transform: translateX(-55%); }
+  100% { transform: translateX(55%); }
+}
+
+/* sections that used to carry their own video are now windows onto the backdrop */
+html.has-backdrop footer[data-video-slot],
+html.has-backdrop .contact-head { background: transparent; }
+
+/* scroll progress line */
+.backdrop-progress {
+  position: fixed; top: 0; left: 0; right: 0; height: 2px; z-index: calc(var(--z-header) + 5);
+  background: var(--color-accent); box-shadow: 0 0 12px var(--color-accent);
+  transform: scaleX(0); transform-origin: 0 50%; pointer-events: none;
+}
+
+/* tagline marquee */
+.marquee {
+  position: relative; overflow: hidden;
+  padding-block: var(--space-5);
+  border-block: 1px solid var(--color-line);
+  background: color-mix(in srgb, var(--color-bg) 30%, transparent);
+  -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+}
+.marquee__track { display: flex; width: max-content; will-change: transform; }
+.marquee__item {
+  display: inline-flex; align-items: center; gap: var(--space-6); padding-right: var(--space-6);
+  font-family: var(--font-display); font-size: var(--fs-2xl); line-height: 1; text-transform: uppercase; white-space: nowrap;
+  color: transparent; -webkit-text-stroke: 1px color-mix(in srgb, var(--color-text) 75%, transparent);
+}
+.marquee__item:nth-child(odd) { color: var(--color-text); -webkit-text-stroke: 0; }
+.marquee__item::after {
+  content: ""; width: 0.32em; height: 0.32em; border-radius: 50%;
+  background: var(--color-accent); box-shadow: 0 0 14px var(--color-accent);
+}
+
+/* word-by-word headline reveal */
+.sw { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: 0.08em; margin-bottom: -0.08em; }
+.sw__i { display: inline-block; transform-origin: 0 100%; will-change: transform; }
+
+@media (prefers-reduced-motion: reduce) {
+  html.has-sweep .backdrop__sweep { animation: none; display: none; }
+}
+
+/* With the backdrop on, a full-bleed slot's media box must not paint a solid colour over it
+   (cards/inline/panel keep their own surface colour as a loading placeholder). */
+html.has-backdrop .vslot--background > .vslot__media { background: transparent; }
+html.has-backdrop .vslot--panel > .vslot__overlay { opacity: 0.6; }
+
+/* page headers & bands that were painted solid now let the backdrop through */
+html.has-backdrop .shop-head,
+html.has-backdrop .gd-hero,
+html.has-backdrop .gd-header,
+html.has-backdrop [data-video-slot="gear-doctor-header"],
+html.has-backdrop .gd-cta { background: transparent; }
+/* surfaces sitting on the video read as glass rather than flat boxes */
+html.has-backdrop .testimonial,
+html.has-backdrop .igstrip__follow,
+html.has-backdrop .c-card,
+html.has-backdrop .c-form,
+html.has-backdrop .faq__list {
+  background: color-mix(in srgb, var(--color-surface) 72%, transparent);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}

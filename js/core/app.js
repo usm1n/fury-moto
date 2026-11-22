@@ -17,6 +17,7 @@
  */
 import { config, applyTheme, markPlaceholders, reportPlaceholders } from "./config.js";
 import { mountSlots } from "./slots.js";
+import { mountBackdrop, initMotionLayer } from "./backdrop.js";
 import { prefersReducedMotion } from "./manager.js";
 import "../data/cart.js"; // registers cart:add listener on every page
 
@@ -40,6 +41,7 @@ export async function boot(page) {
   if (prefersReducedMotion()) root.classList.add("reduced-motion");
   if (!window.gsap) root.classList.add("no-gsap");
   if (window.gsap && window.ScrollTrigger) window.gsap.registerPlugin(window.ScrollTrigger);
+  mountBackdrop(page); // site-wide video behind everything; must exist before slots mount
 
   if (!document.title) document.title = config.seo?.defaultTitle || config.store?.name || "";
   // static ui.* bindings in page shells (skip link etc.)
@@ -56,6 +58,7 @@ export async function boot(page) {
 
   mountSlots(document);
   initMotion();
+  initMotionLayer(page);
   markPlaceholders(document.body);
   reportPlaceholders();
   document.dispatchEvent(new CustomEvent("app:ready", { detail: { page } }));
