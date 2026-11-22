@@ -26,6 +26,8 @@ const waiters = new Map(); // video -> { priority, retry }
 let flushQueued = false;
 
 export function prefersReducedMotion() {
+  // ?reduced-motion=1 forces it (QA: lets automated tests check the reduced-motion path)
+  if (/[?&]reduced-motion=1\b/.test(location.search)) return true;
   return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 }
 

@@ -134,7 +134,7 @@ const config = {
     },
 
     // Layout of the uncropped 9:16 frame.
-    desktopAlign: "right", // wide screens: "right" (headline on the left) or "center"
+    desktopAlign: "right", // wide screens: "right" = frame flush with the right edge (headline on the left), or "center"
     blurFill: {            // the blurred copy of the frame that fills the rest of the screen
       blur: 40,            // softness in px
       darken: 0.6,         // 0 = as bright as the frame, 1 = black

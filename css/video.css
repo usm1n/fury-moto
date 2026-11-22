@@ -82,6 +82,7 @@ html.reduced-motion .vslot--card .vslot__media img { transition: none; transform
 .backdrop__canvas {
   position: absolute; top: -32px; left: -32px;       /* matches MARGIN in backdrop.js */
   width: calc(100% + 64px); height: calc(100% + 64px);
+  max-width: none;                                    /* base.css caps canvas at 100% — that would squash the frame */
   will-change: filter;
 }
 .backdrop__dim { position: absolute; inset: 0; background: rgb(var(--color-overlay)); opacity: 0.3; }

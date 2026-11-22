@@ -229,12 +229,7 @@ function draw(want) {
   if (landscape) {
     h = H; w = h * (iw / ih); y = 0;
     if (b.desktopAlign === "center") x = (W - w) / 2;
-    else {
-      // right-align with the page container's right edge (matches header/content gutters)
-      const gutter = Math.min(40, Math.max(16, 8 + 0.025 * W));
-      const containerRight = (W + Math.min(W - 2 * gutter, 1320)) / 2;
-      x = Math.max(0, containerRight - w);
-    }
+    else x = Math.max(0, W - w);           // "right": flush with the right edge of the screen
   } else {
     const s = Math.min(W / iw, H / ih);   // contain: the whole frame is always visible
     w = iw * s; h = ih * s; x = (W - w) / 2; y = (H - h) / 2;
@@ -251,8 +246,9 @@ function draw(want) {
 }
 
 function sizeCanvas() {
-  B.W = innerWidth;
-  B.H = innerHeight;
+  // the layout viewport (excludes the scrollbar) — must match the CSS box the canvas fills
+  B.W = document.documentElement.clientWidth || innerWidth;
+  B.H = document.documentElement.clientHeight || innerHeight;
   B.dpr = Math.min(devicePixelRatio || 1, 1.5);
   B.canvas.width = Math.round((B.W + 2 * MARGIN) * B.dpr);
   B.canvas.height = Math.round((B.H + 2 * MARGIN) * B.dpr);
