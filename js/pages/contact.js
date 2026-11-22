@@ -19,7 +19,7 @@ export default function mount(main) {
   const field = (id, label, control) => html`<div class="field"><label for="${id}">${label}</label>${control}<p class="field__err" id="${id}-err" role="alert"></p></div>`;
 
   renderTemplate(main, html`
-    <section class="section contact-head" data-video-slot="shop-header" data-reveal>
+    <section class="section contact-head" data-scene="feature" data-reveal>
       <div class="container stack">
         <p class="eyebrow">${ui.contactEyebrow}</p>
         <h1>${contact.title}</h1>

@@ -59,15 +59,24 @@
 .cat-tile__arrow { margin-left: auto; color: var(--color-accent); font-size: var(--fs-lg); transition: transform var(--dur-fast); }
 .cat-tile:hover .cat-tile__arrow { transform: translateX(4px); }
 
-/* ---------- built for the ride (scrub) ---------- */
-.ride { min-height: 100svh; display: flex; align-items: center; }
-.ride__inner { padding-block: var(--space-9); }
-.ride__title { font-size: var(--fs-3xl); max-width: 10ch; margin-bottom: var(--space-7); }
-.ride__beats { display: grid; gap: var(--space-6); max-width: 520px; }
-.ride__beat { border-left: 2px solid var(--color-accent); padding-left: var(--space-5); }
-.ride__beat h3 { font-size: var(--fs-2xl); }
-.ride__beat p { color: color-mix(in srgb, var(--color-text) 85%, transparent); margin-top: var(--space-2); }
-.ride__num { font-size: var(--fs-xs); letter-spacing: 0.2em; color: var(--color-accent); font-weight: 700; }
+/* ---------- built for the ride: sections scrolling over the backdrop ---------- */
+.beat { min-height: 90svh; display: flex; align-items: center; padding-block: var(--space-8); }
+.beat--intro { min-height: 60svh; }
+.beat__title { font-size: var(--fs-hero); line-height: 0.88; max-width: 9ch; text-shadow: 0 6px 40px rgba(0, 0, 0, 0.6); }
+.beat__panel {
+  max-width: 520px; padding: var(--space-6);
+  border-left: 2px solid var(--color-accent); border-radius: 0 var(--radius) var(--radius) 0;
+  background: linear-gradient(90deg, rgba(var(--color-overlay), 0.82), rgba(var(--color-overlay), 0.55));
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+.beat:nth-of-type(odd) .beat__panel { margin-left: auto; }   /* alternate sides as you scroll */
+.beat__panel h3 { font-size: var(--fs-3xl); }
+.beat__panel p { color: color-mix(in srgb, var(--color-text) 88%, transparent); margin-top: var(--space-3); font-size: var(--fs-lg); }
+.beat__num { font-size: var(--fs-xs); letter-spacing: 0.2em; color: var(--color-accent); font-weight: 700; }
+@media (min-width: 900px) and (orientation: landscape) {
+  /* the 9:16 frame sits on the right on desktop: keep beat panels on the left so the rider stays visible */
+  .beat:nth-of-type(odd) .beat__panel { margin-left: 0; }
+}
 
 /* ---------- featured ---------- */
 .featured__grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-4); }

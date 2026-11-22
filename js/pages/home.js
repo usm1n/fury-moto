@@ -1,6 +1,6 @@
 /** Homepage. All copy from config.home / config.store; sections hide themselves when their data is empty. */
 import { config, waLink } from "../core/config.js";
-import { html, raw, esc, renderList, text } from "../core/render.js";
+import { html, raw, esc, renderList, renderTemplate, text } from "../core/render.js";
 import { getProducts } from "../data/products.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -36,14 +36,22 @@ export default async function mount(main) {
       <span class="cat-tile__arrow" aria-hidden="true">→</span>
     </a>`);
 
-  // ---- built for the ride (scrub)
-  text(h("rideTitle"), home.builtForRide.title);
-  renderList(h("beats"), home.builtForRide.beats, (b, i) => html`
-    <div class="ride__beat" data-beat>
-      <span class="ride__num">0${i + 1}</span>
-      <h3>${b.title}</h3>
-      <p>${b.text}</p>
-    </div>`);
+  // ---- built for the ride: an intro section + one section per beat, each scrolling over the backdrop
+  const ride = home.builtForRide;
+  renderTemplate(h("beats"), html`
+    <section class="beat beat--intro" data-scene="feature" aria-labelledby="ride-title">
+      <div class="container"><h2 id="ride-title" class="beat__title">${ride.title}</h2></div>
+    </section>
+    ${ride.beats.map((b, i) => html`
+      <section class="beat" data-scene="feature" aria-labelledby="beat-${i}">
+        <div class="container">
+          <div class="beat__panel" data-reveal>
+            <span class="beat__num">0${i + 1}</span>
+            <h3 id="beat-${i}">${b.title}</h3>
+            <p>${b.text}</p>
+          </div>
+        </div>
+      </section>`)}`);
 
   // ---- featured products
   text(h("featuredTitle"), home.featuredTitle);

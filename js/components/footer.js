@@ -43,7 +43,7 @@ export default function mount(el) {
   const linkCols = cols.map((c, i) => column(c.title, html`<ul class="footer__list">${c.links.map((l) => html`<li><a href="${l.href}">${l.label}</a></li>`)}</ul>`, i));
 
   renderTemplate(el, html`
-    <footer class="footer" data-video-slot="footer">
+    <footer class="footer" data-scene="footer">
       <div class="container footer__inner">
         <div class="footer__brand" data-reveal>
           <p class="footer__name display">${store.name}</p>

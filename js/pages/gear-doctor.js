@@ -57,7 +57,7 @@ export default async function mount(el) {
   document.querySelector('meta[name="description"]')?.setAttribute("content", t.intro || seo.description || "");
 
   renderTemplate(el, `
-    <section class="gd-header" data-video-slot="gear-doctor-header">
+    <section class="gd-header" data-scene="feature">
       <div class="container gd-header__inner">
         <p class="eyebrow">${esc(t.eyebrow)}</p>
         <h1>${esc(t.title)}</h1>
@@ -76,7 +76,7 @@ export default async function mount(el) {
     <section class="section gd-ig" data-reveal>
       <div class="container">${instagramStrip(config.instagramPosts, { title: config.home?.instagramTitle })}</div>
     </section>
-    <section class="section gd-cta" data-reveal data-video-slot="cta-band">
+    <section class="section gd-cta" data-reveal data-scene="feature">
       <div class="container gd-cta__inner">
         <h2>${esc(t.cta?.title)}</h2>
         <p>${esc(t.cta?.text)}</p>

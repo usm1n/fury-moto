@@ -1,355 +1,353 @@
 /**
- * SITE-WIDE BACKDROP + MOTION LAYER
+ * SCROLL-DRIVEN BACKDROP (canvas image sequence) + motion layer
  * ----------------------------------------------------------------------------
- * One fixed, full-screen video behind every page (config.backdrop). Each section
- * the visitor scrolls into "directs" it with a scene — zoom, drift, blur, darkness,
- * saturation, red tint — tweened smoothly, so the footage keeps moving under the
- * content. On top: scroll parallax, pointer parallax, a light sweep, a scroll
- * progress line, a velocity-reactive tagline marquee and word-by-word headlines.
+ * The 9:16 rider clip, pre-extracted to WebP frames (docs/MEDIA.md), is drawn on
+ * ONE fixed full-screen <canvas> behind every page. Scroll position = timeline:
+ *   page top -> frame 1 (still), scroll down -> forward, up -> backward,
+ *   stop -> hold, page bottom -> last frame. Light lerp smoothing.
  *
- *   mountBackdrop(page)   -> call BEFORE mountSlots (hero panel checks html.has-backdrop)
- *   initMotionLayer(page) -> call AFTER the page has rendered (needs sections/headlines)
+ * Layout never crops the 9:16 frame:
+ *   - portrait screens: frame drawn "contain" (full frame visible, centred)
+ *   - landscape screens: frame at full viewport height, aligned per
+ *     config.backdrop.desktopAlign ("right" | "center")
+ *   - everywhere else on the canvas: a blurred, darkened, scaled-up copy of the
+ *     SAME current frame (so it scrubs too) — no black bars. Mouse parallax moves
+ *     this fill only; the main frame never moves.
  *
- * Everything reads config.backdrop; set enabled:false to switch it all off.
- * Reduced motion / Save-Data: poster still only, scenes switch instantly, no drift,
- * sweep, marquee movement or split headlines.
+ * Section looks (config.backdrop.scenes) may only change brightness, blur, dim and
+ * red tint. Sections pick one with data-scene="<name>".
+ *
+ *   mountBackdrop(page)   -> before page modules render (sets html.has-backdrop)
+ *   initMotionLayer(page) -> after the page has rendered (scenes, marquee, headlines)
+ *
+ * Reduced motion / Save-Data: only `stillFrame` is loaded and drawn; no scrubbing.
  */
-import { config, getVideo } from "./config.js";
-import { VideoBg, buildPoster, makeVideo } from "./video-bg.js";
-import { frameUrl } from "./video-scrub.js";
-import { canPlayMotion, isDesktop, hoverCapable, prefersReducedMotion, isIOS } from "./manager.js";
+import { config } from "./config.js";
+import { prefersReducedMotion, saveData, isDesktop, hoverCapable } from "./manager.js";
 
-const KEYS = ["scale", "x", "y", "blur", "dim", "saturate", "brightness", "tint"];
-const NEUTRAL = { scale: 1.1, x: 0, y: 0, blur: 0, dim: 0.6, saturate: 1, brightness: 1, tint: 0 };
-
-let els = null;          // { root, drift, stage, dim, tint, progress }
-let state = null;        // current numeric scene values
-let currentScene = null;
-let tween = null;
+const SCENE_KEYS = ["brightness", "blur", "dim", "tint"];
+const SCENE_NEUTRAL = { brightness: 1, blur: 0, dim: 0.3, tint: 0 };
+const MARGIN = 32;             // css px the canvas extends past the viewport, so CSS blur never shows edges
 
 const cfg = () => config.backdrop || {};
 const motionCfg = () => cfg().motion || {};
 const gsap = () => window.gsap || null;
-const animated = () => !prefersReducedMotion() && canPlayMotion();
+const still = () => prefersReducedMotion() || saveData();
+const clamp01 = (n) => Math.min(1, Math.max(0, n));
 
-function activeOn(page) {
-  const b = cfg();
-  if (!b.enabled || !getVideo(b.videoId)) return false;
-  return b.pages === "all" || (Array.isArray(b.pages) && b.pages.includes(page));
-}
+let B = null;                  // engine state, null when the backdrop is off
 
-/* ------------------------------------------------------------------ mount */
+/* ======================================================================= mount */
 
 export function mountBackdrop(page) {
-  if (els || !activeOn(page)) return null;
+  if (B) return B;
   const b = cfg();
-  const video = getVideo(b.videoId);
+  if (!b.enabled || !b.frames?.count) return null;
+  if (b.pages !== "all" && !(Array.isArray(b.pages) && b.pages.includes(page))) return null;
+
   const html = document.documentElement;
   html.classList.add("has-backdrop");
-  if (motionCfg().lightSweep && animated()) html.classList.add("has-sweep");
+  if (motionCfg().lightSweep && !still()) html.classList.add("has-sweep");
 
   const root = document.createElement("div");
   root.className = "backdrop";
-  root.setAttribute("aria-hidden", "true");
   root.innerHTML =
-    '<div class="backdrop__drift"><div class="backdrop__stage"></div></div>' +
-    '<div class="backdrop__tint"></div><div class="backdrop__dim"></div>' +
-    '<div class="backdrop__sweep"></div><div class="backdrop__vignette"></div>';
+    '<canvas class="backdrop__canvas" role="img"></canvas>' +
+    '<div class="backdrop__tint" aria-hidden="true"></div><div class="backdrop__dim" aria-hidden="true"></div>' +
+    '<div class="backdrop__sweep" aria-hidden="true"></div><div class="backdrop__vignette" aria-hidden="true"></div>';
   document.body.prepend(root);
+  const canvas = root.querySelector("canvas");
+  if (b.alt) canvas.setAttribute("aria-label", b.alt);
+  else canvas.setAttribute("aria-hidden", "true");
 
-  els = {
-    root,
-    drift: root.querySelector(".backdrop__drift"),
-    stage: root.querySelector(".backdrop__stage"),
+  B = {
+    root, canvas,
+    ctx: canvas.getContext("2d", { alpha: false }),
+    small: document.createElement("canvas"),         // downscaled copy -> cheap, smooth blur fill
     dim: root.querySelector(".backdrop__dim"),
     tint: root.querySelector(".backdrop__tint"),
-    progress: null,
+    count: b.frames.count,
+    pattern: pickFrameSet(b.frames),
+    imgs: new Array(b.frames.count),
+    target: 0, smooth: 0,                            // position in the clip, 0..1
+    drawn: -1, dirty: true,
+    px: 0, py: 0, tpx: 0, tpy: 0,                    // pointer parallax (fill only), current/target
+    raf: 0, lastT: 0,
+    scene: { ...SCENE_NEUTRAL, ...resolveScene(b.defaultScene) },
+    sceneName: null, sceneTween: null,
+    W: 0, H: 0, dpr: 1,
   };
+  B.sctx = B.small.getContext("2d");
 
-  if (b.playback === "scroll" && animated() && (video.scrubMp4 || video.frames)) {
-    // Video frames follow the scroll position. Never calls play(), so it doesn't use the 2-video budget.
-    mountScrollVideo(els.stage, video, b);
+  sizeCanvas();
+  applyScene();
+  addEventListener("resize", onResize, { passive: true });
+
+  if (still()) {
+    const i = Math.min(B.count, Math.max(1, Number(b.stillFrame) || 1)) - 1;
+    B.target = B.smooth = B.count > 1 ? i / (B.count - 1) : 0;
+    loadFrames([i]);
   } else {
-    // Autoplay loop. The engine handles lazy load, poster, reduced-motion and the 2-video budget.
-    // Priority 90: above cards/inline (60/80), below the hero panel (100).
-    VideoBg.mount(els.stage, {
-      video, mode: "background", overlayOpacity: 0, focalPoint: b.focalPoint || video.focalPoint,
-      priority: true, playPriority: 90,
-    });
+    B.target = B.smooth = scrollPosition();
+    loadFrames(loadOrder(B.count, Math.round(B.smooth * (B.count - 1))));
+    addEventListener("scroll", onScroll, { passive: true });
+    // page height changes as sections render / images load -> remap
+    if ("ResizeObserver" in window) new ResizeObserver(onScroll).observe(document.body);
   }
-
-  state = { ...NEUTRAL, ...resolveScene(b.defaultScene) };
-  apply();
-  return els;
+  return B;
 }
 
-/* ------------------------------------------------- scroll-driven playback */
+/** desktop (1080×1920) set for large screens on a decent connection, else mobile (720×1280). */
+function pickFrameSet(frames) {
+  const c = navigator.connection;
+  const slow = !!(c && (c.saveData || /(^|-)(2g|3g)$/.test(c.effectiveType || "")));
+  const px = Math.max(innerWidth, innerHeight) * Math.min(devicePixelRatio || 1, 2);
+  return (!slow && px >= 1400 && frames.desktop) ? frames.desktop : (frames.mobile || frames.desktop);
+}
 
-/**
- * The backdrop's video time is a function of scroll position:
- *   u = position in the clip, 0..1 (from config.backdrop.scroll)
- * Seeks an all-keyframe MP4 (scrubMp4) with lerp smoothing; on iOS, or if seeking
- * turns out to be slow, it switches to drawing the pre-extracted frame sequence
- * on a canvas.
- */
-function mountScrollVideo(stage, video, b) {
-  const sc = b.scroll || {};
-  const focal = b.focalPoint || video.focalPoint || "50% 50%";
-  const frames = video.frames?.pattern && video.frames?.count > 0 ? video.frames : null;
-  const lerp = Math.min(1, Math.max(0.02, Number(sc.smoothing) || 0.12));
+/** "frame_%04d.webp", 0 -> "frame_0001.webp" */
+const frameUrl = (pattern, i) => pattern.replace(/%0?(\d*)d/, (_, n) => String(i + 1).padStart(Number(n) || 0, "0"));
 
-  stage.classList.add("vslot", "vslot--background", "vslot--scroll");
-  const media = document.createElement("div");
-  media.className = "vslot__media";
-  media.append(buildPoster(video, { focal, priority: true }));
-  stage.append(media);
+/** current frame first, then every 10th, every 5th, every 2nd, then the rest. */
+function loadOrder(count, first) {
+  const seen = new Set();
+  const out = [];
+  const push = (i) => { if (i >= 0 && i < count && !seen.has(i)) { seen.add(i); out.push(i); } };
+  push(first); push(0); push(count - 1);
+  for (const step of [10, 5, 2, 1]) for (let i = 0; i < count; i += step) push(i);
+  return out;
+}
 
-  let target = 0, smooth = 0, raf = 0;
-  let vid = null, duration = 0, seeking = false, seekT0 = 0, slowSeeks = 0;
-  let canvas = null, ctx = null, imgs = null, lastFrame = -1, useFrames = false;
+function loadFrames(order) {
+  let next = 0;
+  const one = () => {
+    if (!B || next >= order.length) return;
+    const i = order[next++];
+    const img = new Image();
+    img.decoding = "async";
+    img.src = frameUrl(B.pattern, i);
+    (img.decode ? img.decode() : new Promise((res, rej) => { img.onload = res; img.onerror = rej; }))
+      .then(() => { B.imgs[i] = img; if (Math.abs(i - frameIndex()) < 12 || B.drawn < 0) { B.dirty = true; kick(); } })
+      .catch(() => {})
+      .finally(one);
+  };
+  for (let k = 0; k < 6; k++) one();   // 6 in flight
+}
 
-  /* where in the clip (0..1) the current scroll position maps to */
-  function position() {
-    const vh = innerHeight || 1;
-    if (sc.mapping === "page") {
-      const max = document.documentElement.scrollHeight - vh;
-      return max > 0 ? Math.min(1, Math.max(0, scrollY / max)) : 0;
-    }
-    const loops = scrollY / vh / (Number(sc.screensPerLoop) || 4);
-    if (sc.pingpong !== false) {
-      const m = loops % 2;
-      return m <= 1 ? m : 2 - m;
-    }
+/* ====================================================== scroll -> clip position */
+
+function scrollPosition() {
+  const sc = cfg().scroll || {};
+  const H = innerHeight || 1;
+  if (sc.mapping === "distance") {
+    const loops = Math.max(0, scrollY - (sc.startOffset || 0)) / H / (Number(sc.screensPerLoop) || 4);
+    if (sc.pingpong) { const m = loops % 2; return m <= 1 ? m : 2 - m; }
     return loops % 1;
   }
+  const max = document.documentElement.scrollHeight - H;
+  const start = Number(sc.startOffset) || 0;
+  const end = max - (Number(sc.endOffset) || 0);
+  return end > start ? clamp01((scrollY - start) / (end - start)) : 0;
+}
 
-  function onScroll() {
-    const next = position();
-    // a hard wrap (non-pingpong) should jump, not sweep backwards through the clip
-    if (Math.abs(next - smooth) > 0.5 && sc.pingpong === false) smooth = next;
-    target = next;
-    kick();
-  }
-
-  let lastT = 0;
-  function kick() { if (!raf) raf = requestAnimationFrame(tick); }
-
-  function tick(now) {
-    raf = 0;
-    // frame-rate independent easing: `lerp` is the catch-up per 60fps frame
-    const dt = lastT ? Math.min(250, now - lastT) : 16.7;
-    lastT = now;
-    smooth += (target - smooth) * (1 - Math.pow(1 - lerp, dt / 16.7));
-    if (Math.abs(target - smooth) < 0.0005) smooth = target;
-    let busy = smooth !== target;
-    if (useFrames) drawFrame(smooth);
-    else busy = seek(smooth) || busy;
-    if (busy) kick(); else lastT = 0;
-  }
-
-  /* ---- video seeking ---- */
-  function seek(u) {
-    if (!vid || !duration) return false;
-    const t = Math.min(duration - 0.04, Math.max(0, u * duration));
-    if (seeking) return true;
-    if (Math.abs(vid.currentTime - t) < 1 / 30) return false;
-    seeking = true;
-    seekT0 = performance.now();
-    vid.currentTime = t;
-    return true;
-  }
-
-  function startVideo() {
-    if (!video.scrubMp4) return frames ? startFrames() : null;
-    vid = makeVideo([{ src: video.scrubMp4, type: "video/mp4" }], {
-      preload: "auto", loop: false,
-      onFail: () => { vid?.remove(); vid = null; if (frames) startFrames(); },
-    });
-    vid.style.objectPosition = focal;
-    vid.addEventListener("loadedmetadata", () => { duration = vid.duration || 0; vid.pause(); kick(); });
-    vid.addEventListener("loadeddata", () => vid.classList.add("is-ready"), { once: true });
-    vid.addEventListener("seeked", () => {
-      seeking = false;
-      if (performance.now() - seekT0 > 120 && ++slowSeeks >= 3 && frames) startFrames();
-      kick();
-    });
-    media.append(vid);
-  }
-
-  /* ---- canvas frame sequence (iOS / slow seeking) ---- */
-  function startFrames() {
-    if (useFrames || !frames) return;
-    useFrames = true;
-    canvas = document.createElement("canvas");
-    canvas.className = "is-ready";
-    ctx = canvas.getContext("2d");
-    media.append(canvas);
-    if (vid) { vid.remove(); vid = null; }
-    sizeCanvas();
-    imgs = new Array(frames.count);
-    // coarse-to-fine so the whole range is roughly covered early
-    const order = [];
-    for (const step of [16, 8, 4, 2, 1]) for (let i = 0; i < frames.count; i += step) if (!order.includes(i)) order.push(i);
-    let next = 0;
-    const loadOne = () => {
-      if (next >= order.length) return;
-      const i = order[next++];
-      const img = new Image();
-      img.decoding = "async";
-      img.onload = () => { imgs[i] = img; lastFrame = -1; kick(); loadOne(); };
-      img.onerror = loadOne;
-      img.src = frameUrl(frames.pattern, i);
-    };
-    for (let k = 0; k < 4; k++) loadOne();
-    addEventListener("resize", sizeCanvas, { passive: true });
-  }
-
-  function sizeCanvas() {
-    if (!canvas) return;
-    const r = media.getBoundingClientRect();
-    const dpr = Math.min(devicePixelRatio || 1, 1.5);
-    canvas.width = Math.round(r.width * dpr);
-    canvas.height = Math.round(r.height * dpr);
-    lastFrame = -1;
-    kick();
-  }
-
-  function drawFrame(u) {
-    const want = Math.round(u * (frames.count - 1));
-    let i = want;
-    // nearest loaded frame
-    for (let d = 0; d < frames.count && !imgs[i]; d++) {
-      if (imgs[want - d]) { i = want - d; break; }
-      if (imgs[want + d]) { i = want + d; break; }
-    }
-    const img = imgs[i];
-    if (!img || i === lastFrame) return;
-    lastFrame = i;
-    const [fx, fy] = String(focal).split(/\s+/).map((p) => (p?.endsWith("%") ? parseFloat(p) / 100 : 0.5));
-    const cw = canvas.width, ch = canvas.height;
-    const s = Math.max(cw / img.naturalWidth, ch / img.naturalHeight);
-    const w = img.naturalWidth * s, h = img.naturalHeight * s;
-    ctx.drawImage(img, (cw - w) * (fx ?? 0.5), (ch - h) * (fy ?? 0.5), w, h);
-  }
-
-  if (isIOS() && frames) startFrames(); else startVideo();
-  addEventListener("scroll", onScroll, { passive: true });
-  addEventListener("resize", onScroll, { passive: true });
-  target = smooth = position();
+function onScroll() {
+  if (!B) return;
+  const next = scrollPosition();
+  const sc = cfg().scroll || {};
+  if (sc.mapping === "distance" && !sc.pingpong && Math.abs(next - B.smooth) > 0.5) B.smooth = next; // hard wrap: jump
+  B.target = next;
   kick();
 }
 
-/* ----------------------------------------------------------------- scenes */
+const frameIndex = () => Math.round(B.smooth * (B.count - 1));
+
+/* ================================================================ render loop */
+
+function kick() { if (B && !B.raf) B.raf = requestAnimationFrame(tick); }
+
+function tick(now) {
+  B.raf = 0;
+  const dt = B.lastT ? Math.min(250, now - B.lastT) : 16.7;
+  B.lastT = now;
+  const k = (rate) => 1 - Math.pow(1 - rate, dt / 16.7);       // frame-rate independent easing
+
+  const lerp = Math.min(1, Math.max(0.02, Number(cfg().scroll?.smoothing) || 0.12));
+  B.smooth += (B.target - B.smooth) * k(lerp);
+  if (Math.abs(B.target - B.smooth) < 0.0004) B.smooth = B.target;
+  B.px += (B.tpx - B.px) * k(0.08);
+  B.py += (B.tpy - B.py) * k(0.08);
+  const pointerMoving = Math.abs(B.tpx - B.px) > 0.2 || Math.abs(B.tpy - B.py) > 0.2;
+
+  const i = frameIndex();
+  if (i !== B.drawn || B.dirty || pointerMoving) draw(i);
+
+  if (B.smooth !== B.target || pointerMoving) kick();
+  else B.lastT = 0;
+}
+
+/** nearest loaded frame to i */
+function nearest(i) {
+  if (B.imgs[i]) return i;
+  for (let d = 1; d < B.count; d++) {
+    if (B.imgs[i - d]) return i - d;
+    if (B.imgs[i + d]) return i + d;
+  }
+  return -1;
+}
+
+function draw(want) {
+  const i = nearest(want);
+  if (i < 0) return;
+  const img = B.imgs[i];
+  const { ctx, W, H, dpr } = B;
+  const b = cfg();
+  const fill = b.blurFill || {};
+  const iw = img.naturalWidth, ih = img.naturalHeight;
+  const CW = W + 2 * MARGIN, CH = H + 2 * MARGIN;   // canvas size in css px
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  // 1) blurred fill: same frame, cover the whole canvas (+10% for parallax room), via a tiny
+  //    downscaled copy that is smoothed back up. Pointer parallax moves only this layer.
+  const blur = Math.max(1, Number(fill.blur) || 40);
+  const sw = Math.max(8, Math.round(CW / (blur * 0.8)));
+  const sh = Math.max(8, Math.round(CH / (blur * 0.8)));
+  if (B.small.width !== sw || B.small.height !== sh) { B.small.width = sw; B.small.height = sh; }
+  const cs = Math.max(sw / iw, sh / ih);
+  B.sctx.imageSmoothingQuality = "low";
+  B.sctx.drawImage(img, (sw - iw * cs) / 2, (sh - ih * cs) / 2, iw * cs, ih * cs);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  const over = 1.12;
+  ctx.drawImage(B.small, (CW - CW * over) / 2 + B.px, (CH - CH * over) / 2 + B.py, CW * over, CH * over);
+  ctx.fillStyle = `rgba(0,0,0,${clamp01(Number(fill.darken ?? 0.6))})`;
+  ctx.fillRect(0, 0, CW, CH);
+
+  // 2) main 9:16 frame, uncropped
+  const landscape = W / H > (iw / ih) * 1.25;
+  let w, h, x, y;
+  if (landscape) {
+    h = H; w = h * (iw / ih); y = 0;
+    if (b.desktopAlign === "center") x = (W - w) / 2;
+    else {
+      // right-align with the page container's right edge (matches header/content gutters)
+      const gutter = Math.min(40, Math.max(16, 8 + 0.025 * W));
+      const containerRight = (W + Math.min(W - 2 * gutter, 1320)) / 2;
+      x = Math.max(0, containerRight - w);
+    }
+  } else {
+    const s = Math.min(W / iw, H / ih);   // contain: the whole frame is always visible
+    w = iw * s; h = ih * s; x = (W - w) / 2; y = (H - h) / 2;
+  }
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.55)";
+  ctx.shadowBlur = 60;
+  ctx.drawImage(img, MARGIN + x, MARGIN + y, w, h);
+  ctx.restore();
+
+  B.drawn = i === want ? i : -2;      // -2 = showing a stand-in; redraw when the real frame arrives
+  B.dirty = false;
+  B.root.dataset.frame = String(i + 1);
+}
+
+function sizeCanvas() {
+  B.W = innerWidth;
+  B.H = innerHeight;
+  B.dpr = Math.min(devicePixelRatio || 1, 1.5);
+  B.canvas.width = Math.round((B.W + 2 * MARGIN) * B.dpr);
+  B.canvas.height = Math.round((B.H + 2 * MARGIN) * B.dpr);
+  B.dirty = true;
+}
+
+let resizeQueued = false;
+function onResize() {
+  if (resizeQueued) return;
+  resizeQueued = true;
+  requestAnimationFrame(() => {
+    resizeQueued = false;
+    if (!B) return;
+    sizeCanvas();
+    if (B.sceneName) { const n = B.sceneName; B.sceneName = null; goTo(n, true); }
+    onScroll();
+    kick();
+  });
+}
+
+/* ===================================================================== scenes */
 
 function resolveScene(name) {
   const scenes = cfg().scenes || {};
   const s = scenes[name] || scenes[cfg().defaultScene] || {};
-  const { desktop, ...base } = s;
-  return { ...NEUTRAL, ...base, ...(isDesktop() && desktop ? desktop : {}) };
+  return Object.fromEntries(SCENE_KEYS.map((k) => [k, s[k] ?? SCENE_NEUTRAL[k]]));
 }
 
 function sceneFor(el) {
-  const map = cfg().sceneMap || {};
   if (el.dataset.scene) return el.dataset.scene;
-  const slot = el.dataset.videoSlot || el.querySelector?.(":scope > [data-video-slot], :scope > footer[data-video-slot]")?.dataset.videoSlot;
-  if (slot && map[slot]) return map[slot];
   if (el.querySelector?.(".pcard") && cfg().scenes?.shelf) return "shelf";
   return cfg().defaultScene || "content";
 }
 
-function apply() {
-  if (!els) return;
-  const s = state;
-  els.stage.style.transform = `translate3d(${s.x}%, ${s.y}%, 0) scale(${s.scale})`;
-  els.stage.style.filter = `blur(${s.blur}px) saturate(${s.saturate}) brightness(${s.brightness})`;
-  els.dim.style.opacity = s.dim;
-  els.tint.style.opacity = s.tint;
+function applyScene() {
+  const s = B.scene;
+  B.canvas.style.filter = `brightness(${s.brightness}) blur(${s.blur}px)`;
+  B.dim.style.opacity = s.dim;
+  B.tint.style.opacity = s.tint;
 }
 
 function goTo(name, instant = false) {
-  if (!els || (name === currentScene && !instant)) return;
-  currentScene = name;
-  els.root.dataset.scene = name;
+  if (!B || name === B.sceneName) return;
+  B.sceneName = name;
+  B.root.dataset.scene = name;
   const target = resolveScene(name);
   const g = gsap();
-  tween?.kill();
-  if (!g || instant || !animated()) {
-    KEYS.forEach((k) => (state[k] = target[k]));
-    apply();
-    return;
-  }
-  tween = g.to(state, {
-    ...Object.fromEntries(KEYS.map((k) => [k, target[k]])),
-    duration: motionCfg().sceneDuration ?? 1.4,
-    ease: "power2.inOut",
-    onUpdate: apply,
-  });
+  B.sceneTween?.kill();
+  if (!g || instant || still()) { Object.assign(B.scene, target); applyScene(); return; }
+  B.sceneTween = g.to(B.scene, { ...target, duration: motionCfg().sceneDuration ?? 1.2, ease: "power2.inOut", onUpdate: applyScene });
 }
 
 function watchScenes() {
   const sections = [
-    ...document.querySelectorAll("main > section, main > div:not([data-component]) > section, main > .marquee"),
-    ...document.querySelectorAll("footer"),
-  ].filter((el, i, a) => a.indexOf(el) === i && !el.closest(".backdrop"));
+    ...document.querySelectorAll("main > section, main > div > section, main > .marquee, footer"),
+  ].filter((el, i, a) => a.indexOf(el) === i);
   if (!sections.length) return;
-
+  // tag each section with its look so CSS can add a readability panel where needed
+  sections.forEach((s) => s.classList.add("bd-scene", `bd-scene--${sceneFor(s)}`));
   goTo(sceneFor(sections[0]), true);
-
-  // The section crossing the middle band of the viewport owns the backdrop.
   const io = new IntersectionObserver((entries) => {
     entries.forEach((e) => { if (e.isIntersecting) goTo(sceneFor(e.target)); });
   }, { rootMargin: "-45% 0px -45% 0px" });
   sections.forEach((s) => io.observe(s));
-
-  let wasDesktop = isDesktop();
-  addEventListener("resize", () => {
-    if (isDesktop() !== wasDesktop) { wasDesktop = isDesktop(); const n = currentScene; currentScene = null; goTo(n, true); }
-  }, { passive: true });
 }
 
-/* ------------------------------------------------- scroll / pointer motion */
+/* ============================================== progress line + pointer parallax */
 
 function watchMotion() {
   const m = motionCfg();
-  const g = gsap();
-  const moving = animated();
-
   if (m.progressBar) {
-    els.progress = document.createElement("div");
-    els.progress.className = "backdrop-progress";
-    els.progress.setAttribute("aria-hidden", "true");
-    document.body.append(els.progress);
-  }
-
-  const drift = Number(m.scrollDrift) || 0;
-  const setY = g && moving ? g.quickTo(els.drift, "yPercent", { duration: 0.8, ease: "power3.out" }) : null;
-  let ticking = false;
-  const onScroll = () => {
-    if (ticking) return;
-    ticking = true;
-    requestAnimationFrame(() => {
-      ticking = false;
+    const bar = document.createElement("div");
+    bar.className = "backdrop-progress";
+    bar.setAttribute("aria-hidden", "true");
+    document.body.append(bar);
+    let queued = false;
+    const update = () => {
+      queued = false;
       const max = document.documentElement.scrollHeight - innerHeight;
-      const p = max > 0 ? Math.min(1, Math.max(0, scrollY / max)) : 0;
-      if (els.progress) els.progress.style.transform = `scaleX(${p})`;
-      if (setY && drift) setY((0.5 - p) * drift);
-    });
-  };
-  addEventListener("scroll", onScroll, { passive: true });
-  onScroll();
-
+      bar.style.transform = `scaleX(${max > 0 ? clamp01(scrollY / max) : 0})`;
+    };
+    addEventListener("scroll", () => { if (!queued) { queued = true; requestAnimationFrame(update); } }, { passive: true });
+    update();
+  }
   const pp = Number(m.pointerParallax) || 0;
-  if (pp && g && moving && hoverCapable()) {
-    const qx = g.quickTo(els.drift, "x", { duration: 1.2, ease: "power3.out" });
-    const qy = g.quickTo(els.drift, "y", { duration: 1.2, ease: "power3.out" });
+  if (pp && !still() && hoverCapable() && isDesktop()) {
     addEventListener("pointermove", (e) => {
-      qx(-((e.clientX / innerWidth) * 2 - 1) * pp);
-      qy(-((e.clientY / innerHeight) * 2 - 1) * pp);
+      B.tpx = -((e.clientX / innerWidth) * 2 - 1) * pp;
+      B.tpy = -((e.clientY / innerHeight) * 2 - 1) * pp;
+      kick();
     }, { passive: true });
   }
 }
 
-/* ----------------------------------------------------------------- marquee */
+/* ==================================================================== marquee */
 
 function mountMarquee(page) {
   const mq = motionCfg().marquee;
@@ -365,8 +363,7 @@ function mountMarquee(page) {
   band.dataset.scene = "feature";
   const track = document.createElement("div");
   track.className = "marquee__track";
-  // two identical halves -> seamless loop at -50%
-  for (let r = 0; r < 2; r++) {
+  for (let r = 0; r < 2; r++) {                      // two identical halves -> seamless loop
     for (const t of mq.items) {
       const s = document.createElement("span");
       s.className = "marquee__item";
@@ -378,14 +375,12 @@ function mountMarquee(page) {
   (mq.after === "first" ? first : main.lastElementChild).after(band);
 
   const g = gsap();
-  if (!g || !animated()) return;
-  let x = 0;
-  let boost = 0;
-  let lastY = scrollY;
+  if (!g || still()) return;
+  let x = 0, boost = 0, lastY = scrollY;
   g.ticker.add((time, dt) => {
     const dy = scrollY - lastY;
     lastY = scrollY;
-    boost += (Math.min(40, Math.abs(dy)) - boost) * 0.1;          // scroll velocity -> speed
+    boost += (Math.min(40, Math.abs(dy)) - boost) * 0.1;
     const dir = dy < 0 ? -1 : 1;
     x -= (0.04 + boost * 0.02) * dt * (boost > 1 ? dir : 1);
     const half = track.scrollWidth / 2 || 1;
@@ -395,21 +390,20 @@ function mountMarquee(page) {
   });
 }
 
-/* --------------------------------------------------------- split headlines */
+/* ============================================================ split headlines */
 
 function splitHeadlines() {
-  if (!motionCfg().splitHeadlines || !animated()) return;
+  if (!motionCfg().splitHeadlines || still()) return;
   const g = gsap();
   const ST = window.ScrollTrigger;
   if (!g || !ST) return;
   const heads = [...document.querySelectorAll("main h1, main h2, footer h2")].filter((h) =>
-    !h.closest(".hero, .backdrop, [data-no-split], .vslot--scrub") &&
-    !h.dataset.split && h.children.length === 0 && h.textContent.trim());
-
+    !h.closest(".hero, .backdrop, [data-no-split]") && !h.dataset.split && h.children.length === 0 && h.textContent.trim());
   heads.forEach((h) => {
-    const words = h.textContent.trim().split(/\s+/);
+    const label = h.textContent.trim();
+    const words = label.split(/\s+/);
     h.dataset.split = "";
-    h.setAttribute("aria-label", h.textContent.trim());
+    h.setAttribute("aria-label", label);
     h.textContent = "";
     words.forEach((w, i) => {
       const outer = document.createElement("span");
@@ -429,16 +423,17 @@ function splitHeadlines() {
   });
 }
 
-/* --------------------------------------------------------------- public API */
+/* ================================================================= public API */
 
 export function initMotionLayer(page) {
-  if (!els) return;
+  if (!B) return;
   mountMarquee(page);
   watchScenes();
   watchMotion();
   splitHeadlines();
+  onScroll();                    // page height is final-ish now
   window.ScrollTrigger?.refresh();
 }
 
-/** Current scene name (for debugging / QA). */
-export const backdropScene = () => currentScene;
+/** QA helpers: current frame (1-based) and scene. */
+export const backdropState = () => (B ? { frame: B.drawn + 1, target: B.target, scene: B.sceneName, set: B.pattern } : null);

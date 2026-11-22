@@ -41,7 +41,7 @@
   <div data-component="header"></div>
 
   <main id="main" data-page="home">
-    <section class="hero" data-video-slot="hero" data-video-layout="hero-panel" data-video-priority>
+    <section class="hero" data-scene="hero">
       <div class="hero__inner container">
         <p class="eyebrow hero__eyebrow" data-hero="eyebrow"></p>
         <h1 class="hero__title" data-hero="title"></h1>
@@ -58,12 +58,8 @@
       </div>
     </section>
 
-    <section class="ride" data-video-slot="built-for-ride" aria-labelledby="ride-title">
-      <div class="ride__inner container">
-        <h2 id="ride-title" class="ride__title" data-home="rideTitle"></h2>
-        <div class="ride__beats" data-home="beats"></div>
-      </div>
-    </section>
+    <!-- "Built for the ride": intro + one section per beat, scrolling over the backdrop -->
+    <div class="beats" data-home="beats"></div>
 
     <section class="section featured" aria-labelledby="feat-title">
       <div class="container">
@@ -75,7 +71,7 @@
       </div>
     </section>
 
-    <section class="cta-band" data-video-slot="cta-band" aria-labelledby="cta-title">
+    <section class="cta-band" data-scene="feature" aria-labelledby="cta-title">
       <div class="cta-band__inner container" data-reveal>
         <h2 id="cta-title" data-home="ctaTitle"></h2>
         <p data-home="ctaText"></p>

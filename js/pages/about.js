@@ -24,7 +24,7 @@ export default function mount(main) {
   ];
 
   renderTemplate(main, html`
-    <section class="about-hero" data-video-slot="about" aria-labelledby="about-title">
+    <section class="about-hero" data-scene="feature" aria-labelledby="about-title">
       <div class="container about-hero__inner">
         <div class="about-hero__head">
           <p class="eyebrow">${ui.aboutEyebrow}</p>
@@ -32,7 +32,7 @@ export default function mount(main) {
           <p class="about-hero__intro">${about.intro}</p>
         </div>
         <div class="about-hero__beats">
-          ${story.slice(0, 3).map((p) => html`<p class="about-hero__beat" data-beat>${p}</p>`)}
+          ${story.slice(0, 3).map((p) => html`<p class="about-hero__beat">${p}</p>`)}
         </div>
       </div>
     </section>
