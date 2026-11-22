@@ -1,0 +1,31 @@
+{
+  "name": "The Gear Doctor",
+  "short_name": "Gear Doctor",
+  "description": "Helmets, race suits, gloves and boots chosen and explained by rider Umair (@fury__moto). Know your gear before you ride.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0A0A0C",
+  "theme_color": "#0A0A0C",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "assets/img/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/img/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/img/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

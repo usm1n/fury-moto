@@ -1,0 +1,7 @@
+# robots.txt: allow all crawlers.
+# PLACEHOLDER: the Sitemap line below uses the example domain until store.siteUrl is set.
+# Re-run node tools/sitemap.mjs after setting it.
+User-agent: *
+Allow: /
+
+Sitemap: https://example.com/sitemap.xml

@@ -1,0 +1,25 @@
+<!--
+  SEO + icons + PWA head block. Paste into the <head> of EVERY page, right after
+  <meta name="description">. Paths are relative (no leading slash).
+
+  Social crawlers (Facebook, WhatsApp, Slack, X) do NOT run JavaScript, so the
+  og:/twitter: tags below must exist in the static HTML. js/core/seo.js (setSeo)
+  overwrites them at runtime for each page, which is what browsers and Google see.
+  Per-page static og:title / og:description are optional but help previews on
+  product and guide pages.
+
+  Once config.store.siteUrl is set, change og:image to the absolute URL, e.g.
+  https://gear-doctor.pk/assets/img/og/og-default.jpg
+-->
+<link rel="icon" href="assets/img/icons/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/img/icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="assets/img/icons/apple-touch-icon.png" sizes="180x180">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0A0A0C">
+<meta property="og:site_name" content="The Gear Doctor">
+<meta property="og:type" content="website">
+<meta property="og:image" content="assets/img/og/og-default.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="assets/img/og/og-default.jpg">
