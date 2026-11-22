@@ -8,6 +8,8 @@ Plain HTML + CSS + vanilla JS modules. **No build step, no framework.** It runs 
 
 ---
 
+**Live preview (GitHub Pages):** https://usm1n.github.io/fury-moto/ — redeploys automatically a minute or so after every push to `main`.
+
 ## 1. Run it locally
 
 You need any static web server; opening `index.html` directly from disk won't work, because browsers block ES modules on `file://`.
