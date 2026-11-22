@@ -83,11 +83,10 @@ html.reduced-motion .vslot--card .vslot__media img { transition: none; transform
   position: absolute; top: -32px; left: -32px;       /* matches MARGIN in backdrop.js */
   width: calc(100% + 64px); height: calc(100% + 64px);
   max-width: none;                                    /* base.css caps canvas at 100% — that would squash the frame */
-  will-change: filter;
 }
 .backdrop__dim { position: absolute; inset: 0; background: rgb(var(--color-overlay)); opacity: 0.3; }
 .backdrop__tint {
-  position: absolute; inset: 0; opacity: 0; mix-blend-mode: screen;
+  position: absolute; inset: 0; opacity: 0;            /* plain alpha: blend modes re-composite the whole screen every frame */
   background:
     radial-gradient(110% 70% at 85% 0%, color-mix(in srgb, var(--color-accent) 70%, transparent), transparent 60%),
     radial-gradient(90% 60% at 0% 100%, color-mix(in srgb, var(--color-accent) 45%, transparent), transparent 65%);
@@ -98,7 +97,7 @@ html.reduced-motion .vslot--card .vslot__media img { transition: none; transform
 }
 .backdrop__sweep { display: none; }
 html.has-sweep .backdrop__sweep {
-  display: block; position: absolute; inset: -50%; mix-blend-mode: screen;
+  display: block; position: absolute; inset: -50%; will-change: transform;
   background: linear-gradient(105deg, transparent 42%, rgba(255, 255, 255, 0.06) 47.5%,
     color-mix(in srgb, var(--color-accent) 22%, transparent) 50%, transparent 56%);
   animation: backdrop-sweep 12s cubic-bezier(0.6, 0, 0.3, 1) infinite;
@@ -190,3 +189,28 @@ html.has-backdrop .faq__list {
 @media (prefers-reduced-motion: reduce) {
   html.has-sweep .backdrop__sweep { animation: none; display: none; }
 }
+
+/* ---------- smoothness: nothing that re-blurs or re-blends the moving canvas every frame ----------
+   backdrop-filter / mix-blend-mode over a canvas that repaints at 60fps force a full-screen
+   re-render per frame. Over the backdrop, panels use slightly more opaque plain backgrounds instead. */
+html.has-backdrop .beat__panel,
+html.has-backdrop .testimonial,
+html.has-backdrop .igstrip__follow,
+html.has-backdrop .c-card,
+html.has-backdrop .c-form,
+html.has-backdrop .faq__list,
+html.has-backdrop .marquee {
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+html.has-backdrop .beat__panel { background: linear-gradient(90deg, rgba(var(--color-overlay), 0.9), rgba(var(--color-overlay), 0.72)); }
+html.has-backdrop .testimonial,
+html.has-backdrop .igstrip__follow,
+html.has-backdrop .c-card,
+html.has-backdrop .c-form,
+html.has-backdrop .faq__list { background: color-mix(in srgb, var(--color-surface) 88%, transparent); }
+html.has-backdrop .marquee { background: color-mix(in srgb, var(--color-bg) 62%, transparent); }
+/* fixed header + mobile bar sit over the canvas the whole time */
+html.has-backdrop .site-header.is-solid,
+html.has-backdrop .bottom-bar { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; background: rgba(var(--color-overlay), 0.9) !important; }
+/* film grain: plain alpha instead of an overlay blend across the whole screen */
+html.has-backdrop.has-grain body::after { mix-blend-mode: normal; opacity: 0.035; }

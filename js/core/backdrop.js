@@ -85,10 +85,14 @@ export function mountBackdrop(page) {
     scene: { ...SCENE_NEUTRAL, ...resolveScene(b.defaultScene) },
     sceneName: null, sceneTween: null,
     W: 0, H: 0, dpr: 1,
+    small: document.createElement("canvas"), sctx: null,  // downscaled buffer for the soft (blur) layer
+    soft: 0,                                         // 0..1 opacity of the soft layer (from scene blur)
+    drawnU: NaN,                                     // position last drawn
     orient: orientation(),                           // last orientation, to detect rotation
     history: [],                                     // [{t, p}] progress at recent scroll events (rotation restore)
   };
 
+  B.sctx = B.small.getContext("2d", { alpha: false });
   sizeCanvas();
   applyScene();
   addEventListener("resize", onResize, { passive: true });
@@ -145,6 +149,7 @@ function activateSequence(orient) {
   B.drawn = -1;
   B.dirty = true;
   B.root.dataset.sequence = seq.name;
+  if (B.W) sizeCanvas();                           // canvas resolution follows the active frame set
   const token = ++B.loadToken;                     // stops the previous sequence's loader
   if (still()) {
     const i = Math.min(B.count, Math.max(1, Number(cfg().stillFrame) || 1)) - 1;
@@ -257,8 +262,8 @@ function tick(now) {
   B.py += (B.tpy - B.py) * k(0.08);
   const pointerMoving = Math.abs(B.tpx - B.px) > 0.0002 || Math.abs(B.tpy - B.py) > 0.0002;
 
-  const i = frameIndex();
-  if (i !== B.drawn || B.dirty || pointerMoving) draw(i);
+  // with frame blending every change of the eased position is visible, so redraw on any movement
+  if (B.smooth !== B.drawnU || B.dirty || pointerMoving) draw(B.smooth);
 
   if (B.smooth !== B.target || pointerMoving) kick();
   else B.lastT = 0;
@@ -274,42 +279,84 @@ function nearest(i) {
   return -1;
 }
 
-function draw(want) {
-  const i = nearest(want);
-  if (i < 0) return;
-  const img = B.imgs[i];
+/**
+ * Draw position u (0..1). The clip has far fewer frames than the page has pixels, so
+ * instead of stepping from frame to frame we cross-fade the two neighbouring frames by the
+ * fractional part: motion stays continuous however slowly you scroll.
+ * No CSS filters are used (they re-rasterise the whole screen on every frame): the section
+ * "blur" is a soft layer drawn from a small downscaled copy, faded in by the scene.
+ */
+function draw(u) {
+  const f = clamp01(u) * (B.count - 1);
+  const want0 = Math.floor(f), want1 = Math.min(B.count - 1, want0 + 1);
+  const i0 = nearest(want0);
+  if (i0 < 0) return;
+  const img = B.imgs[i0];
+  const exact = i0 === want0;
+  const t = exact && want1 !== want0 && B.imgs[want1] ? f - want0 : 0;
+
   const { ctx, W, H, dpr } = B;
   const iw = img.naturalWidth, ih = img.naturalHeight;
   const CW = W + 2 * MARGIN, CH = H + 2 * MARGIN;   // canvas size in css px (viewport + margin)
 
   // cover: scale so the frame fills the whole canvas, plus a slight overscale for parallax room
-  const s = Math.max(CW / iw, CH / ih) * overscale();
-  const w = iw * s, h = ih * s;
+  const sc = Math.max(CW / iw, CH / ih) * overscale();
+  const w = iw * sc, h = ih * sc;
 
   // centre the focal point (nudged by the pointer) on the viewport centre, then clamp so no edge shows
-  const f = focal();
-  const fx = clamp01(f.x + B.px), fy = clamp01(f.y + B.py);
+  const fp = focal();
+  const fx = clamp01(fp.x + B.px), fy = clamp01(fp.y + B.py);
   const x = Math.min(0, Math.max(CW - w, CW / 2 - fx * w));
   const y = Math.min(0, Math.max(CH - h, CH / 2 - fy * h));
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
+  ctx.imageSmoothingQuality = "medium";
+  ctx.globalAlpha = 1;
   ctx.drawImage(img, x, y, w, h);
+  if (t > 0.02) {                                   // cross-fade into the next frame
+    ctx.globalAlpha = t;
+    ctx.drawImage(B.imgs[want1], x, y, w, h);
+    ctx.globalAlpha = 1;
+  }
+
+  // soft layer (section "blur"): tiny copy of what we just drew, scaled back up
+  if (B.soft > 0.01) {
+    const sw = B.small.width, sh = B.small.height;
+    B.sctx.setTransform(1, 0, 0, 1, 0, 0);
+    B.sctx.drawImage(B.canvas, 0, 0, sw, sh);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = B.soft;
+    ctx.drawImage(B.small, 0, 0, B.canvas.width, B.canvas.height);
+    ctx.globalAlpha = 1;
+  }
 
   B.layout = { x: x - MARGIN, y: y - MARGIN, w, h, iw, ih, W, H, upscale: (w * dpr) / iw }; // viewport coords (QA)
-  B.drawn = i === want ? i : -2;      // -2 = showing a stand-in; redraw when the real frame arrives
+  B.drawn = exact ? Math.round(f) : -2;             // -2 = showing a stand-in; redraw when the real frame arrives
+  // complete only if both frames we wanted were available; otherwise redraw when they arrive
+  const complete = exact && (want1 === want0 || f - want0 <= 0.02 || !!B.imgs[want1]);
+  B.drawnU = complete ? u : NaN;
   B.dirty = false;
-  B.root.dataset.frame = String(i + 1);
+  B.root.dataset.frame = String(Math.round(f) + 1);
 }
 
 function sizeCanvas() {
   // the layout viewport (excludes the scrollbar) — must match the CSS box the canvas fills
   B.W = document.documentElement.clientWidth || innerWidth;
   B.H = document.documentElement.clientHeight || innerHeight;
-  B.dpr = Math.min(devicePixelRatio || 1, 1.5);
-  B.canvas.width = Math.round((B.W + 2 * MARGIN) * B.dpr);
-  B.canvas.height = Math.round((B.H + 2 * MARGIN) * B.dpr);
+  // Render the canvas no sharper than the source frames: on a high-DPI laptop a 1.5× canvas
+  // would push ~2× the pixels every frame for no visible gain (the frames are 1920 / 1080 wide).
+  const CW = B.W + 2 * MARGIN, CH = B.H + 2 * MARGIN;
+  const landscape = (B.seqName || orientation()) === "landscape";
+  const coverW = Math.max(CW, CH * (landscape ? 16 / 9 : 9 / 16)) * overscale();
+  const srcW = widthFromPath(B.pattern) || (landscape ? 1920 : 1080);
+  B.dpr = Math.min(devicePixelRatio || 1, 1.5, Math.max(0.75, srcW / coverW));
+  B.canvas.width = Math.round(CW * B.dpr);
+  B.canvas.height = Math.round(CH * B.dpr);
+  // small buffer for the soft (blur) layer, ~1/12 size
+  B.small.width = Math.max(16, Math.round(B.canvas.width / 12));
+  B.small.height = Math.max(16, Math.round(B.canvas.height / 12));
+  B.drawnU = NaN;
   B.dirty = true;
 }
 
@@ -374,9 +421,13 @@ function sceneFor(el) {
 
 function applyScene() {
   const s = B.scene;
-  B.canvas.style.filter = `brightness(${s.brightness}) blur(${s.blur}px)`;
-  B.dim.style.opacity = s.dim;
+  // brightness folded into the dark overlay (an opacity change is free to composite;
+  // a CSS filter on a full-screen canvas re-rasterises every frame)
+  const dim = 1 - (1 - clamp01(s.dim)) * Math.min(1, Math.max(0, s.brightness));
+  B.dim.style.opacity = dim.toFixed(3);
   B.tint.style.opacity = s.tint;
+  const soft = clamp01(s.blur / 8);                // 8px "blur" = fully soft
+  if (Math.abs(soft - B.soft) > 0.005) { B.soft = soft; B.dirty = true; kick(); }
 }
 
 function goTo(name, instant = false) {
