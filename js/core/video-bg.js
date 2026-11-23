@@ -360,7 +360,9 @@ function createPlayer(el, opts) {
   /* ---- observers & listeners ---- */
   if (motion) {
     if (opts.priority) load();
-    else cleanups.push(observeNear(el, (near) => { if (near) load(); }));
+    // cards only download their clip when they are about to play (hover / focus / 60% in view on touch):
+    // update() -> wantPlay() -> load(). Other modes pre-load when near the viewport.
+    else if (mode !== "card") cleanups.push(observeNear(el, (near) => { if (near) load(); }));
 
     cleanups.push(observeVisible(el, (e) => {
       visible = e.isIntersecting;

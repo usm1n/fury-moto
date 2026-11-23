@@ -164,6 +164,13 @@ import { VideoBg } from "../core/video-bg.js"; // only for product gallery inlin
 - backdrop.js adds `.bd-scene bd-scene--<name>` to every section; CSS (`css/video.css`) uses these classes for the readability panels.
 - Reduced motion / Save-Data: only `stillFrame` is loaded and drawn.
 
+## 6b. Performance contract
+- Page `<head>`s carry a generated `perf:start…perf:end` block (fonts, first-frame preloads, `modulepreload` graph). Re-run `node tools/head.mjs` after adding/removing modules. Dynamic imports must use a literal path (`import("../x.js")` or the pages' `loadModule("../x.js", …)`) so the generator can see them.
+- Nothing may read layout (`getBoundingClientRect`, `scrollWidth`, `offsetTop`) inside a per-frame loop. Cache it and update it on resize.
+- Per-frame loops (GSAP ticker, rAF) must stop while their element is off screen.
+- No `backdrop-filter`, `mix-blend-mode` or CSS `filter` on or over the moving canvas.
+- Text that JS injects into the first screen must not shift layout: reserve its space (e.g. `visibility:hidden` until filled).
+
 ## 7. Shared UI classes (from `css/base.css`)
 `.container .section .stack .grid .btn .btn--primary .btn--ghost .btn--block .pill .pill--cert .pill--badge .pill-row .price .price__compare .eyebrow .muted .visually-hidden`.
 Certification badges are always `<span class="pill pill--cert">ECE 22.06</span>`; product badges are `.pill--badge`.

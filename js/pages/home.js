@@ -24,6 +24,7 @@ export default async function mount(main) {
   renderList($('[data-hero="ctas"]', main), home.hero.ctas, (c) =>
     html`<a class="btn btn--${c.style === "primary" ? "primary" : "ghost"}" href="${c.href}" ${raw(c.style === "primary" ? "data-magnetic" : "")}>${c.label}</a>`);
   renderList($('[data-hero="taglines"]', main), store.secondaryTaglines, (t) => html`<li>${t}</li>`);
+  main.querySelector(".hero__inner")?.classList.add("is-filled");
   heroIntro(main);
 
   // ---- categories (video cards)

@@ -10,6 +10,12 @@ Plain HTML + CSS + vanilla JS modules. **No build step, no framework.** It runs 
 
 **Live preview (GitHub Pages):** https://usm1n.github.io/fury-moto/ — redeploys automatically a minute or so after every push to `main`.
 
+## Performance notes (for developers)
+- Every page `<head>` has a generated block (between `perf:start` and `perf:end`) with the font stylesheet, a preload of the first background frame for the visitor's orientation, and a `modulepreload` for every JS module the page needs. **After adding or removing a JS module, changing the default fonts or the frame folders, run `node tools/head.mjs`.**
+- The background frames load in two phases. First the frames around the scroll position plus every 10th frame, at high priority. Then, after the page has loaded, the rest, nearest to where the visitor is first, at low priority.
+- Category-card videos only download when they're about to play (hover, focus, or 60% in view on touch screens).
+- Dev probe: open any page and run `await (await import('/dev/perf.js')).report()` in the console for LCP, CLS, requests and bytes.
+
 ## 1. Run it locally
 
 You need any static web server; opening `index.html` directly from disk won't work, because browsers block ES modules on `file://`.

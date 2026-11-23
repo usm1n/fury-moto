@@ -92,35 +92,58 @@ function initMotion() {
 
 function initReveals(root) {
   const g = gsap();
+  const ST = ScrollTrigger();
   const els = [...root.querySelectorAll("[data-reveal]:not([data-revealed])")];
+  if (!els.length) return;
   els.forEach((el) => (el.dataset.revealed = ""));
-  if (!g || !ScrollTrigger() || prefersReducedMotion()) {
+  if (!g || !ST || prefersReducedMotion()) {
     els.forEach((el) => { el.style.opacity = 1; el.style.transform = "none"; });
     return;
   }
-  els.forEach((el) => {
-    g.to(el, {
-      opacity: 1, y: 0, duration: 0.7, ease: "power3.out",
-      delay: Number(el.dataset.revealDelay || 0),
-      scrollTrigger: { trigger: el, start: "top 88%", once: true },
-    });
+  // One batched trigger set: elements entering together reveal as a staggered group
+  // (cheaper than a ScrollTrigger per element, and reads better as motion).
+  ST.batch(els, {
+    start: "top 90%",
+    once: true,
+    onEnter: (batch) => g.to(batch, {
+      opacity: 1, y: 0, duration: 0.75, ease: "power3.out", overwrite: true,
+      stagger: { each: 0.07, from: "start" },
+      delay: (i, el) => Number(el.dataset.revealDelay || 0) * 0.5,
+      // done: mark revealed (CSS stops applying the start state) and drop the inline transform,
+      // so hover transforms on cards/tiles stay crisp
+      onComplete: () => batch.forEach((el) => { el.classList.add("is-revealed"); el.style.transform = ""; }),
+    }),
   });
 }
 
 function initMagnetic() {
-  if (!window.matchMedia("(hover: hover)").matches) return;
+  if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+  let current = null, raf = 0, px = 0, py = 0;
+  const release = (el) => {
+    el.style.transition = "transform 450ms cubic-bezier(0.16, 1, 0.3, 1)";
+    el.style.transform = "";
+    el.classList.remove("is-magnet");
+    setTimeout(() => { if (el !== current) el.style.transition = ""; }, 460);
+  };
+  const frame = () => {
+    raf = 0;
+    if (!current) return;
+    const r = current.getBoundingClientRect();
+    const x = (px - r.left - r.width / 2) * 0.25;
+    const y = (py - r.top - r.height / 2) * 0.35;
+    current.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
+  };
   document.addEventListener("pointermove", (e) => {
-    const el = e.target.closest?.("[data-magnetic]");
-    document.querySelectorAll("[data-magnetic].is-magnet").forEach((m) => {
-      if (m !== el) { m.classList.remove("is-magnet"); m.style.transform = ""; }
-    });
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const x = (e.clientX - r.left - r.width / 2) * 0.25;
-    const y = (e.clientY - r.top - r.height / 2) * 0.35;
-    el.classList.add("is-magnet");
-    el.style.transform = `translate(${x}px, ${y}px)`;
+    px = e.clientX; py = e.clientY;
+    const el = e.target.closest?.("[data-magnetic]") || null;
+    if (el !== current) {
+      if (current) release(current);
+      current = el;
+      if (el) { el.style.transition = "transform 120ms linear"; el.classList.add("is-magnet"); }
+    }
+    if (current && !raf) raf = requestAnimationFrame(frame);
   }, { passive: true });
+  document.addEventListener("pointerleave", () => { if (current) { release(current); current = null; } });
 }
 
 function initPageLeave() {

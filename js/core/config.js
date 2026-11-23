@@ -31,15 +31,20 @@ export function applyTheme() {
 }
 
 function loadFonts(families) {
-  if (!families.length || document.querySelector("link[data-theme-fonts]")) return;
+  if (!families.length) return;
   // Single-weight display faces (Anton, Bebas Neue…) reject a weight range, so only the body font asks for one.
   const SINGLE_WEIGHT = /^(Anton|Bebas Neue|Oswald Bold)$/i;
   const q = families
     .map((f) => `family=${encodeURIComponent(f).replace(/%20/g, "+")}${SINGLE_WEIGHT.test(f) ? "" : ":wght@400;500;600;700"}`)
     .join("&");
+  const href = `https://fonts.googleapis.com/css2?${q}&display=swap`;
+  // Pages ship a static <link data-theme-fonts> for the default fonts so text renders early.
+  // Only touch it if config.theme.fonts was changed to something else.
+  const existing = document.querySelector("link[data-theme-fonts]");
+  if (existing) { if (existing.href !== href) existing.href = href; return; }
   const link = document.createElement("link");
   link.rel = "stylesheet";
-  link.href = `https://fonts.googleapis.com/css2?${q}&display=swap`;
+  link.href = href;
   link.dataset.themeFonts = "";
   document.head.appendChild(link);
 }

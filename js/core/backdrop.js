@@ -154,9 +154,9 @@ function activateSequence(orient) {
   if (still()) {
     const i = Math.min(B.count, Math.max(1, Number(cfg().stillFrame) || 1)) - 1;
     B.target = B.smooth = B.count > 1 ? i / (B.count - 1) : 0;
-    loadFrames([i], token);
+    loadFrames(token, [i]);                        // reduced motion: one still frame, nothing else
   } else {
-    loadFrames(loadOrder(B.count, Math.round(B.smooth * (B.count - 1))), token);
+    loadFrames(token);
   }
   kick();
 }
@@ -172,46 +172,80 @@ function focal() {
 /** "frame_%04d.webp", 0 -> "frame_0001.webp" */
 const frameUrl = (pattern, i) => pattern.replace(/%0?(\d*)d/, (_, n) => String(i + 1).padStart(Number(n) || 0, "0"));
 
-/** current frame first, then every 10th, every 5th, every 2nd, then the rest. */
-function loadOrder(count, first) {
-  const seen = new Set();
-  const out = [];
-  const push = (i) => { if (i >= 0 && i < count && !seen.has(i)) { seen.add(i); out.push(i); } };
-  push(first); push(0); push(count - 1);
-  for (const step of [10, 5, 2, 1]) for (let i = 0; i < count; i += step) push(i);
-  return out;
-}
+const idle = (fn) => ("requestIdleCallback" in window ? requestIdleCallback(fn, { timeout: 1500 }) : setTimeout(fn, 200));
+const decodeImg = (img) => (img.decode ? img.decode() : new Promise((res, rej) => { img.onload = res; img.onerror = rej; }));
 
-function loadFrames(order, token, attempt = 0) {
-  const pattern = B.pattern;
-  const imgs = B.imgs;
-  const failed = [];
-  let next = 0, inFlight = 0;
-  const one = () => {
-    if (!B || token !== B.loadToken) return;                            // sequence switched: stop
-    if (next >= order.length) {
-      // all requested: retry frames that failed (network hiccup, files still uploading) with back-off,
-      // otherwise the animation would stick on the last loaded frame
-      if (inFlight === 0 && failed.length && attempt < 5) {
-        setTimeout(() => loadFrames(failed, token, attempt + 1), 1000 * 2 ** attempt);
-      }
-      return;
-    }
-    const i = order[next++];
-    if (imgs[i]) return one();
-    inFlight++;
-    const img = new Image();
-    img.decoding = "async";
-    img.src = frameUrl(pattern, i) + (attempt ? `?r=${attempt}` : "");
-    (img.decode ? img.decode() : new Promise((res, rej) => { img.onload = res; img.onerror = rej; }))
-      .then(() => {
-        imgs[i] = img;
-        if (B.imgs === imgs && (Math.abs(i - frameIndex()) < 12 || B.drawn < 0)) { B.dirty = true; kick(); }
-      })
-      .catch(() => failed.push(i))
-      .finally(() => { inFlight--; one(); });
+/**
+ * Frame loader, in two phases so the background never fights the rest of the page for bandwidth:
+ *   1. now, high priority: the frames around the current scroll position + every 10th frame
+ *      (so any position has a real frame within 5, which the cross-fade covers).
+ *   2. after the page's load event, when the browser is idle, low priority, 4 at a time:
+ *      the remaining frames NEAREST TO WHERE THE VISITOR IS first (re-evaluated on every pick),
+ *      so a fast scroll fills in where you are, not at the end of the clip.
+ * Failed frames are retried with back-off (a missing frame would freeze the animation).
+ * `only` = load just these frames (reduced motion: the still frame).
+ */
+function loadFrames(token, only = null) {
+  const { count, imgs, pattern } = B;
+  const center = () => Math.round(clamp01(B.target) * (count - 1));
+  const pending = new Set();
+  for (let i = 0; i < count; i++) if (!imgs[i]) pending.add(i);
+  const queue = [];                                // phase-1 order
+  if (only) queue.push(...only);
+  else {
+    const c = center();
+    for (const d of [0, 1, -1, 2, -2, 3, -3]) queue.push(c + d);
+    for (let i = 0; i < count; i += 10) queue.push(i);
+    queue.push(count - 1);
+  }
+  const tries = new Map();
+  let inFlight = 0, phase2 = false, phase2Queued = false;
+
+  const next = () => {
+    while (queue.length) { const i = queue.shift(); if (pending.has(i)) return i; }
+    if (!phase2 || only) return -1;
+    const c = center();
+    let best = -1, bd = Infinity;
+    for (const i of pending) { const d = Math.abs(i - c); if (d < bd) { bd = d; best = i; } }
+    return best;
   };
-  for (let k = 0; k < 6; k++) one();   // 6 in flight
+  const startPhase2 = () => {
+    if (phase2Queued || only) return;
+    phase2Queued = true;
+    const go = () => idle(() => { phase2 = true; pump(); });
+    if (document.readyState === "complete") go();
+    else addEventListener("load", go, { once: true });
+  };
+  const pump = () => {
+    if (!B || token !== B.loadToken) return;      // sequence switched: stop
+    const max = phase2 ? 4 : 6;
+    while (inFlight < max) {
+      const i = next();
+      if (i < 0) break;
+      pending.delete(i);
+      inFlight++;
+      const n = tries.get(i) || 0;
+      const img = new Image();
+      img.decoding = "async";
+      img.fetchPriority = phase2 ? "low" : "high";
+      img.src = frameUrl(pattern, i) + (n ? `?r=${n}` : "");
+      decodeImg(img)
+        .then(() => {
+          imgs[i] = img;
+          if (B.imgs === imgs && (Math.abs(i - center()) < 12 || B.drawn < 0)) { B.dirty = true; B.drawnU = NaN; kick(); }
+        })
+        .catch(() => {
+          if (n < 5) { tries.set(i, n + 1); setTimeout(() => { pending.add(i); queue.push(i); pump(); }, 1000 * 2 ** n); }
+        })
+        .finally(() => {
+          inFlight--;
+          if (!queue.length) startPhase2();
+          pump();
+        });
+    }
+    if (!queue.length && inFlight === 0) startPhase2();
+  };
+  pump();
 }
 
 /* ====================================================== scroll -> clip position */
@@ -243,7 +277,6 @@ function onScroll(e) {
   kick();
 }
 
-const frameIndex = () => Math.round(B.smooth * (B.count - 1));
 
 /* ================================================================ render loop */
 
@@ -512,18 +545,26 @@ function mountMarquee(page) {
 
   const g = gsap();
   if (!g || still()) return;
-  let x = 0, boost = 0, lastY = scrollY;
-  g.ticker.add((time, dt) => {
+  let x = 0, boost = 0, lastY = scrollY, half = track.scrollWidth / 2 || 1;
+  // width only changes on resize / font load, never per frame
+  if ("ResizeObserver" in window) new ResizeObserver(() => { half = track.scrollWidth / 2 || 1; }).observe(track);
+  const step = (time, dt) => {
     const dy = scrollY - lastY;
     lastY = scrollY;
     boost += (Math.min(40, Math.abs(dy)) - boost) * 0.1;
     const dir = dy < 0 ? -1 : 1;
     x -= (0.04 + boost * 0.02) * dt * (boost > 1 ? dir : 1);
-    const half = track.scrollWidth / 2 || 1;
     if (x <= -half) x += half;
     if (x > 0) x -= half;
-    track.style.transform = `translate3d(${x}px,0,0) skewX(${(-boost * 0.25 * dir).toFixed(2)}deg)`;
+    track.style.transform = `translate3d(${x.toFixed(1)}px,0,0) skewX(${(-boost * 0.25 * dir).toFixed(2)}deg)`;
+  };
+  // only tick while the band is on screen
+  let on = false;
+  const io = new IntersectionObserver(([e]) => {
+    if (e.isIntersecting && !on) { on = true; lastY = scrollY; g.ticker.add(step); }
+    else if (!e.isIntersecting && on) { on = false; g.ticker.remove(step); }
   });
+  io.observe(band);
 }
 
 /* ============================================================ split headlines */

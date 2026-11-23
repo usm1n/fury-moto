@@ -6,6 +6,8 @@
   display: flex; align-items: flex-end;
   padding-block: calc(var(--header-h) + var(--space-6)) calc(var(--space-8) + var(--bottom-bar-h));
 }
+/* hidden (not collapsed) until home.js has filled it from config, so the text never shifts in */
+html.js .hero__inner:not(.is-filled) { visibility: hidden; }
 .hero__inner { flex: 0 0 auto; } /* keep .container's width + gutters inside the flex row */
 .hero__title {
   font-size: var(--fs-hero);

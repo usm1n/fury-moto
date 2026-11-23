@@ -135,10 +135,10 @@ html.has-grain body::after {
 }
 
 /* ---------- reveal (GSAP sets final state; this is the no-JS-safe initial state) ---------- */
-html.js [data-reveal] { opacity: 0; transform: translateY(24px); }
+html.js [data-reveal]:not(.is-revealed) { opacity: 0; transform: translateY(24px); }
 html.reduced-motion [data-reveal], html.no-gsap [data-reveal] { opacity: 1 !important; transform: none !important; }
 
-/* page transition */
+/* page transition (fade-out on leave is in app.js) */
 body { animation: page-in var(--dur-med) var(--ease-out) both; }
 html.is-leaving body { opacity: 0; transition: opacity var(--dur-fast); }
 @keyframes page-in { from { opacity: 0; } to { opacity: 1; } }
