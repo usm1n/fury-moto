@@ -1,0 +1,567 @@
+openapi: 3.1.0
+info:
+  title: The Gear Doctor API
+  version: 0.1.0-draft
+  description: |
+    DRAFT contract for review (Phase 1 checkpoint). Implementation will generate the
+    real spec from code (Microsoft.AspNetCore.OpenApi); this file is what the code
+    must match. Conventions:
+    - JSON camelCase. Money = integer PKR. Timestamps ISO-8601 UTC.
+    - Errors are RFC 9457 ProblemDetails (`application/problem+json`); validation
+      errors add `errors: { field: [message] }`.
+    - Lists return `{ items, page, pageSize, total }`. pageSize max 60.
+    - Public GETs: `Cache-Control: public, s-maxage=60, stale-while-revalidate=600`.
+    - Admin endpoints: cookie `gd_auth` (JWT, HttpOnly, Secure, SameSite=Strict, Path=/api)
+      + header `X-CSRF-Token` on every non-GET.
+servers:
+  - url: /
+tags:
+  - name: Public
+  - name: Orders
+  - name: Auth
+  - name: AdminProducts
+  - name: AdminImages
+  - name: AdminCatalog
+  - name: AdminOrders
+  - name: AdminSettings
+
+paths:
+  /api/health:
+    get:
+      tags: [Public]
+      summary: Liveness + DB reachability
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { status: { type: string, example: ok }, db: { type: string, example: ok } } } } } }
+
+  /api/products:
+    get:
+      tags: [Public]
+      summary: Published products with filters (storefront shop/search)
+      parameters:
+        - { name: category, in: query, schema: { type: string }, description: category slug }
+        - { name: brand, in: query, schema: { type: string }, description: "comma-separated brand slugs" }
+        - { name: size, in: query, schema: { type: string }, description: "comma-separated sizes" }
+        - { name: cert, in: query, schema: { type: string }, description: "comma-separated certification codes" }
+        - { name: minPrice, in: query, schema: { type: integer } }
+        - { name: maxPrice, in: query, schema: { type: integer } }
+        - { name: inStock, in: query, schema: { type: boolean } }
+        - { name: q, in: query, schema: { type: string, maxLength: 80 } }
+        - { name: sort, in: query, schema: { type: string, enum: [featured, price-asc, price-desc, new, name], default: featured } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, minimum: 1, maximum: 60, default: 24 } }
+      responses:
+        "200":
+          description: Page of product cards
+          content: { application/json: { schema: { $ref: "#/components/schemas/ProductCardPage" } } }
+        "400": { $ref: "#/components/responses/Problem" }
+
+  /api/products/featured:
+    get:
+      tags: [Public]
+      summary: Featured products (home "Rider's picks")
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/ProductCard" } } } } }
+
+  /api/products/{slug}:
+    get:
+      tags: [Public]
+      summary: Product detail (published only)
+      parameters: [ { name: slug, in: path, required: true, schema: { type: string } } ]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ProductDetail" } } } }
+        "404": { $ref: "#/components/responses/Problem" }
+
+  /api/products/facets:
+    get:
+      tags: [Public]
+      summary: Filter options for the shop sidebar (brands, sizes, certs, price range) for a category
+      parameters: [ { name: category, in: query, schema: { type: string } } ]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Facets" } } } }
+
+  /api/categories:
+    get:
+      tags: [Public]
+      responses:
+        "200": { description: Active categories by sortOrder, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Category" } } } } }
+  /api/brands:
+    get:
+      tags: [Public]
+      responses:
+        "200": { description: Active brands, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Brand" } } } } }
+  /api/certifications:
+    get:
+      tags: [Public]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Certification" } } } } }
+
+  /api/settings/public:
+    get:
+      tags: [Public]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PublicSettings" } } } }
+
+  /api/cart/validate:
+    post:
+      tags: [Orders]
+      summary: Re-price and re-check stock for a cart (no side effects, not cached)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [lines], properties: { lines: { type: array, maxItems: 30, items: { $ref: "#/components/schemas/CartLineInput" } } } } } }
+      responses:
+        "200": { description: Current truth per line, content: { application/json: { schema: { $ref: "#/components/schemas/CartValidation" } } } }
+
+  /api/orders:
+    post:
+      tags: [Orders]
+      summary: Place an order (COD / bank transfer). Server prices everything; client prices are never accepted.
+      description: |
+        Validates Turnstile, product/variant existence, availability (stock >= qty) and
+        computes prices + delivery fee server-side. Does NOT deduct stock (deducted on
+        Confirmed). Rate limited per IP. Returns the WhatsApp text the storefront opens.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/CreateOrder" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/OrderCreated" } } } }
+        "400": { $ref: "#/components/responses/Problem" }
+        "409": { description: "Stock or price changed — body lists lines (type /problems/cart-changed)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/CartChangedProblem" } } } }
+        "429": { $ref: "#/components/responses/Problem" }
+
+  /api/auth/csrf:
+    get:
+      tags: [Auth]
+      summary: Issues the antiforgery cookie (gd_csrf) the admin echoes in X-CSRF-Token
+      responses: { "204": { description: Cookie set } }
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [email, password], properties: { email: { type: string, format: email }, password: { type: string } } } } } }
+      responses:
+        "200": { description: "Logged in; sets gd_auth cookie", content: { application/json: { schema: { $ref: "#/components/schemas/Me" } } } }
+        "401": { $ref: "#/components/responses/Problem" }
+        "423": { description: Locked out (5 failures → 15 min), content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "429": { $ref: "#/components/responses/Problem" }
+  /api/auth/logout:
+    post: { tags: [Auth], security: [ { cookieAuth: [] } ], responses: { "204": { description: Cookie cleared } } }
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      security: [ { cookieAuth: [] } ]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Me" } } } }
+        "401": { $ref: "#/components/responses/Problem" }
+  /api/auth/change-password:
+    post:
+      tags: [Auth]
+      security: [ { cookieAuth: [] } ]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [currentPassword, newPassword], properties: { currentPassword: { type: string }, newPassword: { type: string, minLength: 12 } } } } } }
+      responses: { "204": { description: Changed; mustChangePassword cleared }, "400": { $ref: "#/components/responses/Problem" } }
+
+  /api/admin/dashboard:
+    get:
+      tags: [AdminOrders]
+      security: [ { cookieAuth: [] } ]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Dashboard" } } } } }
+
+  /api/admin/products:
+    get:
+      tags: [AdminProducts]
+      security: [ { cookieAuth: [] } ]
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { $ref: "#/components/schemas/ProductStatus" } }
+        - { name: category, in: query, schema: { type: integer } }
+        - { name: brand, in: query, schema: { type: integer } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 25, maximum: 100 } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AdminProductRowPage" } } } } }
+    post:
+      tags: [AdminProducts]
+      security: [ { cookieAuth: [] } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ProductUpsert" } } } }
+      responses: { "201": { description: Created (Draft), content: { application/json: { schema: { $ref: "#/components/schemas/AdminProduct" } } } }, "400": { $ref: "#/components/responses/Problem" } }
+  /api/admin/products/reorder:
+    post:
+      tags: [AdminProducts]
+      security: [ { cookieAuth: [] } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/Reorder" } } } }
+      responses: { "204": { description: OK } }
+  /api/admin/products/{id}:
+    parameters: [ { name: id, in: path, required: true, schema: { type: integer } } ]
+    get:
+      tags: [AdminProducts]
+      security: [ { cookieAuth: [] } ]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AdminProduct" } } } }, "404": { $ref: "#/components/responses/Problem" } }
+    put:
+      tags: [AdminProducts]
+      security: [ { cookieAuth: [] } ]
+      description: Full update of product fields (not variants/images). Send `version` from GET; 409 if changed meanwhile.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ProductUpsert" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AdminProduct" } } } }, "400": { $ref: "#/components/responses/Problem" }, "409": { $ref: "#/components/responses/Problem" } }
+    delete:
+      tags: [AdminProducts]
+      security: [ { cookieAuth: [] } ]
+      description: Soft delete (sets deletedAt; hidden everywhere; images kept for 30 days)
+      responses: { "204": { description: Deleted } }
+  /api/admin/products/{id}/duplicate:
+    post: { tags: [AdminProducts], security: [ { cookieAuth: [] } ], parameters: [ { name: id, in: path, required: true, schema: { type: integer } } ], responses: { "201": { description: Copy as Draft, content: { application/json: { schema: { $ref: "#/components/schemas/AdminProduct" } } } } } }
+  /api/admin/products/{id}/publish:
+    post: { tags: [AdminProducts], security: [ { cookieAuth: [] } ], parameters: [ { name: id, in: path, required: true, schema: { type: integer } } ], description: "Requires ≥1 image and ≥1 active variant", responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AdminProduct" } } } }, "400": { $ref: "#/components/responses/Problem" } } }
+  /api/admin/products/{id}/unpublish:
+    post: { tags: [AdminProducts], security: [ { cookieAuth: [] } ], parameters: [ { name: id, in: path, required: true, schema: { type: integer } } ], responses: { "200": { description: Back to Draft, content: { application/json: { schema: { $ref: "#/components/schemas/AdminProduct" } } } } } }
+  /api/admin/products/{id}/variants:
+    put:
+      tags: [AdminProducts]
+      security: [ { cookieAuth: [] } ]
+      parameters: [ { name: id, in: path, required: true, schema: { type: integer } } ]
+      description: Bulk upsert of the size × colour grid. Rows absent from the body are deactivated (not deleted, orders reference them). SKU auto-generated when blank.
+      requestBody: { required: true, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/VariantUpsert" } } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Variant" } } } } }, "409": { $ref: "#/components/responses/Problem" } }
+  /api/admin/variants/{id}/stock:
+    post:
+      tags: [AdminProducts]
+      security: [ { cookieAuth: [] } ]
+      parameters: [ { name: id, in: path, required: true, schema: { type: integer } } ]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [delta], properties: { delta: { type: integer, description: "+n restock / -n correction; result must stay ≥ 0" }, reason: { type: string } } } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Variant" } } } }, "400": { $ref: "#/components/responses/Problem" } }
+
+  /api/admin/uploads/presign:
+    post:
+      tags: [AdminImages]
+      security: [ { cookieAuth: [] } ]
+      description: |
+        Returns a presigned PUT URL to R2 (10 min). The admin resizes client-side to
+        ≤2000 px WebP (~80%) + a 480 px thumbnail and PUTs each directly to R2.
+        Server enforces contentType image/webp and maxBytes (main 3 MB, thumb 300 KB).
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [productId, kind], properties: { productId: { type: integer }, kind: { type: string, enum: [main, thumb] }, contentType: { type: string, enum: [image/webp] }, bytes: { type: integer } } } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { type: object, properties: { uploadUrl: { type: string, format: uri }, key: { type: string, example: "products/42/7f3c….webp" }, headers: { type: object, additionalProperties: { type: string } }, expiresAt: { type: string, format: date-time } } } } } } }
+  /api/admin/products/{id}/images:
+    post:
+      tags: [AdminImages]
+      security: [ { cookieAuth: [] } ]
+      parameters: [ { name: id, in: path, required: true, schema: { type: integer } } ]
+      description: Register uploaded keys (server HEADs R2 to confirm the object exists and size/type match).
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [key, thumbKey, width, height], properties: { key: { type: string }, thumbKey: { type: string }, width: { type: integer }, height: { type: integer }, alt: { type: string, maxLength: 200 } } } } } }
+      responses: { "201": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Image" } } } } }
+  /api/admin/products/{id}/images/reorder:
+    post: { tags: [AdminImages], security: [ { cookieAuth: [] } ], parameters: [ { name: id, in: path, required: true, schema: { type: integer } } ], requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/Reorder" } } } }, responses: { "204": { description: OK } } }
+  /api/admin/images/{imageId}:
+    patch: { tags: [AdminImages], security: [ { cookieAuth: [] } ], parameters: [ { name: imageId, in: path, required: true, schema: { type: integer } } ], requestBody: { content: { application/json: { schema: { type: object, properties: { alt: { type: string } } } } } }, responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Image" } } } } } }
+    delete: { tags: [AdminImages], security: [ { cookieAuth: [] } ], parameters: [ { name: imageId, in: path, required: true, schema: { type: integer } } ], description: Deletes row and both R2 objects, responses: { "204": { description: Deleted } } }
+
+  /api/admin/categories:
+    get: { tags: [AdminCatalog], security: [ { cookieAuth: [] } ], responses: { "200": { description: All incl. inactive, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Category" } } } } } } }
+    post: { tags: [AdminCatalog], security: [ { cookieAuth: [] } ], requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/CategoryUpsert" } } } }, responses: { "201": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Category" } } } } } }
+  /api/admin/categories/{id}:
+    put: { tags: [AdminCatalog], security: [ { cookieAuth: [] } ], parameters: [ { name: id, in: path, required: true, schema: { type: integer } } ], requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/CategoryUpsert" } } } }, responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Category" } } } } } }
+    delete: { tags: [AdminCatalog], security: [ { cookieAuth: [] } ], parameters: [ { name: id, in: path, required: true, schema: { type: integer } } ], description: "409 if products still use it (deactivate instead)", responses: { "204": { description: OK }, "409": { $ref: "#/components/responses/Problem" } } }
+  /api/admin/categories/reorder:
+    post: { tags: [AdminCatalog], security: [ { cookieAuth: [] } ], requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/Reorder" } } } }, responses: { "204": { description: OK } } }
+  /api/admin/brands:
+    get: { tags: [AdminCatalog], security: [ { cookieAuth: [] } ], responses: { "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Brand" } } } } } } }
+    post: { tags: [AdminCatalog], security: [ { cookieAuth: [] } ], requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/BrandUpsert" } } } }, responses: { "201": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Brand" } } } } } }
+  /api/admin/brands/{id}:
+    put: { tags: [AdminCatalog], security: [ { cookieAuth: [] } ], parameters: [ { name: id, in: path, required: true, schema: { type: integer } } ], requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/BrandUpsert" } } } }, responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Brand" } } } } } }
+    delete: { tags: [AdminCatalog], security: [ { cookieAuth: [] } ], parameters: [ { name: id, in: path, required: true, schema: { type: integer } } ], responses: { "204": { description: OK }, "409": { $ref: "#/components/responses/Problem" } } }
+  /api/admin/brands/reorder:
+    post: { tags: [AdminCatalog], security: [ { cookieAuth: [] } ], requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/Reorder" } } } }, responses: { "204": { description: OK } } }
+
+  /api/admin/orders:
+    get:
+      tags: [AdminOrders]
+      security: [ { cookieAuth: [] } ]
+      parameters:
+        - { name: status, in: query, schema: { $ref: "#/components/schemas/OrderStatus" } }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+        - { name: q, in: query, schema: { type: string }, description: "order number, name or phone" }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 25 } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/OrderRowPage" } } } } }
+  /api/admin/orders/{id}:
+    get: { tags: [AdminOrders], security: [ { cookieAuth: [] } ], parameters: [ { name: id, in: path, required: true, schema: { type: integer } } ], responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Order" } } } } } }
+  /api/admin/orders/{id}/status:
+    post:
+      tags: [AdminOrders]
+      security: [ { cookieAuth: [] } ]
+      parameters: [ { name: id, in: path, required: true, schema: { type: integer } } ]
+      description: |
+        Allowed: New→Confirmed|Cancelled, Confirmed→Shipped|Cancelled, Shipped→Delivered|Cancelled.
+        →Confirmed deducts stock atomically (409 /problems/out-of-stock lists short variants).
+        →Cancelled after stock was deducted restores it. All in one transaction.
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [status, version], properties: { status: { $ref: "#/components/schemas/OrderStatus" }, note: { type: string, maxLength: 500 }, version: { type: string } } } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Order" } } } }, "400": { $ref: "#/components/responses/Problem" }, "409": { $ref: "#/components/responses/Problem" } }
+  /api/admin/orders/{id}/notes:
+    post: { tags: [AdminOrders], security: [ { cookieAuth: [] } ], parameters: [ { name: id, in: path, required: true, schema: { type: integer } } ], requestBody: { required: true, content: { application/json: { schema: { type: object, required: [note], properties: { note: { type: string, maxLength: 500 } } } } } }, responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Order" } } } } } }
+
+  /api/admin/settings:
+    get: { tags: [AdminSettings], security: [ { cookieAuth: [] } ], responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AdminSettings" } } } } } }
+    put: { tags: [AdminSettings], security: [ { cookieAuth: [] } ], requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/AdminSettings" } } } }, responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AdminSettings" } } } }, "400": { $ref: "#/components/responses/Problem" } } }
+
+components:
+  securitySchemes:
+    cookieAuth: { type: apiKey, in: cookie, name: gd_auth }
+  responses:
+    Problem:
+      description: ProblemDetails
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+  schemas:
+    Problem:
+      type: object
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        traceId: { type: string }
+        errors: { type: object, additionalProperties: { type: array, items: { type: string } } }
+    ProductStatus: { type: string, enum: [Draft, Published, Archived] }
+    OrderStatus: { type: string, enum: [New, Confirmed, Shipped, Delivered, Cancelled] }
+    PaymentMethod: { type: string, enum: [COD, BankTransfer] }
+    Reorder: { type: object, required: [ids], properties: { ids: { type: array, items: { type: integer }, description: "ids in the new order" } } }
+    Image:
+      type: object
+      properties:
+        id: { type: integer }
+        url: { type: string, format: uri }
+        thumbUrl: { type: string, format: uri }
+        width: { type: integer }
+        height: { type: integer }
+        alt: { type: string }
+    Category: { type: object, properties: { id: { type: integer }, name: { type: string }, slug: { type: string }, imageUrl: { type: [string, "null"] }, sortOrder: { type: integer }, isActive: { type: boolean }, productCount: { type: integer } } }
+    CategoryUpsert: { type: object, required: [name], properties: { name: { type: string, maxLength: 60 }, slug: { type: string, description: "auto from name if blank" }, imageKey: { type: [string, "null"] }, isActive: { type: boolean, default: true } } }
+    Brand: { type: object, properties: { id: { type: integer }, name: { type: string }, slug: { type: string }, logoUrl: { type: [string, "null"] }, isActive: { type: boolean } } }
+    BrandUpsert: { type: object, required: [name], properties: { name: { type: string, maxLength: 60 }, slug: { type: string }, logoKey: { type: [string, "null"] }, isActive: { type: boolean, default: true } } }
+    Certification: { type: object, properties: { id: { type: integer }, code: { type: string, example: ECE_22_06 }, name: { type: string, example: "ECE 22.06" }, description: { type: string } } }
+    Spec: { type: object, required: [label, value], properties: { label: { type: string }, value: { type: string } } }
+    Variant:
+      type: object
+      properties:
+        id: { type: integer }
+        size: { type: string }
+        color: { type: string }
+        colorHex: { type: [string, "null"] }
+        sku: { type: string }
+        stock: { type: integer, minimum: 0 }
+        priceOverride: { type: [integer, "null"] }
+        isActive: { type: boolean }
+        version: { type: string, description: concurrency token (xmin) }
+    VariantUpsert:
+      type: object
+      required: [size, color, stock]
+      properties:
+        id: { type: [integer, "null"] }
+        size: { type: string }
+        color: { type: string }
+        colorHex: { type: [string, "null"] }
+        sku: { type: [string, "null"], description: "blank = auto (BRAND-PRODUCT-SIZE-COLOR)" }
+        stock: { type: integer, minimum: 0 }
+        priceOverride: { type: [integer, "null"] }
+        isActive: { type: boolean, default: true }
+        version: { type: [string, "null"] }
+    ProductCard:
+      description: Grid card — matches today's storefront productCard() needs
+      type: object
+      properties:
+        slug: { type: string }
+        title: { type: string }
+        brand: { type: object, properties: { slug: { type: string }, name: { type: string } } }
+        category: { type: object, properties: { slug: { type: string }, name: { type: string } } }
+        price: { type: integer }
+        compareAtPrice: { type: [integer, "null"] }
+        badges: { type: array, items: { type: string } }
+        certifications: { type: array, items: { type: string }, example: ["ECE 22.06", "FIM"] }
+        images: { type: array, maxItems: 2, items: { $ref: "#/components/schemas/Image" } }
+        inStock: { type: boolean }
+        sizes: { type: array, items: { type: string } }
+    ProductCardPage: { type: object, properties: { items: { type: array, items: { $ref: "#/components/schemas/ProductCard" } }, page: { type: integer }, pageSize: { type: integer }, total: { type: integer } } }
+    ProductDetail:
+      allOf:
+        - $ref: "#/components/schemas/ProductCard"
+        - type: object
+          properties:
+            shortDescription: { type: string }
+            description: { type: string, description: markdown-lite }
+            gearDoctorNote: { type: string }
+            specs: { type: array, items: { $ref: "#/components/schemas/Spec" } }
+            certificationDetails: { type: array, items: { $ref: "#/components/schemas/Certification" } }
+            images: { type: array, items: { $ref: "#/components/schemas/Image" } }
+            variants:
+              type: array
+              items: { type: object, properties: { size: { type: string }, color: { type: string }, colorHex: { type: [string, "null"] }, price: { type: integer }, available: { type: integer, description: "stock, capped at 10 for display; 0 = sold out" }, lowStock: { type: boolean } } }
+            related: { type: array, items: { $ref: "#/components/schemas/ProductCard" } }
+    Facets:
+      type: object
+      properties:
+        brands: { type: array, items: { type: object, properties: { slug: { type: string }, name: { type: string }, count: { type: integer } } } }
+        sizes: { type: array, items: { type: string } }
+        certifications: { type: array, items: { type: object, properties: { code: { type: string }, name: { type: string } } } }
+        minPrice: { type: integer }
+        maxPrice: { type: integer }
+    PublicSettings:
+      type: object
+      properties:
+        whatsappNumber: { type: [string, "null"], description: "digits only, international" }
+        phoneDisplay: { type: [string, "null"] }
+        email: { type: [string, "null"] }
+        city: { type: [string, "null"] }
+        address: { type: [string, "null"] }
+        hours: { type: [string, "null"] }
+        deliveryFee: { type: integer }
+        codEnabled: { type: boolean }
+        bankTransferEnabled: { type: boolean }
+        turnstileSiteKey: { type: string }
+    CartLineInput: { type: object, required: [slug, size, color, quantity], properties: { slug: { type: string }, size: { type: string }, color: { type: string }, quantity: { type: integer, minimum: 1, maximum: 10 } } }
+    CartValidation:
+      type: object
+      properties:
+        lines:
+          type: array
+          items:
+            type: object
+            properties:
+              slug: { type: string }
+              size: { type: string }
+              color: { type: string }
+              requested: { type: integer }
+              available: { type: integer }
+              unitPrice: { type: integer }
+              title: { type: string }
+              thumbUrl: { type: string }
+              status: { type: string, enum: [ok, price-changed, reduced, sold-out, unavailable] }
+        subtotal: { type: integer }
+        deliveryFee: { type: integer }
+        total: { type: integer }
+    CreateOrder:
+      type: object
+      required: [customerName, phone, city, address, paymentMethod, lines, turnstileToken]
+      properties:
+        customerName: { type: string, maxLength: 80 }
+        phone: { type: string, pattern: "^\\+?[0-9 \\-]{10,16}$" }
+        city: { type: string, maxLength: 60 }
+        address: { type: string, maxLength: 300 }
+        notes: { type: [string, "null"], maxLength: 500 }
+        paymentMethod: { $ref: "#/components/schemas/PaymentMethod" }
+        lines: { type: array, minItems: 1, maxItems: 30, items: { $ref: "#/components/schemas/CartLineInput" } }
+        expectedTotal: { type: integer, description: "what the customer saw; mismatch → 409 cart-changed (never used as the price)" }
+        turnstileToken: { type: string }
+    OrderCreated:
+      type: object
+      properties:
+        orderNumber: { type: string, example: GD-1042 }
+        total: { type: integer }
+        whatsappUrl: { type: string, format: uri }
+        whatsappMessage: { type: string }
+    CartChangedProblem:
+      allOf:
+        - $ref: "#/components/schemas/Problem"
+        - type: object
+          properties: { cart: { $ref: "#/components/schemas/CartValidation" } }
+    Me: { type: object, properties: { email: { type: string }, roles: { type: array, items: { type: string } }, mustChangePassword: { type: boolean } } }
+    Dashboard:
+      type: object
+      properties:
+        newOrders: { type: integer }
+        revenueThisMonth: { type: integer, description: "sum of totals for Confirmed/Shipped/Delivered this month" }
+        ordersThisMonth: { type: integer }
+        lowStock: { type: array, items: { type: object, properties: { productId: { type: integer }, title: { type: string }, size: { type: string }, color: { type: string }, stock: { type: integer } } } }
+    AdminProductRow:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        slug: { type: string }
+        status: { $ref: "#/components/schemas/ProductStatus" }
+        brand: { type: string }
+        category: { type: string }
+        price: { type: integer }
+        totalStock: { type: integer }
+        thumbUrl: { type: [string, "null"] }
+        isFeatured: { type: boolean }
+        updatedAt: { type: string, format: date-time }
+    AdminProductRowPage: { type: object, properties: { items: { type: array, items: { $ref: "#/components/schemas/AdminProductRow" } }, page: { type: integer }, pageSize: { type: integer }, total: { type: integer } } }
+    ProductUpsert:
+      type: object
+      required: [title, brandId, categoryId, price]
+      properties:
+        title: { type: string, maxLength: 140 }
+        slug: { type: [string, "null"], description: "auto from title if blank; unique" }
+        brandId: { type: integer }
+        categoryId: { type: integer }
+        shortDescription: { type: string, maxLength: 300 }
+        description: { type: string, maxLength: 8000 }
+        gearDoctorNote: { type: string, maxLength: 500 }
+        specs: { type: array, maxItems: 30, items: { $ref: "#/components/schemas/Spec" } }
+        price: { type: integer, minimum: 0 }
+        compareAtPrice: { type: [integer, "null"], description: "must be > price when set" }
+        badges: { type: array, items: { type: string, enum: [New, "Rider's pick", Sale] } }
+        certificationIds: { type: array, items: { type: integer } }
+        isFeatured: { type: boolean }
+        version: { type: [string, "null"], description: "required on PUT" }
+    AdminProduct:
+      allOf:
+        - $ref: "#/components/schemas/ProductUpsert"
+        - type: object
+          properties:
+            id: { type: integer }
+            status: { $ref: "#/components/schemas/ProductStatus" }
+            variants: { type: array, items: { $ref: "#/components/schemas/Variant" } }
+            images: { type: array, items: { $ref: "#/components/schemas/Image" } }
+            createdAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
+            storefrontUrl: { type: string }
+    OrderItem:
+      type: object
+      properties:
+        productId: { type: integer }
+        variantId: { type: integer }
+        title: { type: string }
+        size: { type: string }
+        color: { type: string }
+        unitPrice: { type: integer }
+        quantity: { type: integer }
+        lineTotal: { type: integer }
+    OrderRow:
+      type: object
+      properties:
+        id: { type: integer }
+        orderNumber: { type: string }
+        customerName: { type: string }
+        phone: { type: string }
+        city: { type: string }
+        total: { type: integer }
+        itemCount: { type: integer }
+        status: { $ref: "#/components/schemas/OrderStatus" }
+        paymentMethod: { $ref: "#/components/schemas/PaymentMethod" }
+        createdAt: { type: string, format: date-time }
+    OrderRowPage: { type: object, properties: { items: { type: array, items: { $ref: "#/components/schemas/OrderRow" } }, page: { type: integer }, pageSize: { type: integer }, total: { type: integer }, countsByStatus: { type: object, additionalProperties: { type: integer } } } }
+    Order:
+      allOf:
+        - $ref: "#/components/schemas/OrderRow"
+        - type: object
+          properties:
+            address: { type: string }
+            notes: { type: [string, "null"] }
+            subtotal: { type: integer }
+            deliveryFee: { type: integer }
+            items: { type: array, items: { $ref: "#/components/schemas/OrderItem" } }
+            history: { type: array, items: { type: object, properties: { from: { type: [string, "null"] }, to: { type: string }, note: { type: [string, "null"] }, by: { type: [string, "null"] }, at: { type: string, format: date-time } } } }
+            whatsappUrl: { type: string, description: "wa.me link to the customer with an order summary" }
+            stockDeducted: { type: boolean }
+            version: { type: string }
+    AdminSettings:
+      type: object
+      required: [deliveryFee, codEnabled, lowStockThreshold]
+      properties:
+        whatsappNumber: { type: [string, "null"], pattern: "^[0-9]{10,15}$" }
+        phoneDisplay: { type: [string, "null"] }
+        email: { type: [string, "null"], format: email }
+        city: { type: [string, "null"] }
+        address: { type: [string, "null"] }
+        hours: { type: [string, "null"] }
+        deliveryFee: { type: integer, minimum: 0 }
+        codEnabled: { type: boolean }
+        bankTransferEnabled: { type: boolean }
+        bankDetails: { type: [object, "null"], properties: { bankName: { type: string }, accountTitle: { type: string }, iban: { type: string } } }
+        lowStockThreshold: { type: integer, minimum: 0, default: 3 }
