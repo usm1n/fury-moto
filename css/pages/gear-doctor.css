@@ -121,21 +121,69 @@
 /* ---------- official Instagram embeds (instagram-strip.js) ---------- */
 .igstrip--embeds .igstrip__item { flex: 0 0 min(340px, 86%); }
 .igstrip__item--embed { display: flex; }
-.igembed.instagram-media {
-  /* pre-script fallback card; Instagram's script replaces it with an iframe */
-  width: 100%; min-width: 0 !important; max-width: 540px; margin: 0 !important;
-  border: 1px solid var(--color-line) !important; border-radius: var(--radius) !important;
-  background: color-mix(in srgb, var(--color-surface) 80%, transparent) !important;
-  padding: 0 !important; box-shadow: none !important;
+/* Slot: holds the skeleton and, once rendered, Instagram's iframe. Its height is reserved up
+   front (the typical rendered post at this width) so nothing below moves when a post arrives. */
+.igembed-slot {
+  position: relative; display: grid; width: 100%; max-width: 540px;
+  min-height: 742px; border-radius: var(--radius); overflow: hidden;
 }
-.igembed__fallback {
-  display: grid; gap: var(--space-2); align-content: end; min-height: 320px; padding: var(--space-5);
-  text-decoration: none; color: var(--color-text);
+.igembed-slot > * { grid-area: 1 / 1; }                 /* skeleton and post share one cell */
+
+/* Instagram's rendered post: hidden until loaded, then fades in over the skeleton */
+.igembed-slot .instagram-media,
+.igembed-slot iframe.instagram-media {
+  width: 100% !important; min-width: 0 !important; max-width: 540px !important; margin: 0 !important;
+  border: 0 !important; border-radius: var(--radius) !important; box-shadow: none !important;
+  opacity: 0; transition: opacity 450ms var(--ease-out);
 }
-.igembed__acct { font-family: var(--font-display); font-size: var(--fs-xl); text-transform: uppercase; }
-.igembed__caption { color: var(--color-muted); }
-.igembed__cta { color: var(--color-accent); font-weight: 600; font-size: var(--fs-sm); letter-spacing: 0.06em; text-transform: uppercase; }
-.igstrip__item--embed iframe.instagram-media { border-radius: var(--radius) !important; min-width: 0 !important; }
+.igembed-slot.is-ready .instagram-media { opacity: 1; }
+
+/* ---- skeleton loader, Instagram-post shaped ---- */
+.igskel {
+  display: grid; grid-template-rows: auto 1fr auto auto; gap: var(--space-3);
+  padding: var(--space-3); border: 1px solid var(--color-line); border-radius: var(--radius);
+  background: color-mix(in srgb, var(--color-surface) 90%, transparent);
+  color: var(--color-muted); text-decoration: none; font-size: var(--fs-sm);
+  transition: opacity 450ms var(--ease-out);
+}
+.igembed-slot.is-ready .igskel { opacity: 0; pointer-events: none; }
+.igskel__head { display: flex; align-items: center; gap: var(--space-3); }
+.igskel__avatar { width: 36px; height: 36px; border-radius: 50%; flex: none; }
+.igskel__lines { display: grid; gap: 6px; flex: 1; }
+.igskel__lines span { height: 10px; border-radius: 5px; width: 60%; }
+.igskel__lines span + span { width: 38%; }
+.igskel__btn { width: 78px; height: 26px; border-radius: 6px; flex: none; }
+.igskel__media { position: relative; border-radius: 4px; min-height: 420px; }
+.igskel__play {
+  position: absolute; inset: 0; margin: auto; width: 54px; height: 54px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+}
+.igskel__play::after {
+  content: ""; position: absolute; left: 22px; top: 17px;
+  border-left: 16px solid rgba(255, 255, 255, 0.35); border-top: 10px solid transparent; border-bottom: 10px solid transparent;
+}
+.igskel__foot { display: flex; gap: var(--space-3); }
+.igskel__foot span { height: 12px; width: 90px; border-radius: 6px; }
+.igskel__foot span + span { width: 60px; }
+.igskel__text { line-height: 1.4; }
+.igskel__text b { color: var(--color-text); font-weight: 600; }
+
+/* shimmer: one shared gradient sweeping across the placeholder blocks (transform-free, cheap) */
+.igskel__avatar, .igskel__lines span, .igskel__btn, .igskel__media, .igskel__foot span {
+  background: linear-gradient(100deg,
+    color-mix(in srgb, var(--color-text) 6%, transparent) 30%,
+    color-mix(in srgb, var(--color-text) 14%, transparent) 50%,
+    color-mix(in srgb, var(--color-text) 6%, transparent) 70%);
+  background-size: 300% 100%;
+  animation: igskel-shimmer 1.4s linear infinite;
+}
+.igskel__media { background-color: color-mix(in srgb, var(--color-text) 4%, transparent); }
+@keyframes igskel-shimmer { from { background-position: 100% 0; } to { background-position: -50% 0; } }
+.igembed-slot.is-ready .igskel *, .igembed-slot.is-fallback .igskel * { animation: none; }
+/* script blocked: the skeleton stays as a plain "view on Instagram" card */
+.igembed-slot.is-fallback .igskel::after { content: attr(aria-label); color: var(--color-accent); font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .igskel * { animation: none !important; } }
+
 .igstrip__more { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-5); }
 @media (min-width: 900px) {
   .igstrip--embeds .igstrip__list { grid-template-columns: repeat(3, 1fr); align-items: start; }
