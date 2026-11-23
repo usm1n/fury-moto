@@ -289,7 +289,12 @@ function tick(now) {
   const k = (rate) => 1 - Math.pow(1 - rate, dt / 16.7);       // frame-rate independent easing
 
   const lerp = Math.min(1, Math.max(0.02, Number(cfg().scroll?.smoothing) || 0.12));
-  B.smooth += (B.target - B.smooth) * k(lerp);
+  // Adaptive easing: floaty for small moves, but the further behind we are (a fast flick), the
+  // harder it catches up, like a damped spring. Gap of 2 % of the clip ≈ base rate;
+  // 15 %+ (a big flick) ≈ 0.35. Keeps the cinematic glide without trailing a hard scroll.
+  const gap = Math.abs(B.target - B.smooth);
+  const rate = Math.min(0.35, lerp + gap * 1.8);
+  B.smooth += (B.target - B.smooth) * k(rate);
   if (Math.abs(B.target - B.smooth) < 0.0004) B.smooth = B.target;
   B.px += (B.tpx - B.px) * k(0.08);
   B.py += (B.tpy - B.py) * k(0.08);

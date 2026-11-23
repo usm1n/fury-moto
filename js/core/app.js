@@ -103,16 +103,27 @@ function initReveals(root) {
   // One batched trigger set: elements entering together reveal as a staggered group
   // (cheaper than a ScrollTrigger per element, and reads better as motion).
   ST.batch(els, {
-    start: "top 90%",
+    // fire just before entering the screen and keep it short, so a fast flick never lands on
+    // an empty section (content is already arriving as it scrolls in)
+    start: "top 105%",
     once: true,
-    onEnter: (batch) => g.to(batch, {
-      opacity: 1, y: 0, duration: 0.75, ease: "power3.out", overwrite: true,
-      stagger: { each: 0.07, from: "start" },
-      delay: (i, el) => Number(el.dataset.revealDelay || 0) * 0.5,
+    onEnter: (batch) => {
       // done: mark revealed (CSS stops applying the start state) and drop the inline transform,
       // so hover transforms on cards/tiles stay crisp
-      onComplete: () => batch.forEach((el) => { el.classList.add("is-revealed"); el.style.transform = ""; }),
-    }),
+      const done = (els) => () => els.forEach((el) => { el.classList.add("is-revealed"); el.style.transform = ""; });
+      // A fast flick / jump can land an element deep inside the screen before its trigger fires.
+      // Those appear almost at once (no stagger) so the visitor never looks at an empty section;
+      // elements arriving normally at the bottom edge get the full staggered reveal.
+      const deep = batch.filter((el) => el.getBoundingClientRect().top < innerHeight * 0.75);
+      const edge = batch.filter((el) => !deep.includes(el));
+      if (deep.length) g.to(deep, { opacity: 1, y: 0, duration: 0.18, ease: "power2.out", overwrite: true, onComplete: done(deep) });
+      if (edge.length) g.to(edge, {
+        opacity: 1, y: 0, duration: 0.55, ease: "power3.out", overwrite: true,
+        stagger: { each: 0.05, from: "start" },
+        delay: (i, el) => Number(el.dataset.revealDelay || 0) * 0.5,
+        onComplete: done(edge),
+      });
+    },
   });
 }
 
