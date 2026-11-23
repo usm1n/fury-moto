@@ -3,6 +3,7 @@ import { config, waLink, getVideo } from "../core/config.js";
 import { html, raw, esc, renderTemplate } from "../core/render.js";
 import { refresh } from "../core/app.js";
 import { instagramStrip, activateEmbeds } from "../components/instagram-strip.js";
+import { whatsappLink } from "../data/settings.js";
 
 const T = () => config.gearDoctor || {};
 const guides = () => config.guides || [];
@@ -80,11 +81,13 @@ export default async function mount(el) {
       <div class="container gd-cta__inner">
         <h2>${esc(t.cta?.title)}</h2>
         <p>${esc(t.cta?.text)}</p>
-        <a class="btn btn--primary" data-magnetic href="${esc(waLink(t.cta?.message))}" target="_blank" rel="noopener noreferrer">${esc(t.cta?.button)}</a>
+        <a class="btn btn--primary" data-magnetic data-gd-wa href="${esc(waLink(t.cta?.message))}" target="_blank" rel="noopener noreferrer">${esc(t.cta?.button)}</a>
       </div>
     </section>`);
 
   activateEmbeds(el);
+  // WhatsApp number lives in the API settings; swap it in once loaded (config is only the offline fallback)
+  whatsappLink(t.cta?.message).then((href) => el.querySelector("[data-gd-wa]")?.setAttribute("href", href)).catch(() => {});
   const results = el.querySelector(".gd-results");
   el.querySelector(".gd-filters").addEventListener("click", (e) => {
     const b = e.target.closest("[data-type]");

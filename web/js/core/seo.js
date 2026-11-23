@@ -6,6 +6,7 @@
  *   setSeo({ title: "Helmets", description: "...", url: "shop.html?cat=helmets", jsonLd: storeJsonLd() });
  */
 import { config, isPlaceholder } from "./config.js";
+import { settingsNow } from "../data/settings.js";
 
 /** Returns the trimmed string, or undefined when empty or still a [PLACEHOLDER]. */
 const clean = (v) => (typeof v === "string" && v.trim() && !isPlaceholder(v) ? v.trim() : undefined);
@@ -145,7 +146,8 @@ export function productJsonLd(product) {
 
 /** schema.org Store (LocalBusiness subtype) from config.store and config.socials. Placeholders are omitted. */
 export function storeJsonLd() {
-  const s = config.store || {};
+  // live contact details from /api/settings/public when already loaded; config.store is the fallback
+  const s = { ...(config.store || {}), ...pickFilled(settingsNow()) };
   const socials = config.socials || {};
   const sameAs = [
     ...(socials.instagram || []).map((i) => i.url),
@@ -188,4 +190,15 @@ export function breadcrumbJsonLd(items = []) {
       item: it.url ? absUrl(it.url) : undefined,
     })),
   };
+}
+
+/** Non-empty fields of the API settings, renamed to config.store keys. */
+function pickFilled(live) {
+  if (!live || live.fallback) return {};
+  const out = {};
+  if (live.address) out.address = live.address;
+  if (live.city) out.city = live.city;
+  if (live.phoneDisplay) out.phoneDisplay = live.phoneDisplay;
+  if (live.email) out.email = live.email;
+  return out;
 }
