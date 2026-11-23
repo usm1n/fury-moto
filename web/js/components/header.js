@@ -6,6 +6,7 @@ import { config, waLink } from "../core/config.js";
 import { html, raw, renderTemplate } from "../core/render.js";
 import { on, emit } from "../core/bus.js";
 import cart from "../data/cart.js";
+import { getSettings } from "../data/settings.js";
 import mountSearch, { lockScroll, unlockScroll, trapFocus, icons } from "./search.js";
 
 const ui = config.ui || {};
@@ -64,7 +65,7 @@ export default function mount(el) {
       <div class="menu__inner">
         <ul class="menu__links">${nav.map((l, i) => html`<li style="--i:${i}"><a class="menu__link" href="${l.href}"${l.href === active ? raw(' aria-current="page"') : ""}>${l.label}</a></li>`)}</ul>
         <div class="menu__foot">
-          <a class="btn btn--primary btn--block" href="${waLink()}" target="_blank" rel="noopener">${raw(ICON.whatsapp)}${ui.menuWhatsapp}</a>
+          <a class="btn btn--primary btn--block" data-wa href="${waLink()}" target="_blank" rel="noopener">${raw(ICON.whatsapp)}${ui.menuWhatsapp}</a>
           <p class="eyebrow menu__follow">${ui.menuFollow}</p>
           <ul class="menu__socials">
             ${ig.map((s) => html`<li><a href="${s.url}" target="_blank" rel="noopener" aria-label="${s.label || s.handle}">${raw(ICON.instagram)}<span>${s.handle}</span></a></li>`)}
@@ -85,6 +86,8 @@ export default function mount(el) {
   `);
 
   mountSearch();
+  // WhatsApp number comes from the API settings (config.store is the fallback until/unless they load)
+  getSettings().then((s) => { if (s.whatsapp) el.querySelectorAll("[data-wa]").forEach((a) => (a.href = waLink("", s.whatsapp))); });
 
   const header = el.querySelector("[data-header]");
   const menu = el.querySelector("#site-menu");

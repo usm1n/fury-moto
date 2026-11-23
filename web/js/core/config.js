@@ -77,9 +77,10 @@ const nf = new Intl.NumberFormat(config.store?.locale || "en-PK", { maximumFract
 export const formatPrice = (n) => `${config.store?.currencySymbol || "Rs"} ${nf.format(Number(n) || 0)}`;
 
 /** wa.me link with pre-filled message. Returns "#" if the number is still a placeholder. */
-export function waLink(message = "") {
+export function waLink(message = "", number) {
   // Never pull digits out of a "[PLACEHOLDER: … e.g. 923001234567]" string — that would message a stranger.
-  const rawNum = config.store?.whatsapp;
+  // An explicit number (from the API settings) wins; config.store.whatsapp is the fallback.
+  const rawNum = number != null && number !== "" ? number : config.store?.whatsapp;
   const num = isPlaceholder(rawNum) ? "" : String(rawNum || "").replace(/\D/g, "");
   const base = num ? `https://wa.me/${num}` : "https://wa.me/";
   return message ? `${base}?text=${encodeURIComponent(message)}` : base;

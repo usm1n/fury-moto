@@ -1,7 +1,10 @@
 /** Homepage. All copy from config.home / config.store; sections hide themselves when their data is empty. */
 import { config, waLink } from "../core/config.js";
+import { refresh } from "../core/app.js";
 import { html, raw, esc, renderList, renderTemplate, text } from "../core/render.js";
-import { getProducts } from "../data/products.js";
+import { getFeatured, getCategories } from "../data/products.js";
+import { getSettings } from "../data/settings.js";
+import { skeletonCards, showError } from "../components/api-state.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const h = (k) => $(`[data-home="${k}"]`);
@@ -27,15 +30,26 @@ export default async function mount(main) {
   main.querySelector(".hero__inner")?.classList.add("is-filled");
   heroIntro(main);
 
+  // API-backed regions (categories, featured) render skeletons now and fill in when the data arrives.
+  // They never block boot: refresh() re-wires reveals/video slots once the page has finished booting.
+  const ready = new Promise((res) => document.addEventListener("app:ready", res, { once: true }));
+  const fillLater = (region, render) => render().then(() => ready.then(() => refresh(region)));
+
   // ---- categories (video cards)
   text(h("categoriesTitle"), home.categoriesTitle);
-  renderList(h("categories"), config.categories, (c, i) => html`
-    <a class="cat-tile" href="shop.html?cat=${c.id}" data-reveal data-reveal-delay="${(i % 4) * 0.06}"
-       ${raw(c.videoSlot ? `data-video-slot="${esc(c.videoSlot)}" data-video-start="${esc(c.videoStart ?? 0)}"` : "")}>
-      <img class="cat-tile__img" src="${c.image}" alt="" loading="lazy" decoding="async">
-      <span class="cat-tile__title">${c.title}</span>
-      <span class="cat-tile__arrow" aria-hidden="true">→</span>
-    </a>`);
+  renderTemplate(h("categories"), Array.from({ length: 7 }, () => `<span class="cat-tile cat-tile--skeleton" aria-hidden="true"><span class="skeleton" style="position:absolute;inset:0"></span></span>`).join(""));
+  const loadCategories = async () => {
+    try {
+      renderList(h("categories"), await getCategories(), (c, i) => html`
+        <a class="cat-tile" href="shop.html?cat=${c.id}" data-reveal data-reveal-delay="${(i % 4) * 0.06}"
+           ${raw(c.videoSlot ? `data-video-slot="${esc(c.videoSlot)}" data-video-start="${esc(c.videoStart ?? 0)}"` : "")}>
+          ${c.image ? raw(`<img class="cat-tile__img" src="${esc(c.image)}" alt="" loading="lazy" decoding="async">`) : ""}
+          <span class="cat-tile__title">${c.title}</span>
+          <span class="cat-tile__arrow" aria-hidden="true">→</span>
+        </a>`);
+    } catch (e) { console.warn("[home] categories", e); h("categories").closest("section")?.setAttribute("hidden", ""); }
+  };
+  fillLater(h("categories"), loadCategories);
 
   // ---- built for the ride: an intro section + one section per beat, each scrolling over the backdrop
   const ride = home.builtForRide;
@@ -57,15 +71,21 @@ export default async function mount(main) {
   // ---- featured products
   text(h("featuredTitle"), home.featuredTitle);
   text(h("shopAll"), ui.shopAll);
-  const all = await getProducts();
-  let featured = home.featuredIds?.length
-    ? home.featuredIds.map((id) => all.find((p) => p.id === id)).filter(Boolean)
-    : all.filter((p) => (p.badges || []).includes("Rider's pick"));
-  if (featured.length < 4) featured = [...featured, ...all.filter((p) => !featured.includes(p))].slice(0, 8);
-  featured = featured.slice(0, 8);
-  const productCard = await loadModule("../components/product-card.js", "productCard");
-  if (productCard && featured.length) renderList(h("featured"), featured, (p) => productCard(p));
-  else h("featured").closest("section").hidden = !featured.length;
+  const loadFeatured = async () => {
+    const grid = h("featured");
+    renderTemplate(grid, skeletonCards(4));
+    try {
+      const featured = (await getFeatured()).slice(0, 8);
+      const { productCard } = await import("../components/product-card.js");
+      if (!featured.length) { grid.closest("section").hidden = true; return; }
+      renderList(grid, featured, (p) => productCard(p));
+    } catch (e) {
+      console.warn("[home] featured", e);
+      showError(grid, e, async () => { renderTemplate(grid, skeletonCards(4)); await loadFeatured(); refresh(grid); });
+    }
+  };
+  renderTemplate(h("featured"), skeletonCards(4));
+  fillLater(h("featured"), loadFeatured);
 
   // ---- CTA band
   text(h("ctaTitle"), home.ctaBand.title);
@@ -73,6 +93,7 @@ export default async function mount(main) {
   const ctaBtn = h("ctaButton");
   text(ctaBtn, home.ctaBand.button);
   ctaBtn.href = waLink(home.ctaBand.message);
+  getSettings().then((s) => { if (s.whatsapp) ctaBtn.href = waLink(home.ctaBand.message, s.whatsapp); });
 
   // ---- guides teaser
   text(h("guidesTitle"), home.guidesTitle);

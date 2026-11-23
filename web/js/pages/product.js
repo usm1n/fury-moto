@@ -2,10 +2,13 @@
  * Product detail page. mount(main) reads ?id=, renders gallery + info + notes + related.
  * All copy comes from config.ui / the product record.
  */
-import { config, formatPrice, getBrand, getCategory, waLink } from "../core/config.js";
+import { config, formatPrice, waLink } from "../core/config.js";
 import { html, raw, renderTemplate, picture } from "../core/render.js";
 import { emit } from "../core/bus.js";
 import { getProduct, getRelated } from "../data/products.js";
+import { getSettings } from "../data/settings.js";
+import { productJsonLd } from "../core/seo.js";
+import { showError } from "../components/api-state.js";
 import { productCard } from "../components/product-card.js";
 import { openSizeGuide } from "../components/size-guide.js";
 
@@ -18,8 +21,23 @@ const SVG = {
 
 export default async function mount(main) {
   const ui = config.ui || {};
-  const id = new URLSearchParams(location.search).get("id");
-  const p = id ? await getProduct(id) : null;
+  const qp = new URLSearchParams(location.search);
+  const slug = qp.get("slug") || qp.get("id");   // old links used ?id=<x>; seeded slugs equal the old ids
+  if (!qp.get("slug") && qp.get("id")) {
+    try { history.replaceState(null, "", `${location.pathname}?slug=${encodeURIComponent(slug)}${location.hash}`); } catch { /* ignore */ }
+  }
+
+  renderTemplate(main, skeleton());
+  let p = null;
+  try {
+    p = slug ? await getProduct(slug) : null;
+  } catch (e) {
+    console.warn("[product]", e);
+    renderTemplate(main, '<div class="container" data-pd-error></div>');
+    showError(main.querySelector("[data-pd-error]"), e, () => mount(main));
+    return;
+  }
+  const settings = await getSettings();
 
   if (!p) {
     document.title = (config.seo?.titleTemplate || "%s").replace("%s", ui.pdNotFoundTitle || "");
@@ -33,14 +51,17 @@ export default async function mount(main) {
     return;
   }
 
-  const brand = getBrand(p.brand);
-  const cat = getCategory(p.category);
+  const brand = p.brandName ? { name: p.brandName } : null;
+  const cat = p.category ? { id: p.category, title: p.categoryName } : null;
+  const variants = p.variants || [];
+  const sizeSoldOut = (s) => variants.length > 0 && !variants.some((v) => v.size === s && v.available > 0);
   const images = p.images || [];
   const sizes = p.sizes || [];
   const colors = p.colors || [];
   const certs = p.certifications || [];
   const onSale = p.compareAtPrice && p.compareAtPrice > p.price;
   const sizingMsg = fmt(ui.pdSizingMessage, { title: p.title });
+  const certDesc = (name) => (p.certificationDetails || []).find((c) => c.name === name)?.description || "";
   const slideCount = images.length + (p.video ? 1 : 0);
 
   setMeta(p, brand);
@@ -57,7 +78,7 @@ export default async function mount(main) {
   const thumbs = [
     ...images.map((im, i) => html`
       <button type="button" class="pgal__thumb" data-thumb="${i}" aria-label="${fmt(ui.pdThumb, { n: i + 1 })}"${i === 0 ? raw(' aria-current="true"') : ""}>
-        ${picture({ src: im.src, alt: "", sizes: "96px" })}
+        ${picture({ src: im.thumb || im.src, alt: "", sizes: "96px" })}
       </button>`),
     p.video ? html`
       <button type="button" class="pgal__thumb pgal__thumb--video" data-thumb="${images.length}" aria-label="${ui.pdVideo}">${raw(SVG.play)}</button>` : raw(""),
@@ -101,7 +122,7 @@ export default async function mount(main) {
         <section class="pd__certs" data-reveal aria-labelledby="pd-certs-h">
           <h2 id="pd-certs-h" class="pd__h">${ui.pdCertifications}</h2>
           <dl class="pcerts">
-            ${certs.map((c) => html`<div class="pcerts__row"><dt><span class="pill pill--cert">${c}</span></dt>${ui.certInfo?.[c] ? html`<dd>${ui.certInfo[c]}</dd>` : raw("")}</div>`)}
+            ${certs.map((c) => html`<div class="pcerts__row"><dt><span class="pill pill--cert">${c}</span></dt>${ui.certInfo?.[c] || certDesc(c) ? html`<dd>${ui.certInfo?.[c] || certDesc(c)}</dd>` : raw("")}</div>`)}
           </dl>
         </section>` : raw("")}
 
@@ -120,8 +141,9 @@ export default async function mount(main) {
           <fieldset class="pd__field" data-size-field>
             <legend class="pd__label">${ui.pdSize}</legend>
             <div class="sizes">
-              ${sizes.map((s) => html`<label class="size"><input type="radio" name="size" value="${s}"${p.inStock ? raw("") : raw(" disabled")}><span>${s}</span></label>`)}
+              ${sizes.map((s) => html`<label class="size"><input type="radio" name="size" value="${s}"${p.inStock && !sizeSoldOut(s) ? raw("") : raw(" disabled")}><span>${s}</span></label>`)}
             </div>
+            <p class="pd__lowstock" data-low-stock role="status" hidden></p>
             <p class="pd__error" data-size-error role="alert" hidden>${ui.pdSizeError}</p>
             <button type="button" class="pd__link" data-size-guide>${ui.sizeGuide}</button>
           </fieldset>` : raw("")}
@@ -134,7 +156,7 @@ export default async function mount(main) {
             </div>
             <button type="submit" class="btn btn--primary pd__add" data-add data-magnetic${p.inStock ? raw("") : raw(" disabled")}>${p.inStock ? ui.addToCart : ui.outOfStock}</button>
           </div>
-          ${config.store?.cashOnDelivery ? html`<p class="pd__cod muted">${ui.cashOnDelivery}</p>` : raw("")}
+          ${settings.codEnabled ? html`<p class="pd__cod muted">${ui.cashOnDelivery}</p>` : raw("")}
         </form>
 
         ${p.gearDoctorNote ? html`
@@ -143,7 +165,7 @@ export default async function mount(main) {
           <p>${p.gearDoctorNote}</p>
         </aside>` : raw("")}
 
-        <a class="btn btn--ghost btn--block pd__ask" href="${waLink(sizingMsg)}" target="_blank" rel="noopener">${ui.askSizing}</a>
+        <a class="btn btn--ghost btn--block pd__ask" href="${waLink(sizingMsg, settings.whatsapp || undefined)}" target="_blank" rel="noopener">${ui.askSizing}</a>
 
         <section class="pd__desc" data-reveal>
           <h2 class="pd__h">${ui.pdDescription}</h2>
@@ -174,9 +196,9 @@ export default async function mount(main) {
   `);
 
   initGallery(main, slideCount);
-  initBuy(main, p, sizes.length > 0);
+  initBuy(main, p, sizes.length > 0, settings);
   initGuide(main, p);
-  injectJsonLd(p, brand);
+  injectJsonLd(p);
 
   const related = (await getRelated(p, 4)).filter(Boolean);
   if (related.length) {
@@ -194,24 +216,8 @@ function setMeta(p, brand) {
   if (!m) { m = document.createElement("meta"); m.name = "description"; document.head.appendChild(m); }
   m.content = String(p.description || "").replace(/\s+/g, " ").slice(0, 155);
 }
-function injectJsonLd(p, brand) {
-  const abs = (src) => new URL(src, location.href).href;
-  const data = {
-    "@context": "https://schema.org",
-    "@type": "Product",
-    name: p.title,
-    image: (p.images || []).map((i) => abs(i.src)),
-    description: p.description,
-    sku: p.id,
-    brand: { "@type": "Brand", name: brand ? brand.name : p.brand },
-    offers: {
-      "@type": "Offer",
-      url: location.href,
-      price: String(p.price),
-      priceCurrency: config.store?.currency || "PKR",
-      availability: p.inStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
-    },
-  };
+function injectJsonLd(p) {
+  const data = productJsonLd(p);
   document.querySelectorAll('script[data-jsonld="product"]').forEach((n) => n.remove());
   const s = document.createElement("script");
   s.type = "application/ld+json";
@@ -264,6 +270,19 @@ function initGuide(root, p) {
 
 /* ---------- buy box + sticky bar ---------- */
 function initBuy(root, p, needsSize) {
+  const ui = config.ui || {};
+  const lowEl = root.querySelector("[data-low-stock]");
+  /** live stock: "Only N left" for the chosen size + colour when that variant is low */
+  const updateLow = () => {
+    if (!lowEl) return;
+    const size = form.querySelector('input[name="size"]:checked')?.value;
+    const color = form.querySelector('input[name="color"]:checked')?.value;
+    const vs = (p.variants || []).filter((v) => v.size === size && (!color || v.color === color));
+    const v = vs[0];
+    if (v && v.lowStock && v.available > 0) { lowEl.textContent = String(ui.onlyNLeft || "").replace("{n}", v.available); lowEl.hidden = false; }
+    else if (v && v.available === 0) { lowEl.textContent = ui.outOfStock || ""; lowEl.hidden = false; }
+    else lowEl.hidden = true;
+  };
   const form = root.querySelector("[data-form]");
   const qty = form.elements.qty;
   const err = root.querySelector("[data-size-error]");
@@ -275,8 +294,8 @@ function initBuy(root, p, needsSize) {
     clampQty();
   }));
   qty.addEventListener("change", clampQty);
-  form.querySelectorAll('input[name="color"]').forEach((r) => r.addEventListener("change", () => { if (colorName) colorName.textContent = r.value; }));
-  form.querySelectorAll('input[name="size"]').forEach((r) => r.addEventListener("change", () => { err.hidden = true; form.querySelector("[data-size-field]")?.classList.remove("is-invalid"); }));
+  form.querySelectorAll('input[name="color"]').forEach((r) => r.addEventListener("change", () => { if (colorName) colorName.textContent = r.value; updateLow(); }));
+  form.querySelectorAll('input[name="size"]').forEach((r) => r.addEventListener("change", () => { updateLow(); err.hidden = true; form.querySelector("[data-size-field]")?.classList.remove("is-invalid"); }));
 
   function add() {
     if (!p.inStock) return;
@@ -307,4 +326,12 @@ function initBuy(root, p, needsSize) {
       bar.querySelector("[data-bar-add]").tabIndex = show ? 0 : -1;
     }, { threshold: 0 }).observe(mainBtn);
   }
+}
+
+/* ---------- loading skeleton (same grid as the page) ---------- */
+function skeleton() {
+  return `<div class="pd container" aria-busy="true"><div class="pd-skel">
+    <span class="skeleton pd-skel__media"></span>
+    <div class="pd-skel__info"><span class="skeleton" style="width:30%"></span><span class="skeleton is-title"></span><span class="skeleton" style="width:40%"></span>
+      <span class="skeleton" style="height:4rem"></span><span class="skeleton" style="height:3.5rem"></span><span class="skeleton is-btn"></span></div></div></div>`;
 }

@@ -9,12 +9,12 @@ import { readingTime } from "./gear-doctor.js";
 const T = () => config.gearDoctor || {};
 
 async function productCards(ids) {
-  const products = (await Promise.all((ids || []).map((id) => getProduct(id)))).filter(Boolean);
+  const products = (await Promise.all((ids || []).map((id) => getProduct(id).catch(() => null)))).filter(Boolean);
   if (!products.length) return "";
   let card = null;
   try { card = (await import("../components/product-card.js")).productCard; } catch { /* built in parallel */ }
   const fallback = (p) => `<article class="gd-pfallback" data-product-id="${esc(p.id)}">
-      <a href="product.html?id=${encodeURIComponent(p.id)}">
+      <a href="product.html?slug=${encodeURIComponent(p.slug)}">
         ${p.images?.[0] ? `<img src="${esc(p.images[0].src)}" alt="${esc(p.images[0].alt || p.title)}" loading="lazy" onerror="this.remove()">` : ""}
         <h3>${esc(p.title)}</h3><span class="price">${esc(formatPrice(p.price))}</span>
       </a></article>`;

@@ -117,3 +117,13 @@ main[data-page="product"] { padding-top: calc(var(--header-h) + var(--space-4));
   .pd-related__grid { grid-template-columns: repeat(4, 1fr); }
 }
 html.reduced-motion .pbar { transition: none; }
+
+/* ---- live stock + loading skeleton ---- */
+.pd__lowstock { color: var(--color-accent); font-size: var(--fs-sm); margin-top: var(--space-2); }
+.pd-skel { display: grid; gap: var(--space-6); }
+.pd-skel__media { aspect-ratio: 4 / 5; }
+.pd-skel__info { display: grid; gap: var(--space-3); align-content: start; }
+.pd-skel__info .skeleton { height: 1.1em; }
+.pd-skel__info .skeleton.is-title { height: 2.2em; width: 80%; }
+.pd-skel__info .skeleton.is-btn { height: 3rem; margin-top: var(--space-4); }
+@media (min-width: 900px) { .pd-skel { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: var(--space-7); } }

@@ -28,15 +28,17 @@ export function initQuickView() {
 }
 
 export async function openQuickView(productId, from = document.activeElement) {
-  const p = await getProduct(productId);
+  let p = null;
+  try { p = await getProduct(productId); } catch (e) { console.warn("[quick-view]", e); }
   if (!p) return;
   closeQuickView(false);
   opener = from;
 
-  const img = p.images?.[0];
+  const img = p.images?.[0] && { src: p.images[0].thumb || p.images[0].src, alt: p.images[0].alt }; // 1:1 thumb
   const sizes = p.sizes || [];
+  const soldOut = (s) => !!p.variants?.length && !p.variants.some((v) => v.size === s && v.available > 0);
   const onSale = p.compareAtPrice && p.compareAtPrice > p.price;
-  const brand = (config.brands || []).find((b) => b.id === p.brand);
+  const brand = p.brandName ? { name: p.brandName } : null;
 
   root = document.createElement("div");
   root.className = "qv";
@@ -54,13 +56,13 @@ export async function openQuickView(productId, from = document.activeElement) {
           <label class="qv__field"><span class="qv__label">${ui().selectSize}</span>
             <select class="qv__select" data-qv-size>
               <option value="">${ui().chooseSize}</option>
-              ${sizes.map((s) => html`<option value="${s}">${s}</option>`)}
+              ${sizes.map((s) => html`<option value="${s}"${soldOut(s) ? " disabled" : ""}>${s}</option>`)}
             </select>
           </label>` : ""}
         <p class="qv__error muted" data-qv-error role="alert" hidden>${ui().chooseSize}</p>
         <div class="qv__actions">
           <button class="btn btn--primary btn--block" type="button" data-qv-add ${p.inStock ? "" : "disabled"}>${p.inStock ? ui().addToCart : ui().outOfStock}</button>
-          <a class="btn btn--ghost btn--block" href="product.html?id=${encodeURIComponent(p.id)}">${ui().viewDetails}</a>
+          <a class="btn btn--ghost btn--block" href="product.html?slug=${encodeURIComponent(p.slug)}">${ui().viewDetails}</a>
         </div>
       </div>
     </div>`);
@@ -80,7 +82,7 @@ export async function openQuickView(productId, from = document.activeElement) {
       root.querySelector("[data-qv-size]").focus();
       return;
     }
-    emit("cart:add", { productId: p.id, size: size || null, color: p.colors?.[0]?.name || null, qty: 1 });
+    emit("cart:add", { productId: p.id, size: size || null, color: (p.variants?.find((v) => v.size === size && v.available > 0) || p.variants?.[0])?.color || p.colors?.[0]?.name || null, qty: 1 });
     closeQuickView(false);
     emit("cart:open", {});
   });

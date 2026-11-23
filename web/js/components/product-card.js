@@ -3,18 +3,17 @@
  *   productCard(product, { loading }) -> raw() HTML (safe to interpolate in html`` or join / String())
  * Quick-view button carries [data-quick-view="<id>"]; quick-view.js (shop agent) listens for it.
  */
-import { config, formatPrice, getBrand } from "../core/config.js";
+import { config, formatPrice } from "../core/config.js";
 import { html, raw, picture } from "../core/render.js";
 
 const pill = (cls, t) => String(html`<span class="pill ${cls}">${t}</span>`);
 
 export function productCard(p, { loading = "lazy" } = {}) {
   const ui = config.ui || {};
-  const brand = getBrand(p.brand);
   const imgs = p.images || [];
   const first = imgs[0];
   const second = imgs[1];
-  const href = `product.html?id=${encodeURIComponent(p.id)}`;
+  const href = `product.html?slug=${encodeURIComponent(p.slug || p.id)}`;
   const onSale = p.compareAtPrice && p.compareAtPrice > p.price;
   const badges = [...(p.badges || [])];
   if (!p.inStock) badges.unshift(ui.soldOut || ui.outOfStock);
@@ -35,7 +34,7 @@ export function productCard(p, { loading = "lazy" } = {}) {
     </button>
   </div>
   <a class="pcard__body" href="${href}">
-    <span class="pcard__brand eyebrow">${brand ? brand.name : p.brand}</span>
+    <span class="pcard__brand eyebrow">${p.brandName || p.brand}</span>
     <span class="pcard__title">${p.title}</span>
     <span class="pcard__price price">${formatPrice(p.price)}${onSale ? raw(`<span class="price__compare">${formatPrice(p.compareAtPrice)}</span>`) : ""}</span>
     ${certs.length ? raw(`<span class="pill-row pcard__certs">${certs.map((c) => pill("pill--cert", c)).join("")}</span>`) : raw("")}

@@ -29,6 +29,7 @@
   <link rel="preload" as="image" type="image/webp" href="assets/frames/9x16/720/frame_0001.webp" media="(orientation: portrait) and (max-resolution: 1.49dppx)" fetchpriority="high">
   <link rel="modulepreload" href="js/core/app.js">
   <link rel="modulepreload" href="js/components/cart-drawer.js">
+  <link rel="modulepreload" href="js/components/checkout.js">
   <link rel="modulepreload" href="js/components/footer.js">
   <link rel="modulepreload" href="js/components/header.js">
   <link rel="modulepreload" href="js/components/search.js">
@@ -39,8 +40,10 @@
   <link rel="modulepreload" href="js/core/render.js">
   <link rel="modulepreload" href="js/core/slots.js">
   <link rel="modulepreload" href="js/core/video-bg.js">
+  <link rel="modulepreload" href="js/data/api.js">
   <link rel="modulepreload" href="js/data/cart.js">
   <link rel="modulepreload" href="js/data/products.js">
+  <link rel="modulepreload" href="js/data/settings.js">
   <link rel="modulepreload" href="js/pages/cart.js">
   <link rel="modulepreload" href="js/site.config.js">
   <!-- perf:end -->
@@ -50,6 +53,7 @@
   <link rel="stylesheet" href="css/components/header.css">
   <link rel="stylesheet" href="css/components/footer.css">
   <link rel="stylesheet" href="css/components/cart.css">
+  <link rel="stylesheet" href="css/components/checkout.css">
   <link rel="stylesheet" href="css/components/product.css">
   <script defer src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
@@ -63,6 +67,7 @@
     <section class="section cart-page">
       <div class="container">
         <h1 class="cart-page__title" data-bind="ui.cartTitle"></h1>
+        <div class="cart-page__notice" data-cart-notice role="status" aria-live="polite"></div>
         <div class="cart-page__root" data-cart-root></div>
       </div>
     </section>

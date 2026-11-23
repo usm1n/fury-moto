@@ -116,11 +116,10 @@ export function setSeo({ title, description, image, url, type = "website", jsonL
   setJsonLd(jsonLd || null);
 }
 
-/** schema.org Product for a config product (see js/site.config.js products[]). */
+/** schema.org Product from an adapted API product (see js/data/products.js). */
 export function productJsonLd(product) {
   if (!product) return null;
-  const url = absUrl(`product.html?id=${encodeURIComponent(product.id)}`);
-  const brand = (config.brands || []).find((b) => b.id === product.brand || b.name === product.brand);
+  const url = absUrl(`product.html?slug=${encodeURIComponent(product.slug || product.id)}`);
   const price = Number(product.price);
   const images = (product.images || []).map((i) => absUrl(i.src)).filter(Boolean);
   const name = clean(siteName());
@@ -128,9 +127,9 @@ export function productJsonLd(product) {
     "@context": "https://schema.org",
     "@type": "Product",
     name: product.title,
-    description: clean(product.description) || clean(product.gearDoctorNote),
-    sku: product.id,
-    brand: { "@type": "Brand", name: brand?.name || product.brand },
+    description: clean(product.shortDescription) || clean(product.description) || clean(product.gearDoctorNote),
+    sku: product.slug || product.id,
+    brand: { "@type": "Brand", name: product.brandName || product.brand },
     image: images.length ? images : undefined,
     url,
     offers: {

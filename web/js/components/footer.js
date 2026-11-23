@@ -1,5 +1,6 @@
 import { config, waLink } from "../core/config.js";
 import { html, raw, renderTemplate } from "../core/render.js";
+import { getSettings, settingsNow } from "../data/settings.js";
 
 const svg = (d) => raw(`<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${d}</svg>`);
 export const icons = {
@@ -26,13 +27,16 @@ export default function mount(el) {
     yt ? html`<li><a class="footer__social" href="${yt.url}" ${raw(ext)} aria-label="${yt.label}">${icons.youtube}<span>${yt.handle}</span></a></li>` : "",
   ];
 
-  const contact = html`
-    <ul class="footer__list">
-      <li><a href="${waLink("")}" ${raw(ext)}>${icons.whatsapp}<span>${ui.contactWhatsapp}</span></a></li>
-      <li><a href="mailto:${store.email}">${icons.mail}<span>${store.email}</span></a></li>
-      <li><span class="footer__plain">${icons.pin}<span>${store.city}</span></span></li>
-      <li><span class="footer__plain">${icons.clock}<span>${store.hours}</span></span></li>
+  // contact details come from the API settings; rendered empty-safe, then patched when they arrive
+  const contactList = (st) => html`
+    <ul class="footer__list" data-footer-contact>
+      <li><a href="${waLink("", st.whatsapp || undefined)}" ${raw(ext)}>${icons.whatsapp}<span>${ui.contactWhatsapp}</span></a></li>
+      ${st.email ? html`<li><a href="mailto:${st.email}">${icons.mail}<span>${st.email}</span></a></li>` : ""}
+      ${st.city ? html`<li><span class="footer__plain">${icons.pin}<span>${st.city}</span></span></li>` : ""}
+      ${st.hours ? html`<li><span class="footer__plain">${icons.clock}<span>${st.hours}</span></span></li>` : ""}
     </ul>`;
+  const fallbackSettings = settingsNow() || { whatsapp: "", email: store.email, city: store.city, hours: store.hours };
+  const contact = contactList(fallbackSettings);
 
   const column = (title, body, i) => html`
     <details class="footer__col" data-col>
@@ -61,6 +65,11 @@ export default function mount(el) {
         </div>
       </div>
     </footer>`);
+
+  getSettings().then((st) => {
+    const list = el.querySelector("[data-footer-contact]");
+    if (list) list.outerHTML = String(contactList(st));
+  });
 
   // Desktop: all columns open and non-collapsible. Mobile: accordions, closed.
   const mq = window.matchMedia("(min-width: 800px)");

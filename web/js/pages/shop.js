@@ -1,13 +1,15 @@
 /** Shop page: filters ⇄ URL, grid, category strip, mobile filter drawer. */
-import { config, getCategory, getBrand } from "../core/config.js";
+import { config } from "../core/config.js";
 import { html, raw, esc, renderTemplate } from "../core/render.js";
 import { on, emit } from "../core/bus.js";
 import { refresh } from "../core/app.js";
-import { getProducts, getFacets } from "../data/products.js";
+import { getProducts, getFacets, getCategories } from "../data/products.js";
+import { skeletonCards, showError } from "../components/api-state.js";
 import { initQuickView } from "../components/quick-view.js";
 
 const ui = () => config.ui || {};
 const FOCUSABLE = 'a[href], button:not([disabled]), select, input, textarea, [tabindex]:not([tabindex="-1"])';
+const PAGE_SIZE = 24;
 const SORTS = [["featured", "sortFeatured"], ["price-asc", "sortPriceAsc"], ["price-desc", "sortPriceDesc"], ["new", "sortNew"], ["name", "sortName"]];
 const list = (v) => (v ? String(v).split(",").map((s) => s.trim()).filter(Boolean) : []);
 
@@ -16,7 +18,7 @@ async function loadCard() {
   try {
     ({ productCard } = await import("../components/product-card.js"));
   } catch {
-    productCard = (p) => raw(`<article class="pcard" data-product-id="${esc(p.id)}"><a href="product.html?id=${esc(p.id)}">${esc(p.title)}</a></article>`);
+    productCard = (p) => raw(`<article class="pcard" data-product-id="${esc(p.id)}"><a href="product.html?slug=${esc(p.id)}">${esc(p.title)}</a></article>`);
   }
 }
 
@@ -49,8 +51,14 @@ export default async function mount(main) {
   const $ = (k) => main.querySelector(`[data-shop="${k}"]`);
   const els = { eyebrow: $("eyebrow"), title: $("title"), count: $("count"), cats: $("cats"), filters: $("filters"), openBtn: $("open-filters"), sortLabel: $("sort-label"), sort: $("sort"), chips: $("chips"), grid: $("grid") };
   let state = readState();
-  let facets = await getFacets(state.cat);
+  let facets = { brands: [], brandNames: {}, sizes: [], certifications: [], minPrice: 0, maxPrice: 0 };
+  let cats = [];
   let opener = null;
+  const catOf = (id) => cats.find((c) => c.id === id) || null;
+  /** categories + facets for the current category; throws ApiError when the API is down */
+  const loadRefs = async () => {
+    [cats, facets] = await Promise.all([getCategories(), getFacets(state.cat)]);
+  };
 
   els.eyebrow.textContent = ui().shopTitle;
   els.openBtn.textContent = ui().filters;
@@ -66,7 +74,7 @@ export default async function mount(main) {
       return `<a class="cat-tile${active ? " is-active" : ""}" href="shop.html${id ? "?cat=" + encodeURIComponent(id) : ""}" data-cat="${esc(id)}"${active ? ' aria-current="page"' : ""}${slot}>
         ${image ? `<img src="${esc(image)}" alt="" loading="lazy" decoding="async">` : ""}<span class="cat-tile__label">${esc(title)}</span></a>`;
     };
-    renderTemplate(els.cats, [tile("", ui().shopAllCategories, "", null), ...(config.categories || []).map((c) => tile(c.id, c.title, c.image, c))].join(""));
+    renderTemplate(els.cats, [tile("", ui().shopAllCategories, "", null), ...cats.map((c) => tile(c.id, c.title, c.image, c))].join(""));
     els.cats.setAttribute("aria-label", ui().shopCategories);
   }
 
@@ -78,17 +86,17 @@ export default async function mount(main) {
     `<label class="fopt"><input type="checkbox" name="${name}" value="${esc(value)}"${checked ? " checked" : ""}><span>${esc(label)}</span></label>`;
 
   function renderFilters() {
-    const cats = (config.categories || []).map((c) =>
+    const catOpts = cats.map((c) =>
       `<label class="fopt"><input type="radio" name="cat" value="${esc(c.id)}"${state.cat === c.id ? " checked" : ""}><span>${esc(c.title)}</span></label>`).join("");
     const allCat = `<label class="fopt"><input type="radio" name="cat" value=""${!state.cat ? " checked" : ""}><span>${esc(ui().shopAllCategories)}</span></label>`;
-    const brandName = (id) => getBrand(id)?.name || id;
+    const brandName = (id) => facets.brandNames[id] || id;
     const sizeOrder = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL"];
     const sizes = facets.sizes.slice().sort((a, b) => (sizeOrder.indexOf(a) + 1 || 99) - (sizeOrder.indexOf(b) + 1 || 99) || String(a).localeCompare(b, undefined, { numeric: true }));
     renderTemplate(els.filters, `
       <div class="fpanel__head"><h2 class="fpanel__title">${esc(ui().filtersTitle)}</h2>
         <button class="fpanel__close" type="button" data-f-close aria-label="${esc(ui().close)}">&times;</button></div>
       <div class="fpanel__body">
-        ${group(ui().filterCategory, allCat + cats)}
+        ${group(ui().filterCategory, allCat + catOpts)}
         ${facets.brands.length ? group(ui().filterBrand, facets.brands.map((b) => check("brand", b, brandName(b), state.brand.includes(b))).join("")) : ""}
         ${sizes.length ? group(ui().filterSize, `<div class="fsizes">${sizes.map((s) => `<label class="fsize"><input type="checkbox" name="size" value="${esc(s)}"${state.size.includes(s) ? " checked" : ""}><span>${esc(s)}</span></label>`).join("")}</div>`) : ""}
         ${group(ui().filterPrice, `<div class="fprice">
@@ -114,8 +122,8 @@ export default async function mount(main) {
   function renderChips() {
     const chips = [];
     const add = (label, key, value) => chips.push(`<button class="chip" type="button" data-chip-key="${key}" data-chip-val="${esc(value ?? "")}" aria-label="${esc(ui().filterRemove)}: ${esc(label)}">${esc(label)}<span aria-hidden="true">&times;</span></button>`);
-    if (state.cat) add(getCategory(state.cat)?.title || state.cat, "cat");
-    state.brand.forEach((b) => add(getBrand(b)?.name || b, "brand", b));
+    if (state.cat) add(catOf(state.cat)?.title || state.cat, "cat");
+    state.brand.forEach((b) => add(facets.brandNames[b] || b, "brand", b));
     state.size.forEach((s) => add(`${ui().filterSize} ${s}`, "size", s));
     state.cert.forEach((c) => add(c, "cert", c));
     if (state.min !== "") add(`${ui().filterPriceMin} ${state.min}`, "min");
@@ -127,33 +135,79 @@ export default async function mount(main) {
 
   /* ---------- results ---------- */
   let token = 0;
+  let loaded = [];          // products shown so far (grows with "Load more")
+  let total = 0;
+  const filtersOf = (page) => ({ cat: state.cat, brand: state.brand, size: state.size, cert: state.cert, min: state.min, max: state.max, q: state.q, sort: state.sort, inStock: state.stock, page, pageSize: PAGE_SIZE });
+  const cardsHtml = (items, from = 0) => items.map((p, i) => String(productCard(p, { loading: from + i < 4 ? "eager" : "lazy" }))).join("");
+
   async function renderResults() {
     const my = ++token;
-    const cat = getCategory(state.cat);
-    const items = await getProducts({ cat: state.cat, brand: state.brand, size: state.size, cert: state.cert, min: state.min, max: state.max, q: state.q, sort: state.sort, inStock: state.stock });
+    loaded = []; total = 0;
+    els.grid.classList.remove("is-empty");
+    renderTemplate(els.grid, skeletonCards(8));
+    let res;
+    try {
+      res = await getProducts(filtersOf(1));
+    } catch (e) {
+      if (my !== token) return;
+      console.warn("[shop]", e);
+      els.grid.classList.add("is-empty");
+      showError(els.grid, e, () => init());
+      return;
+    }
     if (my !== token) return;
+    loaded = res.items; total = res.total;
+    const cat = catOf(state.cat);
     els.title.textContent = state.q ? `${ui().resultsFor} “${state.q}”` : cat?.title || ui().shopAll;
-    els.count.textContent = items.length === 1 ? ui().shopCountOne : String(ui().shopCount).replace("{n}", items.length);
+    els.count.textContent = total === 1 ? ui().shopCountOne : String(ui().shopCount).replace("{n}", total);
     document.title = String(config.seo?.titleTemplate || "%s").replace("%s", cat && !state.q ? cat.title : state.q ? `${ui().resultsFor} ${state.q}` : ui().shopTitle);
     const desc = document.querySelector('meta[name="description"]');
     if (desc) desc.content = ui().shopDescription;
     els.sort.value = state.sort;
     renderChips();
-    if (!items.length) {
+    if (!loaded.length) {
       renderTemplate(els.grid, `<div class="shop-empty"><h2>${esc(ui().noResultsTitle)}</h2><p class="muted">${esc(ui().noResultsText)}</p><button class="btn btn--primary" type="button" data-chip-clear>${esc(ui().filterClear)}</button></div>`);
       els.grid.classList.add("is-empty");
     } else {
-      els.grid.classList.remove("is-empty");
-      renderTemplate(els.grid, items.map((p, i) => String(productCard(p, { loading: i < 4 ? "eager" : "lazy" }))).join(""));
+      renderTemplate(els.grid, cardsHtml(loaded));
     }
+    syncMore();
     refresh(els.grid);
+  }
+
+  /** "Load more" button under the grid while more pages exist */
+  function syncMore() {
+    let more = main.querySelector("[data-shop-more]");
+    if (loaded.length >= total) { more?.remove(); return; }
+    if (!more) {
+      more = document.createElement("div");
+      more.className = "shop-more";
+      more.dataset.shopMore = "";
+      more.innerHTML = `<button class="btn btn--ghost" type="button">${esc(ui().loadMore)}</button>`;
+      els.grid.after(more);
+      more.querySelector("button").addEventListener("click", loadMore);
+    }
+  }
+  async function loadMore() {
+    const my = token;
+    const btn = main.querySelector("[data-shop-more] button");
+    if (btn) btn.disabled = true;
+    try {
+      const res = await getProducts(filtersOf(Math.floor(loaded.length / PAGE_SIZE) + 1));
+      if (my !== token) return;
+      const from = loaded.length;
+      loaded = loaded.concat(res.items);
+      els.grid.insertAdjacentHTML("beforeend", cardsHtml(res.items, from));
+      syncMore();
+      refresh(els.grid);
+    } catch (e) { console.warn("[shop] more", e); if (btn) btn.disabled = false; }
   }
 
   async function apply(next, { rebuildFilters = false, push = true } = {}) {
     const catChanged = next.cat !== state.cat;
     state = next;
     if (push) writeState(state);
-    if (catChanged) { facets = await getFacets(state.cat); prune(); renderCats(); refresh(els.cats); }
+    if (catChanged) { try { facets = await getFacets(state.cat); } catch (e) { console.warn("[shop]", e); } prune(); renderCats(); refresh(els.cats); }
     if (catChanged || rebuildFilters) renderFilters();
     emit("filter:change", { cat: state.cat, brand: state.brand, size: state.size, cert: state.cert, min: state.min, max: state.max, sort: state.sort, q: state.q });
     await renderResults();
@@ -198,7 +252,7 @@ export default async function mount(main) {
   });
   window.addEventListener("popstate", async () => {
     const next = readState();
-    facets = await getFacets(next.cat);
+    try { facets = await getFacets(next.cat); } catch (e) { console.warn("[shop]", e); }
     state = next;
     renderCats(); refresh(els.cats); renderFilters();
     await renderResults();
@@ -243,10 +297,21 @@ export default async function mount(main) {
   });
 
   /* ---------- initial render ---------- */
-  renderCats();
-  renderFilters();
-  await renderResults();
-  emit("filter:change", { cat: state.cat, brand: state.brand, size: state.size, cert: state.cert, min: state.min, max: state.max, sort: state.sort, q: state.q });
+  async function init() {
+    renderTemplate(els.grid, skeletonCards(8));
+    els.grid.classList.remove("is-empty");
+    try { await loadRefs(); } catch (e) {
+      console.warn("[shop]", e);
+      els.grid.classList.add("is-empty");
+      showError(els.grid, e, () => init());
+      return;
+    }
+    renderCats(); refresh(els.cats);
+    renderFilters();
+    await renderResults();
+    emit("filter:change", { cat: state.cat, brand: state.brand, size: state.size, cert: state.cert, min: state.min, max: state.max, sort: state.sort, q: state.q });
+  }
+  await init();
   // search overlay on this page may navigate with ?q= via link; also react to bus search events if any
   on("shop:set", (d) => apply({ ...state, ...d }, { rebuildFilters: true }));
 }

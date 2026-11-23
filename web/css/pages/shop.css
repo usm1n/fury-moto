@@ -115,3 +115,6 @@
   .qv__media { aspect-ratio: auto; min-height: 420px; }
   .qv__body { padding: var(--space-6); }
 }
+
+/* load more */
+.shop-more { display: flex; justify-content: center; padding-block: var(--space-6); }

@@ -58,3 +58,12 @@ html.reduced-motion .pcard__media img, html.reduced-motion .pcard__qv { transiti
   .sg { place-items: center; padding: var(--space-5); }
   .sg__panel { border-radius: calc(var(--radius) * 2); }
 }
+
+/* ---- skeleton card (same box model as .pcard so the grid does not jump) ---- */
+.pcard--skeleton { pointer-events: none; }
+.pcard--skeleton .pcard__media { background: none; }
+.pcard--skeleton .pcard__media .skeleton { position: absolute; inset: 0; border-radius: 0; }
+.pcard--skeleton .skeleton--line { height: 0.8em; margin-top: var(--space-1); }
+.pcard--skeleton .skeleton--line.w-40 { width: 40%; }
+.pcard--skeleton .skeleton--line.w-90 { width: 90%; }
+.pcard--skeleton .skeleton--line.w-60 { width: 60%; }

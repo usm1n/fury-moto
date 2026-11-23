@@ -98,8 +98,9 @@ import { VideoBg } from "../core/video-bg.js"; // only for product gallery inlin
 ### Events (`js/core/bus.js`)
 | Event | Detail | Who emits | Who listens |
 |---|---|---|---|
-| `cart:add` | `{ productId, size, color, qty }` | product page, quick-view, product card | `data/cart.js` (auto) |
-| `cart:change` | `{ items, count, subtotal }` | `data/cart.js` | header badge, drawer, cart page |
+| `cart:add` | `{ slug, size, color, qty, title, thumbUrl, price }` (`productId` accepted as a legacy alias of `slug`; title/thumbUrl/price are the display snapshot — if missing, `cart.validate()` fills it from the API) | product page, quick-view, product card | `data/cart.js` (auto) |
+| `cart:change` | `{ items, count, subtotal, deliveryFee, total, blocked, validated }` (lines: `{ key, slug, size, color, qty, title, thumbUrl, unitPrice, lineTotal, status, available, purchasable }`) | `data/cart.js` | header badge, drawer, cart page |
+| `cart:notice` | `{ changes: [string] }` human-readable cart changes after validate / 409 | `data/cart.js`, checkout | drawer, cart page |
 | `cart:open` / `cart:close` | `{}` | header, after add-to-cart | cart drawer |
 | `filter:change` | `{ cat, brand[], size[], cert[], min, max, sort, q }` | shop filters | shop grid |
 | `search:open` / `search:close` | `{}` | header | search overlay |

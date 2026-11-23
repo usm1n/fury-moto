@@ -4,7 +4,13 @@
  *
  *   node tools/sitemap.mjs
  *
- * Re-run after products, guides, categories or store.siteUrl change.
+ * Products and categories are NOT in site.config.js any more: they live in the API. Pass the API
+ * base URL to include them (slugs are fetched from /api/products and /api/categories):
+ *
+ *   API=https://geardoctor.example node tools/sitemap.mjs
+ *
+ * Without API=..., product and category URLs are skipped (guides, about, contact etc. still listed).
+ * Re-run after the catalogue, guides or store.siteUrl change.
  * While store.siteUrl is a [PLACEHOLDER], the example.com base is used and the output says so.
  */
 import { writeFileSync } from "node:fs";
@@ -25,15 +31,31 @@ const placeholderNote = liveUrl
 const today = new Date().toISOString().slice(0, 10);
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+const apiBase = (process.env.API || "").replace(/\/+$/, "");
+let productSlugs = [], categorySlugs = [];
+if (apiBase) {
+  try {
+    const get = async (p) => { const r = await fetch(apiBase + p); if (!r.ok) throw new Error(p + " " + r.status); return r.json(); };
+    categorySlugs = (await get("/api/categories")).map((c) => c.slug);
+    for (let page = 1; ; page++) {
+      const d = await get(`/api/products?pageSize=60&page=${page}`);
+      productSlugs.push(...d.items.map((p) => p.slug));
+      if (page * d.pageSize >= d.total || !d.items.length) break;
+    }
+  } catch (e) { console.warn("  could not read the API, skipping products/categories:", e.message); }
+} else {
+  console.log("  note: API env var not set, product and category URLs are skipped.");
+}
+
 const ids = (list) => (list || []).map((x) => x.id).filter((id) => isReal(id));
 
 /** [path, priority] pairs. Home is "" so the URL ends with "/". */
 const entries = [
   ["", 1.0],
   ["shop.html", 0.9],
-  ...ids(config.categories).map((id) => [`shop.html?cat=${encodeURIComponent(id)}`, 0.8]),
+  ...categorySlugs.map((id) => [`shop.html?cat=${encodeURIComponent(id)}`, 0.8]),
   ["gear-doctor.html", 0.8],
-  ...ids(config.products).map((id) => [`product.html?id=${encodeURIComponent(id)}`, 0.7]),
+  ...productSlugs.map((id) => [`product.html?slug=${encodeURIComponent(id)}`, 0.7]),
   ...ids(config.guides).map((id) => [`guide.html?id=${encodeURIComponent(id)}`, 0.6]),
   ["about.html", 0.5],
   ["contact.html", 0.5],
@@ -89,7 +111,4 @@ writeFileSync(path.join(root, "robots.txt"), robots);
 writeFileSync(path.join(root, "manifest.webmanifest"), JSON.stringify(manifest, null, 2) + "\n");
 
 console.log(`sitemap.xml: ${urls.length} URLs (base ${base})`);
-console.log(`  products: ${ids(config.products).length}, guides: ${ids(config.guides).length}, categories: ${ids(config.categories).length}`);
-if (!ids(config.products).length || !ids(config.guides).length) {
-  console.log("  note: products or guides are empty in site.config.js. Re-run once they are filled.");
-}
+console.log(`  products: ${productSlugs.length}, guides: ${ids(config.guides).length}, categories: ${categorySlugs.length}`);

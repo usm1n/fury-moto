@@ -1,74 +1,132 @@
 /**
- * Product data access. The ONLY place that knows where products come from.
- * Today: site.config.js. Later: swap the bodies for fetch() calls to an API —
- * keep the signatures (all async) and nothing else in the site changes.
+ * Catalogue data access. The ONLY place that knows where products come from: the public API
+ * (GET /api/products, /api/products/{slug}, /facets, /featured, /api/categories, /brands, /certifications).
+ *
+ * API DTOs are adapted into the shape the storefront components use:
+ *   product = { id (= slug), slug, title, brand (slug), brandName, category (slug), categoryName,
+ *               price, compareAtPrice, badges[], certifications[] (display names), inStock, sizes[],
+ *               images[{ src (4:5 / full), thumb (1:1), alt }],
+ *               // detail only:
+ *               shortDescription, description, gearDoctorNote, specs{label:value}, certificationDetails[],
+ *               colors[{name,hex}], variants[{size,color,colorHex,price,available,lowStock}], related[] }
+ * Everything is async and throws ApiError (see ./api.js) when the API is unreachable.
  */
 import { config } from "../core/config.js";
+import { apiGet } from "./api.js";
 
-const all = () => config.products || [];
+export { ApiError } from "./api.js";
 
-/** @param {{cat?:string, brand?:string[], size?:string[], cert?:string[], min?:number, max?:number, q?:string, sort?:string, inStock?:boolean}} [f] */
-export async function getProducts(f = {}) {
-  let list = all().slice();
-  if (f.cat) list = list.filter((p) => p.category === f.cat);
-  if (f.brand?.length) list = list.filter((p) => f.brand.includes(p.brand));
-  if (f.size?.length) list = list.filter((p) => (p.sizes || []).some((s) => f.size.includes(s)));
-  if (f.cert?.length) list = list.filter((p) => (p.certifications || []).some((c) => f.cert.includes(c)));
-  if (f.min != null && f.min !== "") list = list.filter((p) => p.price >= Number(f.min));
-  if (f.max != null && f.max !== "") list = list.filter((p) => p.price <= Number(f.max));
-  if (f.inStock) list = list.filter((p) => p.inStock);
-  if (f.q) list = searchIn(list, f.q);
-  return sortProducts(list, f.sort);
-}
+/* ---------- adapters ---------- */
+const adaptImage = (i) => ({ src: i.url, thumb: i.thumbUrl || i.url, alt: i.alt || "", width: i.width, height: i.height });
 
-export async function getProduct(id) {
-  return all().find((p) => p.id === id) || null;
-}
-
-export async function searchProducts(q, limit = 8) {
-  return searchIn(all(), q).slice(0, limit);
-}
-
-export async function getRelated(product, limit = 4) {
-  if (!product) return [];
-  const others = all().filter((p) => p.id !== product.id);
-  const same = others.filter((p) => p.category === product.category);
-  const rest = others.filter((p) => p.category !== product.category);
-  return [...same, ...rest].slice(0, limit);
-}
-
-/** Facet values present in the catalogue (for building filter UIs). */
-export async function getFacets(cat) {
-  const list = cat ? all().filter((p) => p.category === cat) : all();
-  const uniq = (arr) => [...new Set(arr)];
-  const prices = list.map((p) => p.price);
+export function adaptCard(d) {
   return {
-    brands: uniq(list.map((p) => p.brand)),
-    sizes: uniq(list.flatMap((p) => p.sizes || [])),
-    certifications: uniq(list.flatMap((p) => p.certifications || [])),
-    minPrice: prices.length ? Math.min(...prices) : 0,
-    maxPrice: prices.length ? Math.max(...prices) : 0,
+    id: d.slug,
+    slug: d.slug,
+    title: d.title,
+    brand: d.brand?.slug || "",
+    brandName: d.brand?.name || "",
+    category: d.category?.slug || "",
+    categoryName: d.category?.name || "",
+    price: d.price,
+    compareAtPrice: d.compareAtPrice ?? null,
+    badges: d.badges || [],
+    certifications: d.certifications || [],
+    images: (d.images || []).map(adaptImage),
+    inStock: !!d.inStock,
+    sizes: d.sizes || [],
   };
 }
 
-function searchIn(list, q) {
-  const terms = String(q).toLowerCase().trim().split(/\s+/).filter(Boolean);
-  if (!terms.length) return list;
-  const cats = Object.fromEntries((config.categories || []).map((c) => [c.id, c.title]));
-  const brands = Object.fromEntries((config.brands || []).map((b) => [b.id, b.name]));
-  return list.filter((p) => {
-    const hay = [p.title, p.brand, brands[p.brand], p.category, cats[p.category]].join(" ").toLowerCase();
-    return terms.every((t) => hay.includes(t));
-  });
+function adaptDetail(d) {
+  const p = adaptCard(d);
+  const seen = new Map();
+  (d.variants || []).forEach((v) => { if (!seen.has(v.color)) seen.set(v.color, { name: v.color, hex: v.colorHex || "#777777" }); });
+  return {
+    ...p,
+    shortDescription: d.shortDescription || "",
+    description: d.description || "",
+    gearDoctorNote: d.gearDoctorNote || "",
+    specs: Object.fromEntries((d.specs || []).map((s) => [s.label, s.value])),
+    certificationDetails: d.certificationDetails || [],
+    colors: [...seen.values()].filter((c) => c.name),
+    variants: d.variants || [],
+    related: (d.related || []).map(adaptCard),
+  };
 }
 
-export function sortProducts(list, sort) {
-  const l = list.slice();
-  switch (sort) {
-    case "price-asc": return l.sort((a, b) => a.price - b.price);
-    case "price-desc": return l.sort((a, b) => b.price - a.price);
-    case "name": return l.sort((a, b) => a.title.localeCompare(b.title));
-    case "new": return l.sort((a, b) => (b.badges || []).includes("New") - (a.badges || []).includes("New"));
-    default: return l; // "featured" = config order
+/* ---------- reference data (cached by apiGet) ---------- */
+export async function getCategories() {
+  const design = config.categoryTiles || {};
+  return (await apiGet("/api/categories")).map((c) => ({
+    id: c.slug, title: c.name, image: c.imageUrl || "", count: c.productCount ?? 0,
+    ...(design[c.slug] || {}),               // videoSlot / videoStart (design-only, see site.config.js)
+  }));
+}
+export async function getBrands() {
+  return (await apiGet("/api/brands")).map((b) => ({ id: b.slug, name: b.name, logo: b.logoUrl || "" }));
+}
+export async function getCertifications() {
+  return (await apiGet("/api/certifications")).map((c) => ({ code: c.code, name: c.name, description: c.description || "" }));
+}
+
+/* ---------- products ---------- */
+/**
+ * @param {{cat?:string, brand?:string[], size?:string[], cert?:string[], min?:number|string, max?:number|string, q?:string, sort?:string, inStock?:boolean, page?:number, pageSize?:number}} [f]
+ * @returns {Promise<{items:object[], total:number, page:number, pageSize:number}>}
+ */
+export async function getProducts(f = {}) {
+  let certCodes = f.cert;
+  if (f.cert?.length) {
+    // The shop URL carries cert display names ("ECE 22.06"); the API wants codes ("ECE_22_06").
+    const certs = await getCertifications().catch(() => []);
+    certCodes = f.cert.map((c) => certs.find((x) => x.name === c || x.code === c)?.code || c);
+  }
+  const page = await apiGet("/api/products", {
+    category: f.cat, brand: f.brand, size: f.size, cert: certCodes,
+    minPrice: f.min, maxPrice: f.max, inStock: f.inStock ? "true" : "",
+    q: f.q, sort: f.sort && f.sort !== "featured" ? f.sort : "", page: f.page > 1 ? f.page : "", pageSize: f.pageSize,
+  });
+  return { items: (page.items || []).map(adaptCard), total: page.total ?? 0, page: page.page ?? 1, pageSize: page.pageSize ?? 24 };
+}
+
+/** @returns product detail or null when the slug is unknown (404). Other errors throw. */
+export async function getProduct(slug) {
+  if (!slug) return null;
+  try {
+    return adaptDetail(await apiGet(`/api/products/${encodeURIComponent(slug)}`));
+  } catch (e) {
+    if (e?.status === 404) return null;
+    throw e;
   }
 }
+
+export async function searchProducts(q, limit = 8) {
+  return (await getProducts({ q, pageSize: limit })).items;
+}
+
+/** Related products come with the detail DTO. */
+export async function getRelated(product, limit = 4) {
+  if (!product) return [];
+  if (product.related) return product.related.slice(0, limit);
+  return (await getProduct(product.slug))?.related?.slice(0, limit) || [];
+}
+
+export async function getFeatured() {
+  return (await apiGet("/api/products/featured")).map(adaptCard);
+}
+
+/** Filter options for the shop sidebar. certifications are display names (what the shop URL carries). */
+export async function getFacets(cat) {
+  const d = await apiGet("/api/products/facets", { category: cat });
+  return {
+    brands: (d.brands || []).map((b) => b.slug),
+    brandNames: Object.fromEntries((d.brands || []).map((b) => [b.slug, b.name])),
+    sizes: d.sizes || [],
+    certifications: (d.certifications || []).map((c) => c.name),
+    minPrice: d.minPrice || 0,
+    maxPrice: d.maxPrice || 0,
+  };
+}
+
+export { getSettings } from "./settings.js";

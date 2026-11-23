@@ -4,11 +4,11 @@
  *   export openSearch()      -> emits "search:open"
  * Also exports small a11y helpers shared with header.js (scroll lock, focus trap).
  */
-import { config, formatPrice, getBrand } from "../core/config.js";
+import { config, formatPrice } from "../core/config.js";
 import { html, raw, renderTemplate } from "../core/render.js";
 import { on, emit } from "../core/bus.js";
 import { getLenis } from "../core/app.js";
-import { searchProducts } from "../data/products.js";
+import { searchProducts, getCategories } from "../data/products.js";
 
 const ui = config.ui || {};
 
@@ -176,7 +176,10 @@ async function run(q) {
   activeIdx = -1;
   input.removeAttribute("aria-activedescendant");
 
-  const cats = (config.categories || []).filter((c) => !q || norm(c.title).includes(norm(q)) || norm(c.id).includes(norm(q)));
+  let allCats = [];
+  try { allCats = await getCategories(); } catch (err) { console.warn("[search] categories", err); }
+  if (mine !== token) return;
+  const cats = allCats.filter((c) => !q || norm(c.title).includes(norm(q)) || norm(c.id).includes(norm(q)));
   let products = [];
   if (q) {
     try { products = await searchProducts(q, 6); } catch (err) { console.error("[search]", err); }
@@ -192,10 +195,10 @@ async function run(q) {
   if (products.length) {
     parts.push(`<li role="presentation" class="search__group">${html`${ui.searchProducts}`}</li>`);
     products.forEach((p) => {
-      const brand = getBrand(p.brand)?.name || p.brand || "";
+      const brand = p.brandName || "";
       parts.push(String(row({
-        href: `product.html?id=${encodeURIComponent(p.id)}`,
-        img: p.images?.[0]?.src, title: p.title, meta: brand, price: formatPrice(p.price), kind: "product",
+        href: `product.html?slug=${encodeURIComponent(p.slug)}`,
+        img: p.images?.[0]?.thumb || p.images?.[0]?.src, title: p.title, meta: brand, price: formatPrice(p.price), kind: "product",
       })));
     });
   }

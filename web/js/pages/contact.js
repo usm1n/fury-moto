@@ -2,11 +2,13 @@ import { config, waLink } from "../core/config.js";
 import { html, raw, renderTemplate, esc } from "../core/render.js";
 import { icons } from "../components/footer.js";
 import { setMeta } from "./about.js";
+import { getSettings } from "../data/settings.js";
 
 const ext = 'target="_blank" rel="noopener noreferrer"';
 
-export default function mount(main) {
-  const { contact, store, ui = {}, faqs = [] } = config;
+export default async function mount(main) {
+  const { contact, ui = {}, faqs = [] } = config;
+  const store = { ...(await getSettings()), mapEmbedUrl: config.store?.mapEmbedUrl };   // API settings (config.store only as fallback)
   setMeta(contact.title, contact.text);
   const topics = ui.formTopics || [];
   const tel = String(store.phoneDisplay || "").replace(/[^\d+]/g, "");
@@ -30,11 +32,11 @@ export default function mount(main) {
     <section class="section contact-main">
       <div class="container contact-grid">
         <ul class="c-cards" role="list" data-reveal>
-          ${card(icons.whatsapp, ui.contactWhatsapp, store.phoneDisplay, waLink(""), true)}
-          ${card(icons.phone, ui.contactPhone, store.phoneDisplay, tel ? `tel:${tel}` : null)}
-          ${card(icons.mail, ui.contactEmail, store.email, `mailto:${store.email}`)}
-          ${card(icons.pin, ui.contactVisit, `${store.address}, ${store.city}`, null)}
-          ${card(icons.clock, ui.contactHours, store.hours, null)}
+          ${card(icons.whatsapp, ui.contactWhatsapp, store.phoneDisplay || ui.contactWhatsapp, waLink("", store.whatsapp || undefined), true)}
+          ${store.phoneDisplay ? card(icons.phone, ui.contactPhone, store.phoneDisplay, tel ? `tel:${tel}` : null) : ""}
+          ${store.email ? card(icons.mail, ui.contactEmail, store.email, `mailto:${store.email}`) : ""}
+          ${store.address || store.city ? card(icons.pin, ui.contactVisit, [store.address, store.city].filter(Boolean).join(", "), null) : ""}
+          ${store.hours ? card(icons.clock, ui.contactHours, store.hours, null) : ""}
         </ul>
 
         <form class="c-form" id="contact-form" novalidate data-reveal aria-labelledby="c-form-title">
@@ -82,7 +84,7 @@ export default function mount(main) {
     if (results.includes(false)) { form.querySelector('[aria-invalid="true"]')?.focus(); return; }
     const topic = topics.find((t) => t.id === v.topic)?.label || v.topic;
     const text = `${ui.formGreeting}\n${ui.formName}: ${name}\n${ui.formPhone}: ${phone}\n${ui.formTopic}: ${topic}\n\n${msg}`;
-    const url = waLink(text);
+    const url = waLink(text, store.whatsapp || undefined);
     form.dataset.lastUrl = url;
     window.open(url, "_blank", "noopener,noreferrer");
   });

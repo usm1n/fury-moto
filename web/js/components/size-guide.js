@@ -4,6 +4,7 @@
  */
 import { config, waLink } from "../core/config.js";
 import { html, raw, renderTemplate } from "../core/render.js";
+import { getSettings } from "../data/settings.js";
 
 let current = null;
 
@@ -32,6 +33,7 @@ export function openSizeGuide(categoryId, opener, productTitle = "") {
       <a class="btn btn--primary btn--block" href="${waLink(msg)}" target="_blank" rel="noopener">${ui.askSizing}</a>
     </div>`);
   document.body.appendChild(root);
+  getSettings().then((s) => { const a = root.querySelector(".sg__panel .btn"); if (a && s.whatsapp) a.href = waLink(msg, s.whatsapp); });
   const prevOverflow = document.documentElement.style.overflow;
   document.documentElement.style.overflow = "hidden";
   const panel = root.querySelector(".sg__panel");
