@@ -40,6 +40,10 @@ public static class Platform
             signingKey = "dev-only-signing-key-change-me-0123456789abcdef";   // local dev only
         }
         if (Encoding.UTF8.GetByteCount(signingKey) < 32) throw new InvalidOperationException("JWT_SIGNING_KEY must be ≥ 32 bytes");
+        // Without a real secret the verifier would use Cloudflare's always-pass test key: fail closed
+        // by refusing to start outside Development (bot protection must never be silently off).
+        if (!env.IsDevelopment() && string.IsNullOrEmpty(config["TURNSTILE_SECRET"]))
+            throw new InvalidOperationException("TURNSTILE_SECRET is not set");
         s.AddSingleton(new JwtSettings(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey)), "geardoctor", "geardoctor-admin", TimeSpan.FromHours(8)));
 
         s.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -58,6 +62,15 @@ public static class Platform
                 o.Events = new JwtBearerEvents
                 {
                     OnMessageReceived = ctx => { ctx.Token = ctx.Request.Cookies[AuthCookie]; return Task.CompletedTask; },
+                    // Stateless JWT + one cheap lookup: the token is only valid while the user still exists,
+                    // isn't locked out and has the same security stamp (rotated on password change).
+                    OnTokenValidated = async ctx =>
+                    {
+                        var users = ctx.HttpContext.RequestServices.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<GearDoctor.Infrastructure.Persistence.AppUser>>();
+                        var user = await users.FindByIdAsync(ctx.Principal?.FindFirst("sub")?.Value ?? "");
+                        if (user is null || await users.IsLockedOutAsync(user) || user.SecurityStamp != ctx.Principal?.FindFirst("ss")?.Value)
+                            ctx.Fail("Session is no longer valid");
+                    },
                 };
             });
         s.AddAuthorizationBuilder().AddPolicy(AdminPolicy, p => p.RequireAuthenticatedUser().RequireRole(AdminRole));

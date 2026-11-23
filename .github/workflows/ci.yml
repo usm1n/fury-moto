@@ -1,0 +1,143 @@
+# CI for The Gear Doctor.
+#   api     build + test the .NET 10 API against a Postgres 17 service (push and pull requests)
+#   admin   build + test the Angular admin app, only once admin/package.json exists
+#   migrate apply the EF migration bundle to Neon, then run the idempotent seed (push to main only)
+# Deployment itself is done by Vercel (see docs/DEPLOY.md), not by this workflow.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  api:
+    name: API build and test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: geardoctor
+          POSTGRES_PASSWORD: geardoctor_dev
+          POSTGRES_DB: geardoctor_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U geardoctor -d geardoctor_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore dotnet tools
+        working-directory: api
+        run: dotnet tool restore
+
+      - name: Build
+        working-directory: api
+        run: dotnet build -c Release
+
+      - name: Test
+        working-directory: api
+        env:
+          TEST_DATABASE_URL: Host=localhost;Database=geardoctor_test;Username=geardoctor;Password=geardoctor_dev
+        run: dotnet test -c Release
+
+  admin:
+    # The job always runs; every step is skipped until admin/package.json exists.
+    # (A job-level `if: hashFiles(...)` cannot work: job conditions are evaluated before the
+    # repository is checked out, so the file is not there yet.)
+    name: Admin build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Notice when the admin app is not present yet
+        if: hashFiles('admin/package.json') == ''
+        run: echo "::notice::admin/package.json not found; admin build and test skipped."
+
+      - uses: actions/setup-node@v4
+        if: hashFiles('admin/package.json') != ''
+        with:
+          node-version: '22'
+
+      - name: Install
+        if: hashFiles('admin/package.json') != ''
+        working-directory: admin
+        run: npm ci
+
+      - name: Build
+        if: hashFiles('admin/package.json') != ''
+        working-directory: admin
+        run: npm run build --if-present
+
+      - name: Test
+        if: hashFiles('admin/package.json') != ''
+        working-directory: admin
+        run: npm test --if-present -- --watch=false
+
+  migrate:
+    name: Migrate and seed Neon
+    needs: api
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    # One migration run at a time; never cancel a half-applied migration.
+    concurrency:
+      group: migrate-production
+      cancel-in-progress: false
+    env:
+      NEON_DIRECT_URL: ${{ secrets.NEON_DIRECT_URL }}
+      ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+      ADMIN_INITIAL_PASSWORD: ${{ secrets.ADMIN_INITIAL_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check that the Neon secret is configured
+        id: check
+        run: |
+          if [ -z "$NEON_DIRECT_URL" ]; then
+            echo "::notice::NEON_DIRECT_URL secret is not configured; skipping migrate and seed."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-dotnet@v4
+        if: steps.check.outputs.skip != 'true'
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore dotnet tools
+        if: steps.check.outputs.skip != 'true'
+        working-directory: api
+        run: dotnet tool restore
+
+      - name: Build EF migration bundle
+        if: steps.check.outputs.skip != 'true'
+        working-directory: api
+        run: dotnet ef migrations bundle -p src/GearDoctor.Infrastructure -s src/GearDoctor.Infrastructure -r linux-x64 --self-contained -o efbundle
+
+      - name: Apply migrations
+        # The design-time factory reads NEON_DIRECT_URL (URI form is converted by the app).
+        if: steps.check.outputs.skip != 'true'
+        working-directory: api
+        run: |
+          chmod +x efbundle
+          ./efbundle
+
+      - name: Seed (idempotent)
+        if: steps.check.outputs.skip != 'true'
+        working-directory: api
+        env:
+          NEON_DATABASE_URL: ${{ secrets.NEON_DIRECT_URL }}
+        run: dotnet run --project src/GearDoctor.Api -c Release --no-launch-profile -- seed

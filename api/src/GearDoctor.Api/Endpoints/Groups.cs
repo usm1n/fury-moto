@@ -16,6 +16,11 @@ public static class Groups
         var admin = app.MapGroup("/api/admin")
             .RequireAuthorization(Platform.AdminPolicy)
             .RequireCsrf()
+            // Seeded admin must change the initial password before anything else works.
+            .AddEndpointFilter(async (ctx, next) =>
+                ctx.HttpContext.User.FindFirst("mcp")?.Value == "1"
+                    ? Results.Problem(title: "Password change required", type: "/problems/password-change-required", statusCode: StatusCodes.Status403Forbidden)
+                    : await next(ctx))
             .WithTags("Admin");
         Admin.AdminCatalogEndpoints.Map(admin);
         Admin.AdminProductEndpoints.Map(admin);
