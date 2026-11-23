@@ -3,6 +3,8 @@ using GearDoctor.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace GearDoctor.Tests.Infrastructure;
@@ -25,6 +27,15 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
+        // Order flows need Turnstile to pass. Unless TEST_REAL_TURNSTILE=1, swap in a local stub that
+        // accepts only StubTurnstileVerifier.PassingToken (no network). The real verifier is exercised
+        // directly in Orders/TurnstileNetworkTests.cs.
+        if (Environment.GetEnvironmentVariable("TEST_REAL_TURNSTILE") != "1")
+            builder.ConfigureTestServices(s =>
+            {
+                s.RemoveAll<GearDoctor.Application.Common.ITurnstileVerifier>();
+                s.AddSingleton<GearDoctor.Application.Common.ITurnstileVerifier, StubTurnstileVerifier>();
+            });
     }
 
     public async Task InitializeAsync()
@@ -118,6 +129,15 @@ public sealed record ProductSpec(string Title, int BrandId, int CategoryId, int 
     public VariantSpec[]? Variants { get; init; }
     public int Images { get; init; } = 3;
     public int[]? CertIds { get; init; }
+}
+
+/// <summary>Test double for Turnstile: accepts exactly one token, never touches the network.</summary>
+public sealed class StubTurnstileVerifier : GearDoctor.Application.Common.ITurnstileVerifier
+{
+    public const string PassingToken = "test-pass";
+    public string SiteKey => "1x00000000000000000000AA";
+    public Task<bool> VerifyAsync(string token, string? remoteIp, CancellationToken ct = default) =>
+        Task.FromResult(token == PassingToken);
 }
 
 [CollectionDefinition(Name)]

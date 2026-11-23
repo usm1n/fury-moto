@@ -3,6 +3,7 @@ using System.Security.Claims;
 using GearDoctor.Api.Infrastructure;
 using GearDoctor.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
 
@@ -87,8 +88,14 @@ public static class AuthEndpoints
         static IResult Locked() => Results.Problem(title: "Too many failed attempts. Try again in 15 minutes.", statusCode: 423);
     }
 
-    private static IResult Logout(HttpContext http)
+    private static async Task<IResult> Logout(HttpContext http, UserManager<AppUser> users)
     {
+        // Revoke server-side too: rotating the security stamp invalidates this JWT (and any copy of it)
+        // immediately, instead of leaving it valid until expiry. Single-admin store, so ending other
+        // sessions as well is the safer behaviour.
+        var auth = await http.AuthenticateAsync(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme);
+        if (auth.Succeeded && await users.FindByIdAsync(auth.Principal!.FindFirstValue("sub") ?? "") is { } user)
+            await users.UpdateSecurityStampAsync(user);
         http.Response.Cookies.Delete(Platform.AuthCookie, new CookieOptions { Path = "/api", Secure = true, SameSite = SameSiteMode.Strict, HttpOnly = true });
         return Results.NoContent();
     }
