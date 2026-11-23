@@ -1,14 +1,27 @@
-# The Gear Doctor — Fury Moto riding-gear store (frontend)
+# The Gear Doctor — Fury Moto riding-gear store
 
-A static, video-led storefront for Umair's riding-gear store ([@fury__moto](https://www.instagram.com/fury__moto/) · [@fury_the_gear_doc](https://www.instagram.com/fury_the_gear_doc/)).
-Plain HTML + CSS + vanilla JS modules. **No build step, no framework.** It runs on any static host.
+Umair's riding-gear store ([@fury__moto](https://www.instagram.com/fury__moto/) · [@fury_the_gear_doc](https://www.instagram.com/fury_the_gear_doc/)): a video-led storefront, an admin panel he runs from his phone, and an API with a Postgres database.
 
-> **Almost every change is made in one file: [`js/site.config.js`](js/site.config.js).**
-> Store name, text, products, prices, colours, fonts, videos and the sections that show them, contact details, nav and footer all live there.
+| Part | Folder | Tech | URL path |
+|---|---|---|---|
+| Storefront | [`web/`](web) | Plain HTML/CSS/JS modules (no build step), scroll-driven canvas background | `/` |
+| Admin panel | [`admin/`](admin) | Angular 22 + PrimeNG 22 (standalone, signals, zoneless) | `/admin` |
+| API | [`api/`](api) | .NET 10 minimal APIs + EF Core (Npgsql) + ASP.NET Identity | `/api` |
+| Database | Neon Postgres | products, variants, images, orders, settings, admin user | n/a |
+| Product photos | Cloudflare R2 | uploaded straight from the admin (never through the API) | `images.<domain>` |
+
+- **Products, stock, prices, orders and contact settings** live in the database and are edited in the admin.
+- **Design, copy, the background video and guides** stay in [`web/js/site.config.js`](web/js/site.config.js).
+
+Docs:
+- **[ADMIN_GUIDE.md](docs/ADMIN_GUIDE.md):** for Umair.
+- **[DEPLOY.md](docs/DEPLOY.md):** deploying from scratch.
+- **[backend/PLAN.md](docs/backend/PLAN.md):** architecture, schema and decisions.
+- **[backend/CONTRACTS-API.md](docs/backend/CONTRACTS-API.md)** and **[backend/openapi.draft.yaml](docs/backend/openapi.draft.yaml):** API rules and contract.
+- **[CONTRACTS.md](docs/CONTRACTS.md):** storefront rules.
+- **[BUILD_LOG.md](docs/BUILD_LOG.md):** what was built, by whom.
 
 ---
-
-**Live preview (GitHub Pages):** https://usm1n.github.io/fury-moto/ — redeploys automatically a minute or so after every push to `main`.
 
 ## Performance notes (for developers)
 - Every page `<head>` has a generated block (between `perf:start` and `perf:end`) with the font stylesheet, a preload of the first background frame for the visitor's orientation, and a `modulepreload` for every JS module the page needs. **After adding or removing a JS module, changing the default fonts or the frame folders, run `node tools/head.mjs`.**
@@ -18,18 +31,25 @@ Plain HTML + CSS + vanilla JS modules. **No build step, no framework.** It runs 
 
 ## 1. Run it locally
 
-You need any static web server; opening `index.html` directly from disk won't work, because browsers block ES modules on `file://`.
+You need the .NET 10 SDK, Node 22.22+ (or 24/26), and PostgreSQL 17. Local database `geardoctor` uses user `geardoctor` with password `geardoctor_dev` (see [CONTRACTS-API.md](docs/backend/CONTRACTS-API.md)).
 
 ```bash
-# from the project folder
-npx http-server . -p 8080 -c-1
-# then open http://127.0.0.1:8080/index.html
+# 1. API  (http://127.0.0.1:5080)
+cd api
+export NEON_DATABASE_URL="Host=localhost;Database=geardoctor;Username=geardoctor;Password=geardoctor_dev"
+dotnet ef database update -p src/GearDoctor.Infrastructure -s src/GearDoctor.Infrastructure
+ADMIN_EMAIL=admin@local.test ADMIN_INITIAL_PASSWORD='LocalDevPassw0rd!' dotnet run --project src/GearDoctor.Api --no-launch-profile -- seed
+ASPNETCORE_ENVIRONMENT=Development DEV_LOCAL_STORAGE=1 PORT=5080 dotnet run --project src/GearDoctor.Api --no-launch-profile
+
+# 2. Admin  (http://127.0.0.1:4200/admin/)
+cd admin && npm ci && npm start
+
+# 3. One origin for everything, like production  →  http://127.0.0.1:8080  (store)  and  /admin
+node tools/dev-server.mjs
 ```
-Alternatives: `python -m http.server 8080` or the VS Code "Live Server" extension.
-
-Pages: `index.html` · `shop.html` (`?cat=helmets`, filters in the URL) · `product.html?id=…` · `cart.html` · `gear-doctor.html` · `guide.html?id=…` · `about.html` · `contact.html` · `404.html`.
-
-Dev helpers: `dev/viewports.html?page=shop.html` previews any page at 375 px and 768 px side by side.
+- `DEV_LOCAL_STORAGE=1` stores uploaded photos on local disk, so no Cloudflare account is needed. It only works in Development.
+- Turnstile uses Cloudflare's always-pass test keys locally.
+- Tests: `cd api && TEST_DATABASE_URL="Host=localhost;Database=geardoctor_test;Username=geardoctor;Password=geardoctor_dev" dotnet test`, and `cd admin && npx ng test --watch=false`.
 
 ## 2. Edit the config
 
@@ -94,21 +114,26 @@ Config fields in `config.backdrop`:
 
 ## 4. Orders
 
-Checkout is **"Order on WhatsApp"**. The cart (saved in the browser) builds a message with items, sizes, quantities and the PKR total, and opens `wa.me/<store.whatsapp>`. Until `store.whatsapp` holds a real number, the link opens WhatsApp with no recipient, on purpose.
-Product data is read only through `js/data/products.js` (`getProducts()`, `getProduct(id)`), so a backend API can replace the config later by changing that one file.
+1. **Checkout:** the customer fills in name, phone, city and address, chooses cash on delivery or bank transfer, and passes a Turnstile check.
+2. **Pricing:** the API prices the order from the database (client prices are never trusted) and creates **GD-####**.
+3. **WhatsApp:** the customer's WhatsApp opens with the order summary.
+4. **Fulfilment in the admin:** **Confirm** deducts stock atomically (the last item can't be sold twice), then Shipped and Delivered. **Cancel** after confirming puts the stock back.
+
+The cart re-checks prices and stock with the API whenever it's opened and before checkout, and tells the customer what changed.
 
 ## 5. Before launch: placeholders still to fill
 
-**In `js/site.config.js`:**
-- `store.city`, `store.address`, `store.whatsapp` (digits, e.g. `923001234567`), `store.phoneDisplay`, `store.email`, `store.hours`, `store.deliveryNote`, `store.siteUrl`, `store.mapEmbedUrl` (optional)
+**In the admin → Settings:** WhatsApp number (digits, e.g. `923001234567`), phone, email, city, address, hours, delivery fee, COD and bank transfer.
+
+**In `web/js/site.config.js`:**
+- `store.*` contact fields are only an offline fallback now. Also set `store.deliveryNote`, `store.siteUrl` and `store.mapEmbedUrl` (optional).
 - `store.name`: currently the brief's default "The Gear Doctor". Confirm it.
-- `store.cashOnDelivery`: confirm true/false
 - `footer.legal`: legal business name
 - `about.intro`, `about.story` (3 paragraphs), `about.stats[2]` (track days)
 - `about.image`: currently a still from the hero video. Replace with a real portrait.
 - `testimonials`: **all 4 are invented**. Replace them with real customer quotes.
 - `faqs`: delivery time, COD coverage, exchange window, authenticity answer
-- `products`: **all 28 are placeholders**. Models, prices, specs and certifications are realistic but unverified, and images are labelled placeholders in `assets/img/products/`.
+- **Products (in the database, edited in the admin):** **all 28 are placeholders** imported from the old config. Models, prices, specs and certifications are realistic but unverified, and the images are labelled placeholders. Replace them in the admin.
 - `guides`: 8 drafts. The 4 reel-based guides were written from the reel titles only. Umair should review them all, especially **DOT vs FIM**.
 - `instagramPosts`: 14 posts shown as official embeds (7 per account). Add `image` paths after downloading the media (see below).
 
@@ -117,22 +142,20 @@ Product data is read only through `js/data/products.js` (`getProducts()`, `getPr
 - Instagram media couldn't be downloaded automatically (the browser tool blocks Instagram's media links). The site shows the posts as official embeds for now. To use the files across the site (tiles, About, guide covers, reels), follow [`docs/INSTAGRAM_TODO.md`](docs/INSTAGRAM_TODO.md): export or save the media into `assets/instagram/<account>/`, then ask Claude to process it.
 - Product photos to replace `assets/img/products/*`.
 
-**SEO:** after setting `store.siteUrl`, run `node tools/sitemap.mjs` (rebuilds `sitemap.xml`, `robots.txt`, `manifest.webmanifest`) and make the `og:image` URL in each page's `<head>` absolute.
+**SEO:** after setting `store.siteUrl`, run `API=https://<domain> node web/tools/sitemap.mjs` (rebuilds `sitemap.xml`, `robots.txt`, `manifest.webmanifest`) and make the `og:image` URL in each page's `<head>` absolute.
 
 ## 6. Project layout
 
 ```
-index.html shop.html product.html cart.html gear-doctor.html guide.html about.html contact.html 404.html
-js/site.config.js        ← edit me
-js/core/                 app bootstrap, config loader, render helpers, event bus, video engine, SEO
-js/data/                 products.js (data access), cart.js (cart state + WhatsApp message)
-js/components/           header, search, footer, cart drawer, product card, size guide, quick view, markdown, instagram strip
-js/pages/                one module per page
-css/tokens.css base.css video.css components/ pages/
-assets/source/           original media (untouched)
-assets/video/ assets/frames/ assets/img/  generated media
-tools/                   media.sh, placeholders.sh, sitemap.mjs
-docs/                    CONTRACTS.md, MEDIA.md, BUILD_LOG.md, SEO_HEAD.html, Instagram TODOs
-dev/                     test/preview pages (not linked from the site)
+web/                     storefront (static): index/shop/product/cart/… .html, js/, css/, assets/, tools/
+  js/site.config.js      design, copy, background video, guides  ← edit me (not products)
+  js/data/               api.js (fetch wrapper), products.js + settings.js (API data), cart.js (cart + checkout data)
+admin/                   Angular admin → dist/admin/browser, served at /admin
+  src/app/api/           generated API client (npm run gen:api, from docs/backend/openapi.draft.yaml)
+api/                     .NET 10 solution: Domain / Application / Infrastructure / Api + tests
+tools/                   dev-server.mjs (one local origin), export-seed.mjs
+docs/                    ADMIN_GUIDE, DEPLOY, backend/ (PLAN, CONTRACTS-API, OpenAPI), CONTRACTS, MEDIA, BUILD_LOG
+vercel.json              one Vercel project: /api → container, /admin → Angular, / → storefront
+.github/workflows/       ci.yml (build, test, migrate + seed on main), pages.yml (manual preview)
 ```
-Libraries (CDN, pinned): GSAP 3.12.5 + ScrollTrigger, Lenis 1.1.13. The site still works if they fail to load.
+Storefront libraries (CDN, pinned): GSAP 3.12.5 + ScrollTrigger, Lenis 1.1.13. The site still works if they fail to load.
