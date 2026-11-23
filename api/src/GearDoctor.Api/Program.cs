@@ -43,6 +43,8 @@ app.MapOrders();               // POST /api/orders, POST /api/cart/validate
 app.MapAuth();                 // /api/auth/*
 app.MapAdmin();                // /api/admin/* (Admin role + CSRF)
 app.MapOpenApi("/api/openapi.json");
+if (app.Environment.IsDevelopment() && app.Services.GetRequiredService<GearDoctor.Application.Common.IFileStorage>() is GearDoctor.Infrastructure.Storage.LocalDevFileStorage)
+    app.MapDevStorage();   // local stand-in for R2 uploads (dev only)
 
 app.Run();
 

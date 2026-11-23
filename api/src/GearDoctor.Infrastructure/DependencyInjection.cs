@@ -66,7 +66,18 @@ public static class DependencyInjection
             o.ServiceUrl = config["R2_SERVICE_URL"];   // override for local S3-compatible testing
         });
         services.AddSingleton<IAmazonS3>(sp => R2FileStorage.CreateClient(sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<R2Options>>().Value));
-        services.AddSingleton<IFileStorage, R2FileStorage>();
+        services.AddSingleton<IFileStorage>(sp =>
+        {
+            var r2 = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<R2Options>>().Value;
+            // Local development without a Cloudflare account: a disk-backed stand-in with the same
+            // presigned-PUT flow. Never used outside Development.
+            // Opt-in only (DEV_LOCAL_STORAGE=1) so tests and normal runs keep production URL behaviour.
+            var dev = string.Equals(config["ASPNETCORE_ENVIRONMENT"], "Development", StringComparison.OrdinalIgnoreCase)
+                      && config["DEV_LOCAL_STORAGE"] == "1";
+            return !r2.IsConfigured && dev
+                ? new LocalDevFileStorage()
+                : new R2FileStorage(sp.GetRequiredService<IAmazonS3>(), sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<R2Options>>());
+        });
 
         services.Configure<TurnstileOptions>(o =>
         {
