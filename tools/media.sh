@@ -7,8 +7,9 @@
 #
 # Environment overrides:
 #   FF=/path/to/ffmpeg.exe           ffmpeg location (ffprobe is looked up next to it)
-#   FRAME_COUNT=<n>                  frames in the scroll-driven sequence (default round(duration*150/7.85),
-#                                    i.e. 150 for a 7.85 s clip, 191 for 10 s; the 16:9 set was built with 180)
+#   FRAME_COUNT=<n>                  frames in the scroll-driven sequence (default: EVERY frame of the clip,
+#                                    e.g. 188 for the 7.85 s 9:16 clip, 240 for the 10 s 16:9 clip at 24 fps).
+#                                    Set a lower number to save download size (frames are then evenly spread).
 #
 # Override the ffmpeg location with FF=/path/to/ffmpeg.exe (ffprobe is looked up next to it).
 set -euo pipefail
@@ -53,11 +54,13 @@ ST="assets/img/stills"
 mkdir -p "$V" "$C" "$ST"
 
 DUR="$("$FP" -v error -show_entries format=duration -of csv=p=0 "$SRC")"
-# Frame sequence: FRAME_COUNT evenly spread over the whole clip (first frame = first video frame,
-# last frame = final moment of the clip). Default keeps the 150-frames-per-7.85 s density.
-FRAME_COUNT="${FRAME_COUNT:-$(awk -v d="$DUR" 'BEGIN{printf "%d", int(d*150/7.85+0.5)}')}"
+# Frame sequence: by default every frame of the clip (smoothest scroll animation). With a lower
+# FRAME_COUNT the frames are spread evenly over the whole clip (first = first, last = final moment).
+NATIVE_FRAMES="$("$FP" -v error -select_streams v:0 -count_frames -show_entries stream=nb_read_frames -of csv=p=0 "$SRC")"
+FRAME_COUNT="${FRAME_COUNT:-$NATIVE_FRAMES}"
 FPS="$(awk -v d="$DUR" -v n="$FRAME_COUNT" 'BEGIN{printf "%.6f", n/d}')"
-echo "== frame count: $FRAME_COUNT (duration ${DUR}s, fps $FPS)"
+if [ "$FRAME_COUNT" = "$NATIVE_FRAMES" ]; then FRAME_FILTER=""; else FRAME_FILTER="fps=$FPS,"; fi
+echo "== frame count: $FRAME_COUNT of $NATIVE_FRAMES (duration ${DUR}s)"
 
 VF1080="$(fit 1080 1920)"
 VF720="$(fit 720 1280)"
@@ -68,7 +71,7 @@ frames() {
   local dir="$1" w="$2" h="$3" q="$4" n
   mkdir -p "$dir"
   rm -f "$dir"/frame_*.webp
-  "$FF" -y -v error -i "$SRC" -vf "fps=$FPS,scale=$w:$h:flags=lanczos" \
+  "$FF" -y -v error -i "$SRC" -vf "${FRAME_FILTER}scale=$w:$h:flags=lanczos" -fps_mode passthrough \
     -frames:v "$FRAME_COUNT" -start_number 1 \
     -c:v libwebp -quality "$q" -compression_level 6 "$dir/frame_%04d.webp"
   n="$(ls "$dir" | grep -c '^frame_[0-9]\{4\}\.webp$' || true)"

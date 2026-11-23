@@ -22,8 +22,8 @@ one per orientation of the viewport:
 
 | Sequence | Source | Frame folders | Sizes (quality) | Frames |
 |---|---|---|---|---|
-| **9:16** (portrait) | `assets/source/rider-hero.mp4` (1080x1920, 7.85 s) | `assets/frames/9x16/1080/` and `assets/frames/9x16/720/` | 1080x1920 (q72), 720x1280 (q70) | 150 |
-| **16:9** (landscape) | `assets/source/rider-hero-16x9.mp4` (1920x1080, 10.0 s, 24 fps) | `assets/frames/16x9/1920/` and `assets/frames/16x9/1280/` | 1920x1080 (q72), 1280x720 (q70) | 180 |
+| **9:16** (portrait) | `assets/source/rider-hero.mp4` (1080x1920, 7.85 s, 24 fps) | `assets/frames/9x16/1080/` and `assets/frames/9x16/720/` | 1080x1920 (q72), 720x1280 (q70) | 188 (every frame) |
+| **16:9** (landscape) | `assets/source/rider-hero-16x9.mp4` (1920x1080, 10.0 s, 24 fps) | `assets/frames/16x9/1920/` and `assets/frames/16x9/1280/` | 1920x1080 (q72), 1280x720 (q70) | 240 (every frame) |
 
 Which set the site uses is decided by the viewport: a **landscape viewport uses the 16:9 sequence, a portrait
 viewport uses the 9:16 sequence**. The small set (1280/720 or 720/1280) is for smaller screens or slow
@@ -31,15 +31,16 @@ connections; the large set is for desktop-class screens.
 
 Both sequences use the same rules:
 
-- **Span:** frames are spread evenly over the **whole** clip. Frame 0001 is the first video frame and the last
-  frame is the clip's final moment. The canvas plays page top = frame 0001, page bottom = the last frame.
+- **Every frame:** by default the pipeline extracts **every frame** of the clip (24 fps sources → 188 and 240
+  frames). That gives the smoothest scroll animation; the site also cross-fades between neighbouring frames.
+  The canvas plays page top = frame 0001, page bottom = the last frame.
+- **Fewer frames (optional):** `FRAME_COUNT=<n> bash tools/media.sh <name>` spreads n frames evenly over the whole
+  clip instead (first = first video frame, last = final moment). Use it only to cut download size.
 - **Naming:** `frame_0001.webp` … `frame_NNNN.webp` (1-based, 4-digit, no gaps). Every frame is a standalone
   image, so the canvas never seeks a video.
 - **Framing:** no cropping. The clip is only scaled to the target size (lanczos).
-- **Density:** the default frame count is `round(duration * 150 / 7.85)`, i.e. about 19.1 frames per second of
-  clip. The 9:16 clip gets 150; a 10 s clip gets 191 by default. The 16:9 set was built with **180** frames
-  (`FRAME_COUNT=180`), which is the count to use for that clip.
 - **Verification:** the script fails if a folder does not contain exactly the expected number of files.
+- **Config:** `count` in `config.backdrop.sequences.landscape|portrait` must equal the number of frames.
 
 ### Sharpness
 
@@ -50,79 +51,47 @@ scales of the current sources, so a sharper desktop result needs a higher-resolu
 ### Size budget
 
 - The large set of each sequence should total **under ~30 MB**. If it goes over, lower that set's quality in
-  steps of 5 (not below 55) in `tools/media.sh` and re-run. Measured sizes are listed below.
+  steps of 5 (not below 55) in `tools/media.sh`, or use a lower `FRAME_COUNT`, and re-run.
 - The small set has no hard budget but should stay well below its large set.
+- Only one set is downloaded per visitor (the one matching their screen), progressively.
 
-### Commands: 9:16 set (rider-hero)
-
-```bash
-tools/media.sh rider-hero        # writes the 9:16 set (and the other rider-hero outputs)
-```
-
-The frame part of that run is equivalent to:
+### Commands
 
 ```bash
-SRC=assets/source/rider-hero.mp4
-DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 $SRC)   # 7.850000
-FPS=$(awk -v d=$DUR -v n=150 'BEGIN{printf "%.6f", n/d}')                # 19.108280 = 150 / 7.85
-
-# 1080x1920, WebP q72
-ffmpeg -y -v error -i $SRC -vf "fps=$FPS,scale=1080:1920:flags=lanczos" \
-  -frames:v 150 -start_number 1 -c:v libwebp -quality 72 -compression_level 6 \
-  assets/frames/9x16/1080/frame_%04d.webp
-
-# 720x1280, WebP q70
-ffmpeg -y -v error -i $SRC -vf "fps=$FPS,scale=720:1280:flags=lanczos" \
-  -frames:v 150 -start_number 1 -c:v libwebp -quality 70 -compression_level 6 \
-  assets/frames/9x16/720/frame_%04d.webp
+bash tools/media.sh rider-hero         # 9:16 set (and the other rider-hero outputs)
+bash tools/media.sh rider-hero-16x9    # 16:9 set (landscape clips only get frame sequences)
 ```
 
-### Commands: 16:9 set (rider-hero-16x9)
-
-The 16:9 set was built with 180 frames over the 10.0 s clip (fps = 180 / 10 = 18):
+The frame part of those runs, by hand (every frame, no fps filter):
 
 ```bash
-FRAME_COUNT=180 bash tools/media.sh rider-hero-16x9
+# 9:16
+ffmpeg -y -v error -i assets/source/rider-hero.mp4 -vf "scale=1080:1920:flags=lanczos" -fps_mode passthrough \
+  -start_number 1 -c:v libwebp -quality 72 -compression_level 6 assets/frames/9x16/1080/frame_%04d.webp
+ffmpeg -y -v error -i assets/source/rider-hero.mp4 -vf "scale=720:1280:flags=lanczos" -fps_mode passthrough \
+  -start_number 1 -c:v libwebp -quality 70 -compression_level 6 assets/frames/9x16/720/frame_%04d.webp
+
+# 16:9
+ffmpeg -y -v error -i assets/source/rider-hero-16x9.mp4 -vf "scale=1920:1080:flags=lanczos" -fps_mode passthrough \
+  -start_number 1 -c:v libwebp -quality 72 -compression_level 6 assets/frames/16x9/1920/frame_%04d.webp
+ffmpeg -y -v error -i assets/source/rider-hero-16x9.mp4 -vf "scale=1280:720:flags=lanczos" -fps_mode passthrough \
+  -start_number 1 -c:v libwebp -quality 70 -compression_level 6 assets/frames/16x9/1280/frame_%04d.webp
 ```
 
-The script detects the landscape source and writes only the two frame sequences (the video, poster and still
-outputs are 9:16 crops and are skipped for landscape clips). The same frames by hand:
-
-```bash
-SRC=assets/source/rider-hero-16x9.mp4
-DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 $SRC)   # 10.000000
-FPS=$(awk -v d=$DUR -v n=180 'BEGIN{printf "%.6f", n/d}')                # 18.000000 = 180 / 10
-
-# 1920x1080, WebP q72
-ffmpeg -y -v error -i $SRC -vf "fps=$FPS,scale=1920:1080:flags=lanczos" \
-  -frames:v 180 -start_number 1 -c:v libwebp -quality 72 -compression_level 6 \
-  assets/frames/16x9/1920/frame_%04d.webp
-
-# 1280x720, WebP q70
-ffmpeg -y -v error -i $SRC -vf "fps=$FPS,scale=1280:720:flags=lanczos" \
-  -frames:v 180 -start_number 1 -c:v libwebp -quality 70 -compression_level 6 \
-  assets/frames/16x9/1280/frame_%04d.webp
-```
-
-Running `tools/media.sh rider-hero-16x9` without `FRAME_COUNT=180` would produce the default 191 frames, which
-does not match the 180-frame set in the site config.
+(Delete the old `frame_*.webp` in a folder first if the new clip has fewer frames; the script does this for you.)
 
 ### Output of the last run
 
-| Folder | Frames | Quality | Total size | Average per frame |
-|---|---|---|---|---|
-| `assets/frames/9x16/1080/` | 150 (0001–0150) | q72 | 16,496,998 bytes (~16.5 MB) | ~110 KB |
-| `assets/frames/9x16/720/` | 150 (0001–0150) | q70 | 9,260,546 bytes (~9.3 MB) | ~62 KB |
-| `assets/frames/16x9/1920/` | 180 (0001–0180) | q72 | 10,397,152 bytes (~10.4 MB) | ~58 KB |
-| `assets/frames/16x9/1280/` | 180 (0001–0180) | q70 | 6,079,704 bytes (~6.1 MB) | ~34 KB |
-
-The 16:9 large set is under the 30 MB budget, so its quality was not lowered. The 9:16 sizes are from the
-earlier run of the same settings.
+| Folder | Frames | Quality | Total size |
+|---|---|---|---|
+| `assets/frames/9x16/1080/` | 188 (0001–0188) | q72 | ~21 MB |
+| `assets/frames/9x16/720/` | 188 (0001–0188) | q70 | ~12 MB |
+| `assets/frames/16x9/1920/` | 240 (0001–0240) | q72 | ~14 MB |
+| `assets/frames/16x9/1280/` | 240 (0001–0240) | q70 | ~8.3 MB |
 
 ### Why these choices
 
-- `fps = frames / duration` spreads the frames evenly over the whole clip, so the first frame is the first video
-  frame and the last frame is the clip's final moment.
+- Every source frame = no invented motion and the most continuous scrub; the canvas cross-fade covers the gaps.
 - `-compression_level 6` is the slowest, smallest WebP setting; the frames are encoded once and read many times.
 - The small set is there to save bandwidth on phones and slow connections.
 
@@ -135,8 +104,8 @@ earlier run of the same settings.
    bash tools/media.sh <name>
    ```
    For a portrait clip this writes the 9:16 frame sequence, the MP4/WebM product loops, poster, 3 s crop and
-   stills. For a landscape clip it writes only the 16:9 frame sequence. The frame count is printed; set
-   `FRAME_COUNT=<n>` to override the default.
+   stills. For a landscape clip it writes only the 16:9 frame sequence. The frame count is printed (default: every frame); set
+   `FRAME_COUNT=<n>` to use fewer.
    Frame folders:
    - portrait: `assets/frames/9x16/1080/` and `assets/frames/9x16/720/` for `rider-hero`;
      `assets/frames/<name>/9x16/1080/` and `assets/frames/<name>/9x16/720/` for any other clip
@@ -147,8 +116,8 @@ earlier run of the same settings.
    `pathSmall`, `count` (and `focalPoint`). The current values are:
    ```js
    backdrop: { sequences: {
-     landscape: { path: "assets/frames/16x9/1920/frame_%04d.webp", pathSmall: "assets/frames/16x9/1280/frame_%04d.webp", count: 180 },
-     portrait:  { path: "assets/frames/9x16/1080/frame_%04d.webp", pathSmall: "assets/frames/9x16/720/frame_%04d.webp", count: 150 },
+     landscape: { path: "assets/frames/16x9/1920/frame_%04d.webp", pathSmall: "assets/frames/16x9/1280/frame_%04d.webp", count: 240 },
+     portrait:  { path: "assets/frames/9x16/1080/frame_%04d.webp", pathSmall: "assets/frames/9x16/720/frame_%04d.webp", count: 188 },
    } }
    ```
    For a new clip, point `path` and `pathSmall` at its folders and set `count` to the number of frames it produced.

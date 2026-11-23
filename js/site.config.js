@@ -122,13 +122,13 @@ const config = {
       landscape: {                                            // screens wider than tall (laptops, desktops, ultrawide)
         path: "assets/frames/16x9/1920/frame_%04d.webp",      // 1920×1080 frames: large screens on a good connection
         pathSmall: "assets/frames/16x9/1280/frame_%04d.webp", // 1280×720 frames: smaller laptops / slow connections / Save-Data
-        count: 180,                                           // frames in each of the two folders (they must match)
+        count: 240,                                           // frames in each of the two folders (they must match); 240 = every frame of the 10 s clip at 24 fps
         focalPoint: { x: 0.5, y: 0.5 },                       // centre of the small crop on odd shapes (0–1 of the frame)
       },
       portrait: {                                             // screens taller than wide (phones, portrait tablets)
         path: "assets/frames/9x16/1080/frame_%04d.webp",      // 1080×1920 frames: large / high-DPI portrait screens
         pathSmall: "assets/frames/9x16/720/frame_%04d.webp",  // 720×1280 frames: phones / slow connections / Save-Data
-        count: 150,                                           // frames in each of the two folders (they must match)
+        count: 188,                                           // frames in each of the two folders (they must match); 188 = every frame of the 7.85 s clip
         focalPoint: { x: 0.5, y: 0.5 },                       // centre of the small crop on tall phones (0–1 of the frame)
       },
     },
@@ -138,7 +138,7 @@ const config = {
     scroll: {
       mapping: "page",     // "page" = whole page top→bottom plays the clip once (default)
                            // "distance" = one pass per `screensPerLoop` screens (optional)
-      smoothing: 0.12,     // easing behind the scroll: 0.05 = floaty … 0.3 = tight, 1 = none
+      smoothing: 0.07,     // easing behind the scroll: 0.05 = floaty … 0.3 = tight, 1 = none (0.07 = glides just behind)
       startOffset: 0,      // px scrolled before the clip starts moving (holds frame 1 until then)
       endOffset: 0,        // px before the page bottom at which the last frame is reached
       screensPerLoop: 4,   // only for mapping "distance"

@@ -62,8 +62,8 @@ Video sections: `category-cards` · `product-gallery` (uses `product.video`).
 The background is a fixed, full-screen canvas behind every page, drawn from WebP frame sequences of the rider clips. Nothing autoplays. Your scroll position picks the frame: the top of the page shows frame 1, the bottom shows the last frame, and scrolling down or up moves forward or backward through the clip. Stop scrolling and it holds.
 
 There are **two sequences, picked by screen orientation**:
-- **Landscape screens** (wider than tall: laptops, desktops, ultrawide) use the **16:9 clip** (`assets/source/rider-hero-16x9.mp4`, 180 frames, 1920×1080 and a smaller 1280×720 set).
-- **Portrait screens** (phones, portrait tablets) use the **9:16 clip** (`assets/source/rider-hero.mp4`, 150 frames, 1080×1920 and a smaller 720×1280 set).
+- **Landscape screens** (wider than tall: laptops, desktops, ultrawide) use the **16:9 clip** (`assets/source/rider-hero-16x9.mp4`, 240 frames = every frame, 1920×1080 and a smaller 1280×720 set).
+- **Portrait screens** (phones, portrait tablets) use the **9:16 clip** (`assets/source/rider-hero.mp4`, 188 frames = every frame, 1080×1920 and a smaller 720×1280 set).
 - Only the active sequence loads. Rotating the phone or resizing the window across square switches sequence at the same scroll progress, so you stay at the same point in the animation.
 
 To change a background clip:
