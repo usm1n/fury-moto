@@ -9,6 +9,7 @@ import { GuideType } from './guide-type';
 export const GUIDE_TYPE: GuideType[] = [
   'safety',
   'buying',
+  'myth',
   'maintenance',
   'riding'
 ];
