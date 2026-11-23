@@ -101,7 +101,7 @@ Save as you go. Do not try to do everything in one go.
 
 ## 5. Categories and brands
 
-On a phone, type **`<your-domain>/admin/categories`** or **`<your-domain>/admin/brands`** in the browser's address bar. On a computer, use the side menu.
+On a phone, tap **More** in the bottom bar, then **Categories** or **Brands**. On a computer, use the side menu.
 
 - **Add:** type a name. Tap **Add**.
 - **Rename:** tap the pencil. Change the name. Tap the green tick.
@@ -182,3 +182,20 @@ Tap **More**, then **Settings**. Tap **Save settings** after every change.
 - **Change not showing on the website yet.** Wait up to one minute, then reload the shop page.
 - **"Changed elsewhere."** See section 3.
 - **Who to contact:** **[Developer name and WhatsApp number, to be filled in]**
+
+---
+
+## 10. Guides, FAQs and reviews
+
+Open **More → Guides**, **FAQs** or **Testimonials** (on a computer: the **Content** group in the side menu).
+
+- **Guides:** tap a guide to edit it.
+  - Write the text in the box. Use the buttons for headings, bold, lists and links. Tap **Preview** to see how it looks.
+  - Add a cover photo, and pick up to 8 related products.
+  - Switch **Published** on to show it on the site.
+- **FAQs:** add a question and its answer. Drag to change the order.
+- **Testimonials:** only use real customer quotes. Add the name, bike, quote and star rating.
+
+## 11. Activity
+
+**More → Activity** shows who changed what and when: prices, stock, orders, settings and sign-ins. Use it to check a change or spot a sign-in you don't recognise.

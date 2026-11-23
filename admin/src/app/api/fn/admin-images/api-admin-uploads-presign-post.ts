@@ -10,8 +10,12 @@ import { RequestBuilder } from '../../request-builder';
 
 export interface ApiAdminUploadsPresignPost$Params {
       body: {
-'productId': number;
-'kind': 'main' | 'thumb';
+
+/**
+ * required for main/thumb; omitted or 0 for guide
+ */
+'productId'?: (number | null);
+'kind': 'main' | 'thumb' | 'guide';
 'contentType'?: 'image/webp';
 'bytes'?: number;
 }
