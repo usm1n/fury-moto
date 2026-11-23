@@ -24,6 +24,10 @@ tags:
   - name: AdminCatalog
   - name: AdminOrders
   - name: AdminSettings
+  - name: Content
+  - name: AdminContent
+  - name: AdminAudit
+  - name: Seo
 
 paths:
   /api/health:
@@ -299,6 +303,66 @@ paths:
     get: { tags: [AdminSettings], security: [ { cookieAuth: [] } ], responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AdminSettings" } } } } } }
     put: { tags: [AdminSettings], security: [ { cookieAuth: [] } ], requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/AdminSettings" } } } }, responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AdminSettings" } } } }, "400": { $ref: "#/components/responses/Problem" } } }
 
+  # ---------------- Phase 4: content, SEO, audit, alerts ----------------
+  /api/content/guides:
+    get: { tags: [Content], summary: "Published guides, sortOrder asc (no body)", responses: { "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/GuideSummary" } } } } } } }
+  /api/content/guides/{slug}:
+    get: { tags: [Content], parameters: [ { name: slug, in: path, required: true, schema: { type: string } } ], responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Guide" } } } }, "404": { $ref: "#/components/responses/Problem" } } }
+  /api/content/faqs:
+    get: { tags: [Content], summary: "Published FAQs, sortOrder asc", responses: { "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Faq" } } } } } } }
+  /api/content/testimonials:
+    get: { tags: [Content], summary: "Published testimonials, sortOrder asc", responses: { "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Testimonial" } } } } } } }
+  /api/seo/product/{slug}:
+    get:
+      tags: [Seo]
+      summary: "Server-rendered product page: product.html with title, description, canonical, OG/Twitter tags and Product JSON-LD injected. Vercel rewrites /products/{slug} here. Unknown or unpublished slug returns the 404 page with status 404."
+      parameters: [ { name: slug, in: path, required: true, schema: { type: string } } ]
+      responses: { "200": { description: HTML, content: { text/html: { schema: { type: string } } } }, "404": { description: HTML not found } }
+  /api/seo/sitemap.xml:
+    get: { tags: [Seo], summary: "Static pages + /products/{slug} for every published product + guide URLs. Vercel rewrites /sitemap.xml here.", responses: { "200": { description: XML, content: { application/xml: { schema: { type: string } } } } } }
+
+  /api/admin/guides:
+    get: { tags: [AdminContent], security: [ { cookieAuth: [] } ], responses: { "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/AdminGuide" } } } } } } }
+    post: { tags: [AdminContent], security: [ { cookieAuth: [] } ], requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/GuideUpsert" } } } }, responses: { "201": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AdminGuide" } } } }, "400": { $ref: "#/components/responses/Problem" } } }
+  /api/admin/guides/{id}:
+    get: { tags: [AdminContent], security: [ { cookieAuth: [] } ], parameters: [ { name: id, in: path, required: true, schema: { type: integer } } ], responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AdminGuide" } } } } } }
+    put: { tags: [AdminContent], security: [ { cookieAuth: [] } ], parameters: [ { name: id, in: path, required: true, schema: { type: integer } } ], requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/GuideUpsert" } } } }, responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AdminGuide" } } } }, "400": { $ref: "#/components/responses/Problem" }, "409": { $ref: "#/components/responses/Problem" } } }
+    delete: { tags: [AdminContent], security: [ { cookieAuth: [] } ], parameters: [ { name: id, in: path, required: true, schema: { type: integer } } ], responses: { "204": { description: OK } } }
+  /api/admin/guides/reorder:
+    post: { tags: [AdminContent], security: [ { cookieAuth: [] } ], requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/Reorder" } } } }, responses: { "204": { description: OK } } }
+
+  /api/admin/faqs:
+    get: { tags: [AdminContent], security: [ { cookieAuth: [] } ], responses: { "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/AdminFaq" } } } } } } }
+    post: { tags: [AdminContent], security: [ { cookieAuth: [] } ], requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/FaqUpsert" } } } }, responses: { "201": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AdminFaq" } } } }, "400": { $ref: "#/components/responses/Problem" } } }
+  /api/admin/faqs/{id}:
+    get: { tags: [AdminContent], security: [ { cookieAuth: [] } ], parameters: [ { name: id, in: path, required: true, schema: { type: integer } } ], responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AdminFaq" } } } } } }
+    put: { tags: [AdminContent], security: [ { cookieAuth: [] } ], parameters: [ { name: id, in: path, required: true, schema: { type: integer } } ], requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/FaqUpsert" } } } }, responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AdminFaq" } } } }, "400": { $ref: "#/components/responses/Problem" }, "409": { $ref: "#/components/responses/Problem" } } }
+    delete: { tags: [AdminContent], security: [ { cookieAuth: [] } ], parameters: [ { name: id, in: path, required: true, schema: { type: integer } } ], responses: { "204": { description: OK } } }
+  /api/admin/faqs/reorder:
+    post: { tags: [AdminContent], security: [ { cookieAuth: [] } ], requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/Reorder" } } } }, responses: { "204": { description: OK } } }
+
+  /api/admin/testimonials:
+    get: { tags: [AdminContent], security: [ { cookieAuth: [] } ], responses: { "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/AdminTestimonial" } } } } } } }
+    post: { tags: [AdminContent], security: [ { cookieAuth: [] } ], requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/TestimonialUpsert" } } } }, responses: { "201": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AdminTestimonial" } } } }, "400": { $ref: "#/components/responses/Problem" } } }
+  /api/admin/testimonials/{id}:
+    get: { tags: [AdminContent], security: [ { cookieAuth: [] } ], parameters: [ { name: id, in: path, required: true, schema: { type: integer } } ], responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AdminTestimonial" } } } } } }
+    put: { tags: [AdminContent], security: [ { cookieAuth: [] } ], parameters: [ { name: id, in: path, required: true, schema: { type: integer } } ], requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/TestimonialUpsert" } } } }, responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AdminTestimonial" } } } }, "400": { $ref: "#/components/responses/Problem" }, "409": { $ref: "#/components/responses/Problem" } } }
+    delete: { tags: [AdminContent], security: [ { cookieAuth: [] } ], parameters: [ { name: id, in: path, required: true, schema: { type: integer } } ], responses: { "204": { description: OK } } }
+  /api/admin/testimonials/reorder:
+    post: { tags: [AdminContent], security: [ { cookieAuth: [] } ], requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/Reorder" } } } }, responses: { "204": { description: OK } } }
+  /api/admin/audit:
+    get:
+      tags: [AdminAudit]
+      security: [ { cookieAuth: [] } ]
+      parameters:
+        - { name: entity, in: query, schema: { type: string } }
+        - { name: entityId, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 50, maximum: 100 } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AuditPage" } } } } }
+  /api/admin/alerts:
+    get: { tags: [AdminAudit], security: [ { cookieAuth: [] } ], summary: "Cheap counts for the shell badge, polled every 60 s while the admin is open", responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Alerts" } } } } } }
+
 components:
   securitySchemes:
     cookieAuth: { type: apiKey, in: cookie, name: gd_auth }
@@ -565,3 +629,96 @@ components:
         bankTransferEnabled: { type: boolean }
         bankDetails: { type: [object, "null"], properties: { bankName: { type: string }, accountTitle: { type: string }, iban: { type: string } } }
         lowStockThreshold: { type: integer, minimum: 0, default: 3 }
+    GuideType: { type: string, enum: [safety, buying, maintenance, riding] }
+    GuideSummary:
+      type: object
+      required: [slug, title, type, excerpt]
+      properties:
+        slug: { type: string }
+        title: { type: string }
+        type: { $ref: "#/components/schemas/GuideType" }
+        excerpt: { type: string }
+        coverUrl: { type: [string, "null"] }
+        video: { type: [string, "null"], description: "id of a site.config video (storefront design asset)" }
+        source: { type: [string, "null"], description: "Instagram reel URL" }
+        updatedAt: { type: string, format: date-time }
+    Guide:
+      allOf:
+        - $ref: "#/components/schemas/GuideSummary"
+        - type: object
+          properties:
+            body: { type: string, description: Markdown }
+            relatedProducts: { type: array, items: { $ref: "#/components/schemas/ProductCard" }, description: "published only, in saved order" }
+    AdminGuide:
+      type: object
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        title: { type: string }
+        type: { $ref: "#/components/schemas/GuideType" }
+        excerpt: { type: string }
+        body: { type: string }
+        coverKey: { type: [string, "null"] }
+        coverUrl: { type: [string, "null"] }
+        video: { type: [string, "null"] }
+        source: { type: [string, "null"] }
+        relatedProductIds: { type: array, items: { type: integer } }
+        isPublished: { type: boolean }
+        sortOrder: { type: integer }
+        updatedAt: { type: string, format: date-time }
+        version: { type: string }
+    GuideUpsert:
+      type: object
+      required: [title, type, excerpt, body]
+      properties:
+        slug: { type: [string, "null"], description: "blank = from title; made unique" }
+        title: { type: string, maxLength: 160 }
+        type: { $ref: "#/components/schemas/GuideType" }
+        excerpt: { type: string, maxLength: 300 }
+        body: { type: string, maxLength: 40000 }
+        coverKey: { type: [string, "null"], description: "storage key from presign (kind=guide) or an assets/ path; null = unchanged, empty = clear" }
+        video: { type: [string, "null"] }
+        source: { type: [string, "null"] }
+        relatedProductIds: { type: array, items: { type: integer }, maxItems: 8 }
+        isPublished: { type: boolean }
+        version: { type: [string, "null"], description: "required on PUT; mismatch gives 409 /problems/stale" }
+    Faq:
+      type: object
+      properties: { q: { type: string }, a: { type: string } }
+    AdminFaq:
+      type: object
+      properties: { id: { type: integer }, q: { type: string }, a: { type: string }, isPublished: { type: boolean }, sortOrder: { type: integer } }
+    FaqUpsert:
+      type: object
+      required: [q, a]
+      properties: { q: { type: string, maxLength: 200 }, a: { type: string, maxLength: 2000 }, isPublished: { type: boolean } }
+    Testimonial:
+      type: object
+      properties: { name: { type: string }, bike: { type: [string, "null"] }, quote: { type: string }, rating: { type: integer, minimum: 1, maximum: 5 } }
+    AdminTestimonial:
+      type: object
+      properties: { id: { type: integer }, name: { type: string }, bike: { type: [string, "null"] }, quote: { type: string }, rating: { type: integer }, isPublished: { type: boolean }, sortOrder: { type: integer } }
+    TestimonialUpsert:
+      type: object
+      required: [name, quote, rating]
+      properties: { name: { type: string, maxLength: 80 }, bike: { type: [string, "null"], maxLength: 80 }, quote: { type: string, maxLength: 600 }, rating: { type: integer, minimum: 1, maximum: 5 }, isPublished: { type: boolean } }
+    AuditEntry:
+      type: object
+      properties:
+        id: { type: integer }
+        at: { type: string, format: date-time }
+        by: { type: [string, "null"], description: "admin email" }
+        action: { type: string, example: "product.update", description: "entity.verb, verbs: create update delete publish unpublish reorder stock status login login-failed logout password-change" }
+        entity: { type: string }
+        entityId: { type: [string, "null"] }
+        summary: { type: string, example: "Price 45,000 to 42,000; stock M/Black 3 to 5" }
+        ip: { type: [string, "null"] }
+    AuditPage:
+      type: object
+      properties: { items: { type: array, items: { $ref: "#/components/schemas/AuditEntry" } }, page: { type: integer }, pageSize: { type: integer }, total: { type: integer } }
+    Alerts:
+      type: object
+      properties:
+        newOrders: { type: integer }
+        lowStock: { type: integer, description: "active variants of published products with 0 < stock <= threshold" }
+        soldOut: { type: integer, description: "published products whose active variants all have stock 0" }
