@@ -1,10 +1,9 @@
 # Preview hosting on GitHub Pages: publishes the storefront in /web.
 # (Production moves to Vercel — see docs/DEPLOY.md. Delete this workflow once Vercel is live.)
 name: pages
+# Manual only now: the storefront reads products from /api, which GitHub Pages can't host.
+# The last Pages deployment (static, pre-API) stays online as a preview until Vercel is live.
 on:
-  push:
-    branches: [main]
-    paths: ["web/**", ".github/workflows/pages.yml"]
   workflow_dispatch:
 permissions:
   contents: read
