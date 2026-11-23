@@ -4,11 +4,14 @@ import { html, raw, esc, renderTemplate } from "../core/render.js";
 import { refresh } from "../core/app.js";
 import { instagramStrip, activateEmbeds } from "../components/instagram-strip.js";
 import { whatsappLink } from "../data/settings.js";
+import { getGuides } from "../data/content.js";
+import { showError } from "../components/api-state.js";
 
 const T = () => config.gearDoctor || {};
-const guides = () => config.guides || [];
+let guideList = [];
 
-export const readingTime = (g) => Math.max(1, Math.round(String(g.body || "").split(/\s+/).filter(Boolean).length / 200));
+/** Minutes to read; 0 when the body is not loaded (list summaries carry no body). */
+export const readingTime = (g) => (g.body ? Math.max(1, Math.round(String(g.body).split(/\s+/).filter(Boolean).length / 200)) : 0);
 
 function igAccount() {
   const list = config.socials?.instagram || [];
@@ -33,7 +36,7 @@ function card(g, featured) {
         <div class="pill-row">
           <span class="pill pill--badge gcard__type">${t.typeLabels?.[g.type] || g.type}</span>
           ${featured && t.featured ? html`<span class="pill">${t.featured}</span>` : ""}
-          <span class="gcard__time muted">${readingTime(g)} ${t.minRead}</span>
+          ${readingTime(g) ? html`<span class="gcard__time muted">${readingTime(g)} ${t.minRead}</span>` : ""}
         </div>
         <h3 class="gcard__title">${g.title}</h3>
         <p class="gcard__excerpt">${g.excerpt}</p>
@@ -43,8 +46,13 @@ function card(g, featured) {
   </article>`;
 }
 
+function skeletonGrid() {
+  const one = (i) => `<article class="gcard${i === 0 ? " gcard--featured" : ""}" aria-hidden="true"><div class="gcard__link"><div class="gcard__media"><span class="skeleton" style="position:absolute;inset:0"></span></div><div class="gcard__body"><span class="skeleton skeleton--line w-40"></span><span class="skeleton skeleton--line w-90"></span><span class="skeleton skeleton--line w-60"></span></div></div></article>`;
+  return `<div class="gd-grid">${[0, 1, 2, 3, 4, 5].map(one).join("")}</div>`;
+}
+
 function gridHtml(type) {
-  const list = guides().filter((g) => type === "all" || g.type === type);
+  const list = guideList.filter((g) => type === "all" || g.type === type);
   if (!list.length) return `<p class="gd-empty muted">${esc(T().empty)}</p>`;
   return `<div class="gd-grid">${list.map((g, i) => String(card(g, i === 0))).join("")}</div>`;
 }
@@ -71,7 +79,7 @@ export default async function mount(el) {
         <div class="gd-filters" role="group" aria-label="${esc(t.filterLabel)}">
           ${(t.filters || []).map((f) => `<button type="button" class="gd-chip" data-type="${esc(f.id)}" aria-pressed="${f.id === type}">${esc(f.label)}</button>`).join("")}
         </div>
-        <div class="gd-results" aria-live="polite">${gridHtml(type)}</div>
+        <div class="gd-results" aria-live="polite">${skeletonGrid()}</div>
       </div>
     </section>
     <section class="section gd-ig" data-reveal>
@@ -89,6 +97,19 @@ export default async function mount(el) {
   // WhatsApp number lives in the API settings; swap it in once loaded (config is only the offline fallback)
   whatsappLink(t.cta?.message).then((href) => el.querySelector("[data-gd-wa]")?.setAttribute("href", href)).catch(() => {});
   const results = el.querySelector(".gd-results");
+  const load = async () => {
+    renderTemplate(results, skeletonGrid());
+    try {
+      guideList = await getGuides();
+      renderTemplate(results, gridHtml(currentType()));
+    } catch (e) {
+      console.warn("[gear-doctor] guides", e);
+      showError(results, e, load);
+      return;
+    }
+    refresh(results);
+  };
+  load();
   el.querySelector(".gd-filters").addEventListener("click", (e) => {
     const b = e.target.closest("[data-type]");
     if (!b) return;
@@ -97,6 +118,7 @@ export default async function mount(el) {
     const u = new URL(location.href);
     if (id === "all") u.searchParams.delete("type"); else u.searchParams.set("type", id);
     history.replaceState(null, "", u);
+    if (!guideList.length) return;
     renderTemplate(results, gridHtml(id));
     refresh(results);
   });

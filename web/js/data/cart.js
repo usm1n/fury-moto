@@ -20,7 +20,7 @@
  * Emits "cart:change" on every mutation. Listens to "cart:add" so any component can add
  * without importing this file.
  */
-import { config, formatPrice } from "../core/config.js";
+import { config, formatPrice, productUrl } from "../core/config.js";
 import { on, emit } from "../core/bus.js";
 import { apiPost } from "./api.js";
 
@@ -69,7 +69,7 @@ function save(lines) {
 
 export const keyOf = (l) => [l.slug, l.size || "", l.color || ""].join("|");
 /** Single place that knows the product page URL for a slug. */
-export const productHref = (slug) => `product.html?id=${encodeURIComponent(slug)}`;
+export const productHref = (slug) => productUrl(slug);
 const purchasable = (l) => l.status !== "sold-out" && l.status !== "unavailable";
 
 /* ---------- reads ---------- */

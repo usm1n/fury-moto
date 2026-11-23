@@ -3,7 +3,7 @@
  *   productCard(product, { loading }) -> raw() HTML (safe to interpolate in html`` or join / String())
  * Quick-view button carries [data-quick-view="<id>"]; quick-view.js (shop agent) listens for it.
  */
-import { config, formatPrice } from "../core/config.js";
+import { config, formatPrice, productUrl } from "../core/config.js";
 import { html, raw, picture } from "../core/render.js";
 
 const pill = (cls, t) => String(html`<span class="pill ${cls}">${t}</span>`);
@@ -13,7 +13,7 @@ export function productCard(p, { loading = "lazy" } = {}) {
   const imgs = p.images || [];
   const first = imgs[0];
   const second = imgs[1];
-  const href = `product.html?slug=${encodeURIComponent(p.slug || p.id)}`;
+  const href = productUrl(p.slug || p.id);
   const onSale = p.compareAtPrice && p.compareAtPrice > p.price;
   const badges = [...(p.badges || [])];
   if (!p.inStock) badges.unshift(ui.soldOut || ui.outOfStock);

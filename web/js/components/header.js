@@ -29,7 +29,7 @@ function activeHref(links) {
   let best = null, bestScore = 0;
   links.forEach((l) => {
     let u;
-    try { u = new URL(l.href, location.href); } catch { return; }
+    try { u = new URL(l.href, document.baseURI); } catch { return; }
     if (file(u) !== file(here)) return;
     const keys = [...u.searchParams.keys()];
     if (!keys.every((k) => u.searchParams.get(k) === here.searchParams.get(k))) return;

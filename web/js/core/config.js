@@ -88,6 +88,14 @@ export function waLink(message = "", number) {
 
 export const getVideo = (id) => (config.videos || []).find((v) => v.id === id) || null;
 export const getSlot = (section) => (config.videoSlots || []).find((s) => s.section === section) || null;
-export const getCategory = (id) => (config.categories || []).find((c) => c.id === id) || null;
-export const getBrand = (id) => (config.brands || []).find((b) => b.id === id || b.name === id) || null;
-export const getGuide = (id) => (config.guides || []).find((g) => g.id === id) || null;
+
+/**
+ * Product page URL for a slug. Pretty ("/products/{slug}", root-relative) when the site is served from the
+ * domain root (store.prettyProductUrls, default true); otherwise "product.html?slug=" (sub-path / static preview).
+ */
+export const productUrl = (slug) => (config.store?.prettyProductUrls === false
+  ? `product.html?slug=${encodeURIComponent(slug)}`
+  : `/products/${encodeURIComponent(slug)}`);
+
+/** store.deliveryNote, or "" while it is still a [PLACEHOLDER] (never shown to customers). */
+export const deliveryNote = () => (isPlaceholder(config.store?.deliveryNote) ? "" : String(config.store?.deliveryNote || "").trim());

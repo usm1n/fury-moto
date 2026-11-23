@@ -6,247 +6,32 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://example.com/</loc>
-    <lastmod>2026-11-22</lastmod>
+    <lastmod>2026-11-23</lastmod>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://example.com/shop.html</loc>
-    <lastmod>2026-11-22</lastmod>
+    <lastmod>2026-11-23</lastmod>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://example.com/shop.html?cat=helmets</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://example.com/shop.html?cat=race-suits</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://example.com/shop.html?cat=jackets</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://example.com/shop.html?cat=gloves</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://example.com/shop.html?cat=boots</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://example.com/shop.html?cat=protection</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://example.com/shop.html?cat=accessories</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.8</priority>
-  </url>
-  <url>
     <loc>https://example.com/gear-doctor.html</loc>
-    <lastmod>2026-11-22</lastmod>
+    <lastmod>2026-11-23</lastmod>
     <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=shoei-x14-full-face</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=agv-pista-gp-rr-carbon</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=arai-rx7v-evo</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=hjc-rpha-11-carbon</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=ls2-ff805-thunder-carbon</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=alpinestars-supertech-r10</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=alpinestars-gp-pro-r-v3-suit</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=dainese-misano-3-perforated</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=revit-quantum-2-two-piece</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=alpinestars-gp-plus-v4-suit</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=alpinestars-missile-v2-jacket</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=dainese-sport-guard-jacket</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=revit-sand-4-h2o-jacket</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=dainese-mugello-leather-jacket</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=alpinestars-sp-8-v3-gloves</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=dainese-carbon-4-short-gloves</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=revit-cayenne-pro-gloves</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=alpinestars-gp-tech-v2-gloves</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=tcx-rt-race-pro-air</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=alpinestars-smx-6-v2-vented</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=dainese-axial-d1-air-boots</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=tcx-comp-evo-2-race-boots</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=alpinestars-nucleon-kr1-back-protector</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=dainese-pro-armor-chest-protector</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=revit-chest-protector-pro</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=shoei-pinlock-anti-fog-insert</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=alpinestars-tech-knit-balaclava</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/product.html?id=dainese-track-knee-sliders</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://example.com/guide.html?id=dot-vs-fim</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://example.com/guide.html?id=race-suit-fit</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://example.com/guide.html?id=leather-vs-textile</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://example.com/guide.html?id=first-helmet</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://example.com/guide.html?id=kangaroo-vs-cowhide</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://example.com/guide.html?id=seam-strength</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://example.com/guide.html?id=ce-level-2-armour</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://example.com/guide.html?id=hard-knuckle-gloves</loc>
-    <lastmod>2026-11-22</lastmod>
-    <priority>0.6</priority>
   </url>
   <url>
     <loc>https://example.com/about.html</loc>
-    <lastmod>2026-11-22</lastmod>
+    <lastmod>2026-11-23</lastmod>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://example.com/contact.html</loc>
-    <lastmod>2026-11-22</lastmod>
+    <lastmod>2026-11-23</lastmod>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://example.com/cart.html</loc>
-    <lastmod>2026-11-22</lastmod>
+    <lastmod>2026-11-23</lastmod>
     <priority>0.3</priority>
   </url>
 </urlset>

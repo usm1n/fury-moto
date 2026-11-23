@@ -2,7 +2,7 @@
  * Cart page with three steps in one place: cart -> checkout (#checkout) -> confirmation.
  * Validates against the API on load and before entering checkout.
  */
-import { config, formatPrice } from "../core/config.js";
+import { config, formatPrice, deliveryNote } from "../core/config.js";
 import { html, renderTemplate, fill } from "../core/render.js";
 import { on } from "../core/bus.js";
 import cart, { productHref } from "../data/cart.js";
@@ -79,7 +79,7 @@ export default function mount(main) {
           <h2 id="cart-summary-title" class="cart-summary__title">${ui.cartSummary}</h2>
           ${totalsMarkup(sum)}
           ${config.store?.cashOnDelivery ? html`<p class="cart-note">${ui.cashOnDelivery}</p>` : ""}
-          <p class="cart-note muted">${config.store?.deliveryNote}</p>
+          ${deliveryNote() ? html`<p class="cart-note muted">${deliveryNote()}</p>` : ""}
           <p class="cart-note" role="status">${checking ? ui.cartChecking : checkError ? ui.cartCheckError : sum.blocked ? ui.cartBlocked : ""}</p>
           <button type="button" class="btn btn--primary btn--block" data-act="checkout" ${sum.blocked || checking ? "disabled" : ""}>${ui.checkout}</button>
           <a class="btn btn--ghost btn--block" href="shop.html">${ui.cartContinue}</a>

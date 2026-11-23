@@ -4,7 +4,7 @@
  *   export openSearch()      -> emits "search:open"
  * Also exports small a11y helpers shared with header.js (scroll lock, focus trap).
  */
-import { config, formatPrice } from "../core/config.js";
+import { config, formatPrice, productUrl } from "../core/config.js";
 import { html, raw, renderTemplate } from "../core/render.js";
 import { on, emit } from "../core/bus.js";
 import { getLenis } from "../core/app.js";
@@ -197,7 +197,7 @@ async function run(q) {
     products.forEach((p) => {
       const brand = p.brandName || "";
       parts.push(String(row({
-        href: `product.html?slug=${encodeURIComponent(p.slug)}`,
+        href: productUrl(p.slug),
         img: p.images?.[0]?.thumb || p.images?.[0]?.src, title: p.title, meta: brand, price: formatPrice(p.price), kind: "product",
       })));
     });

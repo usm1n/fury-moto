@@ -2,7 +2,7 @@
  * Quick view modal. initQuickView() binds one delegated listener for [data-quick-view="<productId>"].
  * Accessible: role=dialog, focus trap, ESC, backdrop click, focus returns to the opener.
  */
-import { config, formatPrice } from "../core/config.js";
+import { config, formatPrice, productUrl } from "../core/config.js";
 import { html, raw, renderTemplate } from "../core/render.js";
 import { emit } from "../core/bus.js";
 import { getProduct } from "../data/products.js";
@@ -62,7 +62,7 @@ export async function openQuickView(productId, from = document.activeElement) {
         <p class="qv__error muted" data-qv-error role="alert" hidden>${ui().chooseSize}</p>
         <div class="qv__actions">
           <button class="btn btn--primary btn--block" type="button" data-qv-add ${p.inStock ? "" : "disabled"}>${p.inStock ? ui().addToCart : ui().outOfStock}</button>
-          <a class="btn btn--ghost btn--block" href="product.html?slug=${encodeURIComponent(p.slug)}">${ui().viewDetails}</a>
+          <a class="btn btn--ghost btn--block" href="${productUrl(p.slug)}">${ui().viewDetails}</a>
         </div>
       </div>
     </div>`);

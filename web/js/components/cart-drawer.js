@@ -1,7 +1,7 @@
 /**
  * Cart drawer: slide-out from the right. Opens on "cart:open" or any [data-cart-open] click.
  */
-import { config, formatPrice } from "../core/config.js";
+import { config, formatPrice, deliveryNote } from "../core/config.js";
 import { html, raw, renderTemplate } from "../core/render.js";
 import { on } from "../core/bus.js";
 import { getLenis } from "../core/app.js";
@@ -108,7 +108,7 @@ export default function mount(el) {
       <footer class="cart-drawer__foot">
         ${totalsMarkup(sum)}
         ${config.store?.cashOnDelivery ? html`<p class="cart-note">${ui.cashOnDelivery}</p>` : ""}
-        <p class="cart-note muted">${config.store?.deliveryNote}</p>
+        ${deliveryNote() ? html`<p class="cart-note muted">${deliveryNote()}</p>` : ""}
         ${sum.blocked ? html`<p class="cart-note cart-note--warn">${ui.cartBlocked}</p>` : ""}
         <a class="btn btn--primary btn--block${sum.blocked ? " is-disabled" : ""}" data-checkout href="cart.html#checkout" aria-disabled="${sum.blocked}">${ui.checkout}</a>
         <a class="btn btn--ghost btn--block" href="cart.html">${ui.cartView}</a>

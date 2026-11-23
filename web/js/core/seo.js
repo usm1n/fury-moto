@@ -5,7 +5,7 @@
  *   import { setSeo, productJsonLd, storeJsonLd, breadcrumbJsonLd } from "./core/seo.js";
  *   setSeo({ title: "Helmets", description: "...", url: "shop.html?cat=helmets", jsonLd: storeJsonLd() });
  */
-import { config, isPlaceholder } from "./config.js";
+import { config, isPlaceholder, productUrl } from "./config.js";
 import { settingsNow } from "../data/settings.js";
 
 /** Returns the trimmed string, or undefined when empty or still a [PLACEHOLDER]. */
@@ -28,7 +28,8 @@ function siteBase() {
       return u.pathname.endsWith("/") ? u.href : `${u.href}/`;
     } catch { /* fall through to location */ }
   }
-  return typeof location !== "undefined" ? location.href : "https://example.com/";
+  // document.baseURI (not location.href): product pages are served at /products/{slug} with <base href="/">
+  return typeof document !== "undefined" ? document.baseURI : "https://example.com/";
 }
 
 /** Absolute URL for a site-relative path ("assets/img/x.jpg", "shop.html?cat=helmets"). */
@@ -45,6 +46,8 @@ export function absUrl(path = "") {
 /** Canonical URL of the current page, without the hash. */
 function currentPageUrl() {
   if (typeof location === "undefined") return "";
+  const pm = /\/products\/([^/]+)\/?$/.exec(location.pathname);
+  if (pm) return absUrl(productUrl(decodeURIComponent(pm[1])));
   const file = location.pathname.split("/").pop();
   const search = location.search || "";
   if (!file || file === "index.html") return `${siteBase()}${search}`;
@@ -120,7 +123,7 @@ export function setSeo({ title, description, image, url, type = "website", jsonL
 /** schema.org Product from an adapted API product (see js/data/products.js). */
 export function productJsonLd(product) {
   if (!product) return null;
-  const url = absUrl(`product.html?slug=${encodeURIComponent(product.slug || product.id)}`);
+  const url = absUrl(productUrl(product.slug || product.id));
   const price = Number(product.price);
   const images = (product.images || []).map((i) => absUrl(i.src)).filter(Boolean);
   const name = clean(siteName());

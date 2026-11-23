@@ -2,12 +2,12 @@
  * Product detail page. mount(main) reads ?id=, renders gallery + info + notes + related.
  * All copy comes from config.ui / the product record.
  */
-import { config, formatPrice, waLink } from "../core/config.js";
+import { config, formatPrice, waLink, productUrl } from "../core/config.js";
 import { html, raw, renderTemplate, picture } from "../core/render.js";
 import { emit } from "../core/bus.js";
 import { getProduct, getRelated } from "../data/products.js";
 import { getSettings } from "../data/settings.js";
-import { productJsonLd } from "../core/seo.js";
+import { productJsonLd, setSeo } from "../core/seo.js";
 import { showError } from "../components/api-state.js";
 import { productCard } from "../components/product-card.js";
 import { openSizeGuide } from "../components/size-guide.js";
@@ -22,8 +22,12 @@ const SVG = {
 export default async function mount(main) {
   const ui = config.ui || {};
   const qp = new URLSearchParams(location.search);
-  const slug = qp.get("slug") || qp.get("id");   // old links used ?id=<x>; seeded slugs equal the old ids
-  if (!qp.get("slug") && qp.get("id")) {
+  // /products/{slug} (pretty), ?slug=, or the legacy ?id=
+  const pm = /\/products\/([^/?#]+)\/?$/.exec(location.pathname);
+  let pathSlug = "";
+  if (pm) { try { pathSlug = decodeURIComponent(pm[1]); } catch { pathSlug = pm[1]; } }
+  const slug = pathSlug || qp.get("slug") || qp.get("id");
+  if (!pathSlug && !qp.get("slug") && qp.get("id")) {
     try { history.replaceState(null, "", `${location.pathname}?slug=${encodeURIComponent(slug)}${location.hash}`); } catch { /* ignore */ }
   }
 
@@ -64,7 +68,7 @@ export default async function mount(main) {
   const certDesc = (name) => (p.certificationDetails || []).find((c) => c.name === name)?.description || "";
   const slideCount = images.length + (p.video ? 1 : 0);
 
-  setMeta(p, brand);
+  setMeta(p);
 
   const slides = [
     ...images.map((im, i) => html`
@@ -209,12 +213,14 @@ export default async function mount(main) {
 }
 
 /* ---------- meta / JSON-LD ---------- */
-function setMeta(p, brand) {
-  const tpl = config.seo?.titleTemplate || "%s";
-  document.title = tpl.replace("%s", p.title);
-  let m = document.querySelector('meta[name="description"]');
-  if (!m) { m = document.createElement("meta"); m.name = "description"; document.head.appendChild(m); }
-  m.content = String(p.description || "").replace(/\s+/g, " ").slice(0, 155);
+function setMeta(p) {
+  setSeo({
+    title: p.title,
+    description: String(p.description || "").replace(/\s+/g, " ").slice(0, 155),
+    image: p.images?.[0]?.src,
+    url: productUrl(p.slug || p.id),
+    type: "product",
+  });
 }
 function injectJsonLd(p) {
   const data = productJsonLd(p);

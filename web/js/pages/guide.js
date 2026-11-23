@@ -1,25 +1,19 @@
-/** Single guide page: guide.html?id=<id> */
-import { config, getGuide, waLink, formatPrice } from "../core/config.js";
+/** Single guide page: guide.html?id=<slug> (API content). */
+import { config, waLink } from "../core/config.js";
 import { esc, renderTemplate } from "../core/render.js";
-import { getProduct } from "../data/products.js";
+import { getGuide, getGuides } from "../data/content.js";
+import { showError } from "../components/api-state.js";
+import { productCard } from "../components/product-card.js";
 import { mdLite } from "../components/markdown.js";
 import { instagramEmbed, activateEmbeds } from "../components/instagram-strip.js";
 import { readingTime } from "./gear-doctor.js";
 
 const T = () => config.gearDoctor || {};
 
-async function productCards(ids) {
-  const products = (await Promise.all((ids || []).map((id) => getProduct(id).catch(() => null)))).filter(Boolean);
-  if (!products.length) return "";
-  let card = null;
-  try { card = (await import("../components/product-card.js")).productCard; } catch { /* built in parallel */ }
-  const fallback = (p) => `<article class="gd-pfallback" data-product-id="${esc(p.id)}">
-      <a href="product.html?slug=${encodeURIComponent(p.slug)}">
-        ${p.images?.[0] ? `<img src="${esc(p.images[0].src)}" alt="${esc(p.images[0].alt || p.title)}" loading="lazy" onerror="this.remove()">` : ""}
-        <h3>${esc(p.title)}</h3><span class="price">${esc(formatPrice(p.price))}</span>
-      </a></article>`;
+function productCards(products) {
+  if (!products?.length) return "";
   const cards = products.map((p) => {
-    try { return String(card ? card(p, { loading: "lazy" }) : fallback(p)); } catch { return fallback(p); }
+    try { return String(productCard(p, { loading: "lazy" })); } catch { return ""; }
   });
   return `<section class="section gd-related" data-reveal><div class="container">
     <h2>${esc(T().guide?.related)}</h2><div class="gd-related__grid">${cards.join("")}</div></div></section>`;
@@ -36,7 +30,7 @@ function notFound(el) {
 function jsonLd(g) {
   const s = document.createElement("script");
   s.type = "application/ld+json";
-  const img = g.cover ? new URL(g.cover, location.href).href : undefined;
+  const img = g.cover ? new URL(g.cover, document.baseURI).href : undefined;
   s.textContent = JSON.stringify({
     "@context": "https://schema.org", "@type": "Article",
     headline: g.title, description: g.excerpt, image: img,
@@ -50,15 +44,30 @@ function jsonLd(g) {
 export default async function mount(el) {
   const t = T();
   const g = t.guide || {};
-  const id = new URLSearchParams(location.search).get("id");
-  const guide = id ? getGuide(id) : null;
+  const qp = new URLSearchParams(location.search);
+  const id = qp.get("id") || qp.get("slug");
+  if (!id) return notFound(el);
+
+  // skeleton in the shape of the hero + article while the guide loads
+  renderTemplate(el, `<article aria-hidden="true"><div class="gd-hero" data-scene="feature"><div class="container gd-hero__inner">
+      <span class="skeleton skeleton--line w-40"></span><span class="skeleton skeleton--line w-90"></span><span class="skeleton skeleton--line w-60"></span></div></div>
+      <section class="section gd-article"><div class="container gd-article__inner">
+      <span class="skeleton skeleton--line w-90"></span><span class="skeleton skeleton--line w-90"></span><span class="skeleton skeleton--line w-60"></span></div></section></article>`);
+  let guide, all = [];
+  try {
+    [guide, all] = await Promise.all([getGuide(id), getGuides().catch(() => [])]);
+  } catch (e) {
+    console.warn("[guide]", e);
+    renderTemplate(el, '<section class="section"><div class="container" data-guide-error></div></section>');
+    showError(el.querySelector("[data-guide-error]"), e, () => mount(el));
+    return;
+  }
   if (!guide) return notFound(el);
 
   document.title = (config.seo?.titleTemplate || "%s").replace("%s", guide.title);
   document.querySelector('meta[name="description"]')?.setAttribute("content", guide.excerpt || "");
   jsonLd(guide);
 
-  const all = config.guides || [];
   const i = all.findIndex((x) => x.id === guide.id);
   const prev = i > 0 ? all[i - 1] : null;
   const next = i >= 0 && i < all.length - 1 ? all[i + 1] : null;
@@ -95,7 +104,7 @@ export default async function mount(el) {
         </div>
       </div></section>
     </article>
-    <div data-related>${await productCards(guide.relatedProducts)}</div>
+    <div data-related>${productCards(guide.relatedProducts)}</div>
     ${prev || next ? `<nav class="section gd-nav" data-reveal><div class="container gd-nav__inner">${nav(prev, g.prev, "gd-nav__link--prev")}${nav(next, g.next, "gd-nav__link--next")}</div></nav>` : ""}`);
 
   const copy = el.querySelector("[data-copy]");

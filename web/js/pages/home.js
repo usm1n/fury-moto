@@ -4,6 +4,7 @@ import { refresh } from "../core/app.js";
 import { html, raw, esc, renderList, renderTemplate, text } from "../core/render.js";
 import { getFeatured, getCategories } from "../data/products.js";
 import { getSettings } from "../data/settings.js";
+import { getGuides, getTestimonials, getFaqs } from "../data/content.js";
 import { skeletonCards, showError } from "../components/api-state.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -95,43 +96,58 @@ export default async function mount(main) {
   ctaBtn.href = waLink(home.ctaBand.message);
   getSettings().then((s) => { if (s.whatsapp) ctaBtn.href = waLink(home.ctaBand.message, s.whatsapp); });
 
-  // ---- guides teaser
+  // ---- guides teaser (API content; hides quietly on failure)
   text(h("guidesTitle"), home.guidesTitle);
   text(h("guidesAll"), home.guidesAll);
   const typeLabels = config.gearDoctor?.typeLabels || {};
-  const guides = (config.guides || []).slice(0, 3);
-  if (guides.length) {
-    renderList(h("guides"), guides, (g, i) => html`
-      <a class="guide-teaser" href="guide.html?id=${g.id}" data-reveal data-reveal-delay="${i * 0.08}">
-        <span class="guide-teaser__media"><img src="${g.cover}" alt="" loading="lazy" decoding="async"></span>
-        <span class="pill">${typeLabels[g.type] || g.type}</span>
-        <h3>${g.title}</h3>
-        <p class="muted">${g.excerpt}</p>
-      </a>`);
-  } else h("guides").closest("section").hidden = true;
+  const guideSkel = Array.from({ length: 3 }, () => `<span class="guide-teaser" aria-hidden="true"><span class="guide-teaser__media"><span class="skeleton" style="position:absolute;inset:0"></span></span><span class="skeleton skeleton--line w-40"></span><span class="skeleton skeleton--line w-90"></span><span class="skeleton skeleton--line w-60"></span></span>`).join("");
+  renderTemplate(h("guides"), guideSkel);
+  fillLater(h("guides"), async () => {
+    try {
+      const guides = (await getGuides()).slice(0, 3);
+      if (!guides.length) { h("guides").closest("section").hidden = true; return; }
+      renderList(h("guides"), guides, (g, i) => html`
+        <a class="guide-teaser" href="guide.html?id=${g.id}" data-reveal data-reveal-delay="${i * 0.08}">
+          <span class="guide-teaser__media">${g.cover ? raw(`<img src="${esc(g.cover)}" alt="" loading="lazy" decoding="async">`) : ""}</span>
+          <span class="pill">${typeLabels[g.type] || g.type}</span>
+          <h3>${g.title}</h3>
+          <p class="muted">${g.excerpt}</p>
+        </a>`);
+    } catch (e) { console.warn("[home] guides", e); h("guides").closest("section").hidden = true; }
+  });
 
-  // ---- testimonials
+  // ---- testimonials (hidden quietly when the API is down or empty)
   text(h("testimonialsTitle"), home.testimonialsTitle);
-  if (config.testimonials?.length) {
-    renderList(h("testimonials"), config.testimonials, (t, i) => html`
-      <figure class="testimonial" data-reveal data-reveal-delay="${i * 0.06}">
-        <div class="testimonial__stars" aria-label="${t.rating} / 5">${"★".repeat(t.rating || 5)}</div>
-        <blockquote>${t.quote}</blockquote>
-        <figcaption><strong>${t.name}</strong> <span class="muted">${t.bike}</span></figcaption>
-      </figure>`);
-  } else h("testimonialsWrap").hidden = true;
+  renderTemplate(h("testimonials"), Array.from({ length: 3 }, () => `<figure class="testimonial" aria-hidden="true"><span class="skeleton skeleton--line w-40"></span><span class="skeleton skeleton--line w-90"></span><span class="skeleton skeleton--line w-60"></span></figure>`).join(""));
+  fillLater(h("testimonials"), async () => {
+    try {
+      const list = await getTestimonials();
+      if (!list.length) { h("testimonialsWrap").hidden = true; return; }
+      renderList(h("testimonials"), list, (t, i) => html`
+        <figure class="testimonial" data-reveal data-reveal-delay="${i * 0.06}">
+          <div class="testimonial__stars" aria-label="${t.rating} / 5">${"★".repeat(t.rating)}</div>
+          <blockquote>${t.quote}</blockquote>
+          <figcaption><strong>${t.name}</strong> <span class="muted">${t.bike}</span></figcaption>
+        </figure>`);
+    } catch (e) { console.warn("[home] testimonials", e); h("testimonialsWrap").hidden = true; }
+  });
 
   // ---- instagram strip
   const strip = await loadModule("../components/instagram-strip.js", "default");
   if (strip) { h("instagram").classList.add("container"); await strip(h("instagram")); }
   else h("instagram").hidden = true;
 
-  // ---- FAQ
+  // ---- FAQ (hidden quietly when the API is down or empty)
   text(h("faqTitle"), home.faqTitle);
-  if (config.faqs?.length) {
-    renderList(h("faqs"), config.faqs, (f) => html`
-      <details class="faq__item"><summary>${f.q}</summary><p>${f.a}</p></details>`);
-  } else h("faqWrap").hidden = true;
+  renderTemplate(h("faqs"), Array.from({ length: 4 }, () => `<details class="faq__item" aria-hidden="true"><summary><span class="skeleton skeleton--line w-60"></span></summary></details>`).join(""));
+  fillLater(h("faqs"), async () => {
+    try {
+      const list = await getFaqs();
+      if (!list.length) { h("faqWrap").hidden = true; return; }
+      renderList(h("faqs"), list, (f) => html`
+        <details class="faq__item"><summary>${f.q}</summary><p>${f.a}</p></details>`);
+    } catch (e) { console.warn("[home] faqs", e); h("faqWrap").hidden = true; }
+  });
 }
 
 /** Staggered hero headline intro (GSAP), skipped for reduced motion. */

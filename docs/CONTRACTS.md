@@ -165,6 +165,11 @@ import { VideoBg } from "../core/video-bg.js"; // only for product gallery inlin
 - backdrop.js adds `.bd-scene bd-scene--<name>` to every section; CSS (`css/video.css`) uses these classes for the readability panels.
 - Reduced motion / Save-Data: only `stillFrame` is loaded and drawn.
 
+## 6c. Content and product URLs (Phase 4)
+- Guides, FAQs and testimonials are no longer in `site.config.js`: they come from the API via `js/data/content.js` (`getGuides/getGuide/getFaqs/getTestimonials`, no config fallback). Guide page and gear-doctor grid show the api-state error + retry; home strips hide quietly. A guide's `video` is still a `config.videos` id.
+- Product links go through ONE helper: `productUrl(slug)` in `core/config.js` ("/products/{slug}" when `store.prettyProductUrls` is true, the default; `product.html?slug=` when false for sub-path/static previews). Never hand-build product hrefs. `product.js` accepts `/products/{slug}`, `?slug=` and legacy `?id=`.
+- The server injects `<base href="/">` on `/products/{slug}`: keep all asset/link paths relative and resolve URLs against `document.baseURI`, not `location.href`. Production sitemap is the API's `/sitemap.xml`; `tools/sitemap.mjs` is static-preview only.
+
 ## 6b. Performance contract
 - Page `<head>`s carry a generated `perf:start…perf:end` block (fonts, first-frame preloads, `modulepreload` graph). Re-run `node tools/head.mjs` after adding/removing modules. Dynamic imports must use a literal path (`import("../x.js")` or the pages' `loadModule("../x.js", …)`) so the generator can see them.
 - Nothing may read layout (`getBoundingClientRect`, `scrollWidth`, `offsetTop`) inside a per-frame loop. Cache it and update it on resize.
