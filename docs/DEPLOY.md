@@ -226,6 +226,27 @@ Practical advice: before a risky release, create a named Neon branch as a snapsh
 
 ---
 
+## 11a. Backups
+
+The database holds everything that matters: products, stock, orders, settings and the admin account. Product photos live in R2 and are referenced from the database.
+
+**What Neon gives you.** Neon keeps a history of every change and can restore to any moment inside the plan's restore window. That window is shorter on Free than on the paid plans, so check the current numbers on Neon's pricing page. A restore creates a **branch**, so production is not touched until you point `NEON_DATABASE_URL` at the restored branch.
+
+**What to add on top: a weekly logical dump that you own.** It protects against mistakes found after the restore window has passed, and against losing the Neon account.
+
+1. **Run a dump.** Install the PostgreSQL 17 client tools. Using the **direct** (non-pooled) URL, run `pg_dump --format=custom --no-owner --no-acl "$NEON_DIRECT_URL" -f geardoctor-$(date +%F).dump`.
+2. **Store it somewhere else.** A private R2 bucket separate from the image bucket is a good choice (R2's free tier covers 10 GB). Google Drive also works. Keep 8 weekly dumps plus 1 per month.
+3. **Automate it (optional).** A scheduled GitHub Actions workflow with `NEON_DIRECT_URL` as a secret can run the dump every Sunday and upload it with the AWS CLI using `--endpoint-url https://<account>.r2.cloudflarestorage.com`. Never commit dumps: they contain customer names, phone numbers and addresses.
+4. **Test a restore every few months.** Create an empty Neon branch, then run `pg_restore --no-owner --no-acl -d "<branch direct URL>" geardoctor-YYYY-MM-DD.dump`. Open the admin against it from a preview deploy and check that recent orders are there.
+
+**Photos.** R2 objects are written once and never overwritten (each upload gets a new key), and deletes only happen when an image is removed in the admin. For an extra copy, run `rclone sync r2:<bucket> <local folder or second bucket>` monthly.
+
+**Data Protection keys** are stored in the database (`DataProtectionKeys` table), so they come back with a restore and existing sessions and antiforgery tokens keep working.
+
+**Privacy.** Dumps and order data contain personal data. Keep them private, delete old ones on schedule, and never share them in chats or email.
+
+---
+
 ## 12. Costs
 
 Figures are from `PLAN.md` as of 2026-11-24. Check current prices before you buy.
