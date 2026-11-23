@@ -9,8 +9,14 @@ public static class DependencyInjection
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly, includeInternalTypes: true);
-        // Services register themselves here as phases add them, e.g.:
-        // services.AddScoped<CatalogService>();
+        // One registration per service; the orchestrator owns this file.
+        services.AddScoped<Catalog.CatalogService>();
+        services.AddScoped<Orders.OrderService>();
+        services.AddScoped<Admin.AdminProductService>();
+        services.AddScoped<Admin.AdminCatalogService>();
+        services.AddScoped<Admin.AdminOrderService>();
+        services.AddScoped<Admin.SettingsService>();
+        services.AddScoped<Admin.DashboardService>();
         return services;
     }
 }
