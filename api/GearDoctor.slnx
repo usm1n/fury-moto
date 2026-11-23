@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/GearDoctor.Api/GearDoctor.Api.csproj" />
+    <Project Path="src/GearDoctor.Application/GearDoctor.Application.csproj" />
+    <Project Path="src/GearDoctor.Domain/GearDoctor.Domain.csproj" />
+    <Project Path="src/GearDoctor.Infrastructure/GearDoctor.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/GearDoctor.Tests/GearDoctor.Tests.csproj" />
+  </Folder>
+</Solution>

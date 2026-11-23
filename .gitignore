@@ -4,3 +4,17 @@ node_modules/
 .DS_Store
 Thumbs.db
 /Rider_turning_head_in_garage_*.mp4
+
+# .NET
+api/**/bin/
+api/**/obj/
+api/**/TestResults/
+*.user
+# local env (never commit secrets)
+.env
+.env.*
+!.env.example
+# Angular
+admin/node_modules/
+admin/dist/
+admin/.angular/

@@ -1,0 +1,29 @@
+# Vercel container service for the API (build context = /api, see /vercel.json).
+# Follows Vercel's "Deploy ASP.NET Core on Vercel with Docker" guide: .NET 10 SDK build stage,
+# chiseled ASP.NET runtime (non-root `app` user, no shell). ReadyToRun for faster cold starts.
+
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+COPY global.json Directory.Build.props GearDoctor.sln ./
+COPY src/GearDoctor.Domain/GearDoctor.Domain.csproj src/GearDoctor.Domain/
+COPY src/GearDoctor.Application/GearDoctor.Application.csproj src/GearDoctor.Application/
+COPY src/GearDoctor.Infrastructure/GearDoctor.Infrastructure.csproj src/GearDoctor.Infrastructure/
+COPY src/GearDoctor.Api/GearDoctor.Api.csproj src/GearDoctor.Api/
+RUN dotnet restore src/GearDoctor.Api/GearDoctor.Api.csproj -r linux-x64
+COPY src/ src/
+RUN dotnet publish src/GearDoctor.Api/GearDoctor.Api.csproj -c Release -r linux-x64 --self-contained false \
+      --no-restore -o /app/publish /p:UseAppHost=false /p:PublishReadyToRun=true
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled
+WORKDIR /app
+COPY --from=build /app/publish .
+# Vercel routes to $PORT. 8080 avoids binding a privileged port as the non-root user
+# (set PORT=8080 in the Vercel project env, per the guide's troubleshooting note).
+ENV PORT=8080 \
+    ASPNETCORE_ENVIRONMENT=Production \
+    DOTNET_EnableDiagnostics=0 \
+    DOTNET_TieredPGO=0 \
+    DOTNET_TC_QuickJitForLoops=1 \
+    DOTNET_gcServer=0
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "GearDoctor.Api.dll"]

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "api": {
+      "root": "api/",
+      "runtime": "container",
+      "entrypoint": "src/GearDoctor.Api/Dockerfile.vercel"
+    },
+    "admin": {
+      "root": "admin/",
+      "framework": "angular",
+      "buildCommand": "npm run build",
+      "outputDirectory": "dist/admin/browser"
+    },
+    "web": {
+      "root": "web/",
+      "framework": null,
+      "buildCommand": "",
+      "outputDirectory": "."
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": { "service": "api" } },
+    { "source": "/admin", "destination": { "service": "admin" } },
+    { "source": "/admin/(.*)", "destination": { "service": "admin" } },
+    { "source": "/(.*)", "destination": { "service": "web" } }
+  ]
+}
