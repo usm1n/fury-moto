@@ -1,5 +1,5 @@
 import { Order } from '../../api/models/order';
-import { nextActions, packingSlipText, relativeTime, shortItems } from './order-helpers';
+import { historyTitle, isNoteEntry, nextActions, packingSlipText, relativeTime, shortItems } from './order-helpers';
 
 const order: Order = {
   id: 1, orderNumber: 'GD-1001', customerName: 'Ali Khan', phone: '03001234567', city: 'Lahore', address: '12 Mall Road',
@@ -36,5 +36,13 @@ describe('order helpers', () => {
     const s = shortItems({ items: [{ variantId: 9, title: 'Helmet', size: 'L', color: 'Black', requested: 2, available: 1 }] }, order);
     expect(s[0].productId).toBe(5);
     expect(shortItems(null, order)).toEqual([]);
+  });
+  it('shows a same-status history entry as a note', () => {
+    expect(isNoteEntry({ from: 'Confirmed', to: 'Confirmed' })).toBe(true);
+    expect(isNoteEntry({ from: 'New', to: 'Confirmed' })).toBe(false);
+    expect(isNoteEntry({ from: null, to: 'New' })).toBe(false);
+    expect(historyTitle({ from: 'Confirmed', to: 'Confirmed' })).toBe('Note · Confirmed');
+    expect(historyTitle({ from: 'New', to: 'Confirmed' })).toBe('New → Confirmed');
+    expect(historyTitle({ from: null, to: 'New' })).toBe('New');
   });
 });

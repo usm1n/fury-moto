@@ -3,12 +3,10 @@ import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject, debounceTime, distinctUntilChanged, map } from 'rxjs';
-import { ButtonModule } from 'primeng/button';
-import { InputTextModule } from 'primeng/inputtext';
-import { PaginatorModule, PaginatorState } from 'primeng/paginator';
-import { SkeletonModule } from 'primeng/skeleton';
-import { TableModule } from 'primeng/table';
-import { TagModule } from 'primeng/tag';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { Skeleton, Tag } from '../../shared/ui/ui';
 import { Api } from '../../api/api';
 import { apiAdminOrdersGet } from '../../api/fn/admin-orders/api-admin-orders-get';
 import { OrderRow } from '../../api/models/order-row';
@@ -19,7 +17,7 @@ import { ORDER_STATUSES, STATUS_SEVERITY, relativeTime } from './order-helpers';
 
 @Component({
   selector: 'gd-orders-list.page',
-  imports: [FormsModule, ButtonModule, InputTextModule, PaginatorModule, SkeletonModule, TableModule, TagModule],
+  imports: [FormsModule, MatButtonModule, MatIconModule, MatPaginatorModule, Skeleton, Tag],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     :host { display: block; }
@@ -30,12 +28,20 @@ import { ORDER_STATUSES, STATUS_SEVERITY, relativeTime } from './order-helpers';
     .tab .n { font-size: .75rem; opacity: .8; font-variant-numeric: tabular-nums; }
     .filters { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; margin-bottom: 1rem; }
     .filters .search { grid-column: 1 / -1; position: relative; }
-    .filters .search i { position: absolute; left: .8rem; top: 50%; transform: translateY(-50%); color: var(--p-surface-400); }
+    .filters .search mat-icon { position: absolute; left: .8rem; top: 50%; transform: translateY(-50%); color: var(--p-surface-400); pointer-events: none; }
     .filters .search input { width: 100%; padding-left: 2.3rem; min-height: 44px; }
     .filters label { display: grid; gap: .2rem; font-size: .75rem; color: var(--p-surface-300); }
     .filters input[type=date] { min-height: 44px; width: 100%; }
     @media (min-width: 760px) { .filters { grid-template-columns: 2fr 1fr 1fr; } .filters .search { grid-column: auto; } .filters label { align-content: end; } }
+    table { width: 100%; min-width: 46rem; border-collapse: collapse; }
+    th { text-align: left; font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--p-surface-300);
+      padding: .75rem 1rem; border-bottom: 1px solid var(--p-surface-700); background: var(--p-surface-800); }
+    td { padding: .75rem 1rem; border-bottom: 1px solid var(--p-surface-800); vertical-align: middle; }
     tr.row { cursor: pointer; }
+    tr.row:hover td, tr.row:focus-visible td { background: var(--p-surface-800); }
+    tr.row:last-child td { border-bottom: 0; }
+    .scroll { overflow-x: auto; }
+    mat-paginator { background: transparent; margin-top: .5rem; }
     .sub { color: var(--p-surface-300); font-size: .8rem; }
     .strong { font-weight: 600; color: var(--p-surface-0); }
     .cards { display: grid; gap: .6rem; }
@@ -57,26 +63,26 @@ import { ORDER_STATUSES, STATUS_SEVERITY, relativeTime } from './order-helpers';
 
     <div class="filters">
       <span class="search">
-        <i class="pi pi-search"></i>
-        <input pInputText type="search" placeholder="Order #, name or phone" aria-label="Search orders" [ngModel]="q()" (ngModelChange)="search$.next($event)" />
+        <mat-icon aria-hidden="true">search</mat-icon>
+        <input class="gd-input" type="search" placeholder="Order #, name or phone" aria-label="Search orders" [ngModel]="q()" (ngModelChange)="search$.next($event)" />
       </span>
-      <label>From <input pInputText type="date" [ngModel]="from()" (ngModelChange)="setDate('from', $event)" [max]="to() || ''" /></label>
-      <label>To <input pInputText type="date" [ngModel]="to()" (ngModelChange)="setDate('to', $event)" [min]="from() || ''" /></label>
+      <label>From <input class="gd-input" type="date" [ngModel]="from()" (ngModelChange)="setDate('from', $event)" [max]="to() || ''" /></label>
+      <label>To <input class="gd-input" type="date" [ngModel]="to()" (ngModelChange)="setDate('to', $event)" [min]="from() || ''" /></label>
     </div>
 
     @if (error(); as err) {
       <div class="card empty error">
-        <i class="pi pi-exclamation-triangle" style="font-size:1.6rem"></i>
+        <mat-icon aria-hidden="true">warning</mat-icon>
         <div>{{ err }}</div>
-        <button pButton type="button" (click)="load()"><span pButtonIcon class="pi pi-refresh"></span><span pButtonLabel>Try again</span></button>
+        <button mat-flat-button type="button" (click)="load()"><mat-icon>refresh</mat-icon>Try again</button>
       </div>
     } @else if (loading() && rows().length === 0) {
-      @for (i of skeletons; track i) { <p-skeleton class="skel" height="76px" /> }
+      @for (i of skeletons; track i) { <gd-skeleton class="skel" height="76px" /> }
     } @else if (rows().length === 0) {
       <div class="card empty">
         @if (hasFilters()) {
           <p>No orders match these filters.</p>
-          <button pButton type="button" severity="secondary" (click)="clear()"><span pButtonLabel>Clear filters</span></button>
+          <button mat-stroked-button type="button" (click)="clear()">Clear filters</button>
         } @else { <p>No orders yet. They will show up here as customers check out.</p> }
       </div>
     } @else {
@@ -84,31 +90,33 @@ import { ORDER_STATUSES, STATUS_SEVERITY, relativeTime } from './order-helpers';
         <div class="cards" [style.opacity]="loading() ? .6 : 1">
           @for (r of rows(); track r.id) {
             <div class="ocard" role="link" tabindex="0" (click)="open(r)" (keydown.enter)="open(r)">
-              <div class="r1"><span class="strong">{{ r.orderNumber }}</span><p-tag [value]="r.status" [severity]="sev(r.status)" /></div>
+              <div class="r1"><span class="strong">{{ r.orderNumber }}</span><gd-tag [value]="r.status" [severity]="sev(r.status)" /></div>
               <div>{{ r.customerName }} <span class="sub">· {{ r.city }}</span></div>
               <div class="r2"><span class="sub">{{ r.itemCount }} item{{ r.itemCount === 1 ? '' : 's' }} · {{ ago(r.createdAt) }}</span><span class="money strong">{{ pkr(r.total) }}</span></div>
             </div>
           }
         </div>
       } @else {
-        <div class="card" style="padding:0;overflow:hidden" [style.opacity]="loading() ? .6 : 1">
-          <p-table [value]="rows()" dataKey="id" [tableStyle]="{ 'min-width': '46rem' }">
-            <ng-template #header><tr><th>Order</th><th>Customer</th><th>City</th><th>Items</th><th>Total</th><th>Status</th><th>Placed</th></tr></ng-template>
-            <ng-template #body let-r>
-              <tr class="row" tabindex="0" (click)="open(r)" (keydown.enter)="open(r)">
-                <td class="strong">{{ r.orderNumber }}</td>
-                <td>{{ r.customerName }}<div class="sub">{{ r.phone }}</div></td>
-                <td>{{ r.city }}</td>
-                <td>{{ r.itemCount }}</td>
-                <td class="money">{{ pkr(r.total) }}</td>
-                <td><p-tag [value]="r.status" [severity]="sev(r.status)" /></td>
-                <td class="sub">{{ ago(r.createdAt) }}</td>
-              </tr>
-            </ng-template>
-          </p-table>
+        <div class="card scroll" style="padding:0" [style.opacity]="loading() ? .6 : 1">
+          <table>
+            <thead><tr><th>Order</th><th>Customer</th><th>City</th><th>Items</th><th>Total</th><th>Status</th><th>Placed</th></tr></thead>
+            <tbody>
+              @for (r of rows(); track r.id) {
+                <tr class="row" tabindex="0" (click)="open(r)" (keydown.enter)="open(r)">
+                  <td class="strong">{{ r.orderNumber }}</td>
+                  <td>{{ r.customerName }}<div class="sub">{{ r.phone }}</div></td>
+                  <td>{{ r.city }}</td>
+                  <td>{{ r.itemCount }}</td>
+                  <td class="money">{{ pkr(r.total) }}</td>
+                  <td><gd-tag [value]="r.status" [severity]="sev(r.status)" /></td>
+                  <td class="sub">{{ ago(r.createdAt) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
         </div>
       }
-      <p-paginator [first]="(page() - 1) * pageSize" [rows]="pageSize" [totalRecords]="total()" (onPageChange)="onPage($event)" [showCurrentPageReport]="!mobile()" currentPageReportTemplate="{first}-{last} of {totalRecords}" />
+      <mat-paginator [length]="total()" [pageSize]="pageSize" [pageIndex]="page() - 1" [hidePageSize]="true" [showFirstLastButtons]="!mobile()" aria-label="Orders pages" (page)="onPage($event)" />
     }
   `,
 })
@@ -191,7 +199,7 @@ export class OrdersListPage {
   }
   protected setStatus(s: OrderStatus | null): void { this.nav({ status: s, page: null }); }
   protected setDate(k: 'from' | 'to', v: string | null): void { this.nav({ [k]: v || null, page: null }); }
-  protected onPage(e: PaginatorState): void { const p = Math.floor((e.first ?? 0) / this.pageSize) + 1; this.nav({ page: p > 1 ? p : null }); }
+  protected onPage(e: PageEvent): void { const p = e.pageIndex + 1; this.nav({ page: p > 1 ? p : null }); }
   protected clear(): void { this.nav({ status: null, q: null, from: null, to: null, page: null }); }
   protected open(r: OrderRow): void { void this.router.navigate(['/orders', r.id]); }
 }

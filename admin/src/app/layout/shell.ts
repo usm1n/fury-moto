@@ -1,9 +1,8 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, TemplateRef, inject, signal, viewChild } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { ToastModule } from 'primeng/toast';
-import { ConfirmDialogModule } from 'primeng/confirmdialog';
-import { ButtonModule } from 'primeng/button';
-import { DrawerModule } from 'primeng/drawer';
+import { MatBottomSheet, MatBottomSheetModule, MatBottomSheetRef } from '@angular/material/bottom-sheet';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 import { AuthService } from '../core/auth.service';
 import { AlertsService } from './alerts.service';
 
@@ -17,56 +16,54 @@ interface NavItem { path: string; label: string; icon: string; exact?: boolean; 
  */
 @Component({
   selector: 'gd-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, ToastModule, ConfirmDialogModule, ButtonModule, DrawerModule],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, MatButtonModule, MatIconModule, MatBottomSheetModule],
   providers: [AlertsService],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <p-toast position="top-center" />
-    <p-confirmdialog closeAriaLabel="Close" />
     <header class="topbar">
       <a routerLink="/" class="brand"><span class="brand__dot"></span>Gear Doctor <small>admin</small></a>
       <span class="spacer"></span>
-      <a class="view-store" href="/" target="_blank" rel="noopener"><i class="pi pi-external-link"></i><span>Store</span></a>
-      <button pButton type="button" class="p-button-text p-button-sm" (click)="signOut()"><span pButtonIcon class="pi pi-sign-out"></span><span pButtonLabel>Sign out</span></button>
+      <a class="view-store" href="/" target="_blank" rel="noopener"><mat-icon>open_in_new</mat-icon><span>Store</span></a>
+      <button mat-button type="button" (click)="signOut()"><mat-icon>logout</mat-icon>Sign out</button>
     </header>
     <div class="frame">
       <nav class="sidenav" aria-label="Admin">
         @for (item of nav; track item.path) {
           <a [routerLink]="item.path" routerLinkActive="is-active" [routerLinkActiveOptions]="{ exact: !!item.exact }">
-            <i [class]="'pi ' + item.icon"></i><span>{{ item.label }}</span>
+            <mat-icon>{{ item.icon }}</mat-icon><span>{{ item.label }}</span>
             @if (badgeOf(item); as n) { <span class="badge" [attr.aria-label]="n + ' need attention'">{{ n }}</span> }
           </a>
         }
         <div class="navgroup">Content</div>
         @for (item of contentNav; track item.path) {
           <a [routerLink]="item.path" routerLinkActive="is-active">
-            <i [class]="'pi ' + item.icon"></i><span>{{ item.label }}</span>
+            <mat-icon>{{ item.icon }}</mat-icon><span>{{ item.label }}</span>
           </a>
         }
         <div class="navgroup">Shop</div>
-        <a routerLink="/settings" routerLinkActive="is-active"><i class="pi pi-cog"></i><span>Settings</span></a>
+        <a routerLink="/settings" routerLinkActive="is-active"><mat-icon>settings</mat-icon><span>Settings</span></a>
       </nav>
       <main class="content"><router-outlet /></main>
     </div>
     <nav class="tabbar" aria-label="Admin (mobile)">
       @for (item of mobileNav; track item.path) {
         <a [routerLink]="item.path" routerLinkActive="is-active" [routerLinkActiveOptions]="{ exact: !!item.exact }">
-          <i [class]="'pi ' + item.icon"></i><span>{{ item.label }}</span>
+          <mat-icon>{{ item.icon }}</mat-icon><span>{{ item.label }}</span>
           @if (badgeOf(item); as n) { <span class="badge" [attr.aria-label]="n + ' need attention'">{{ n }}</span> }
         </a>
       }
-      <button type="button" [class.is-active]="moreOpen()" aria-haspopup="dialog" (click)="moreOpen.set(true)">
-        <i class="pi pi-bars"></i><span>More</span>
+      <button type="button" [class.is-active]="moreOpen()" aria-haspopup="dialog" (click)="openMore()">
+        <mat-icon>more_horiz</mat-icon><span>More</span>
       </button>
     </nav>
-    <p-drawer [visible]="moreOpen()" (visibleChange)="moreOpen.set($event)" position="bottom" header="More" [style]="{ height: 'auto', maxHeight: '85dvh' }">
-      <div class="sheet" (click)="moreOpen.set(false)" (keydown.enter)="moreOpen.set(false)" tabindex="-1">
+    <ng-template #moreSheet>
+      <div class="sheet" aria-label="More">
         @for (item of moreNav; track item.path) {
-          <a [routerLink]="item.path" routerLinkActive="is-active"><i [class]="'pi ' + item.icon"></i><span>{{ item.label }}</span></a>
+          <a [routerLink]="item.path" routerLinkActive="is-active" (click)="closeMore()"><mat-icon>{{ item.icon }}</mat-icon><span>{{ item.label }}</span></a>
         }
-        <button type="button" (click)="signOut()"><i class="pi pi-sign-out"></i><span>Sign out</span></button>
+        <button type="button" (click)="signOut()"><mat-icon>logout</mat-icon><span>Sign out</span></button>
       </div>
-    </p-drawer>
+    </ng-template>
   `,
   styles: `
     :host { display: block; min-height: 100dvh; }
@@ -87,7 +84,9 @@ interface NavItem { path: string; label: string; icon: string; exact?: boolean; 
     .tabbar a, .tabbar button { position: relative; display: grid; justify-items: center; gap: 2px; padding: .55rem 0 .5rem; min-height: 56px; color: var(--p-surface-300);
       text-decoration: none; font-size: .7rem; }
     .tabbar button { background: none; border: 0; font: inherit; font-size: .7rem; cursor: pointer; }
-    .tabbar a i, .tabbar button i { font-size: 1.15rem; }
+    .tabbar mat-icon { font-size: 24px; width: 24px; height: 24px; }
+    .sidenav mat-icon { font-size: 22px; width: 22px; height: 22px; }
+    .view-store mat-icon { font-size: 18px; width: 18px; height: 18px; }
     .tabbar a.is-active, .tabbar button.is-active { color: var(--p-primary-400); }
     .badge { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--p-primary-500); color: #fff; font-size: .68rem; font-weight: 700;
       display: inline-grid; place-items: center; line-height: 1; }
@@ -116,40 +115,52 @@ export class Shell {
   private readonly router = inject(Router);
   private readonly alerts = inject(AlertsService);
 
+  private readonly sheet = inject(MatBottomSheet);
+  private readonly moreSheet = viewChild.required<TemplateRef<unknown>>('moreSheet');
+  private sheetRef: MatBottomSheetRef | null = null;
+
   protected readonly moreOpen = signal(false);
 
   protected readonly nav: NavItem[] = [
-    { path: '/', label: 'Dashboard', icon: 'pi-home', exact: true, badge: 'stock' },
-    { path: '/orders', label: 'Orders', icon: 'pi-shopping-bag', badge: 'orders' },
-    { path: '/products', label: 'Products', icon: 'pi-box' },
-    { path: '/categories', label: 'Categories', icon: 'pi-th-large' },
-    { path: '/brands', label: 'Brands', icon: 'pi-tag' },
+    { path: '/', label: 'Dashboard', icon: 'home', exact: true, badge: 'stock' },
+    { path: '/orders', label: 'Orders', icon: 'receipt_long', badge: 'orders' },
+    { path: '/products', label: 'Products', icon: 'inventory_2' },
+    { path: '/categories', label: 'Categories', icon: 'category' },
+    { path: '/brands', label: 'Brands', icon: 'sell' },
   ];
   protected readonly contentNav: NavItem[] = [
-    { path: '/guides', label: 'Guides', icon: 'pi-book' },
-    { path: '/faqs', label: 'FAQs', icon: 'pi-question-circle' },
-    { path: '/testimonials', label: 'Testimonials', icon: 'pi-comments' },
-    { path: '/audit', label: 'Activity', icon: 'pi-history' },
+    { path: '/guides', label: 'Guides', icon: 'menu_book' },
+    { path: '/faqs', label: 'FAQs', icon: 'help' },
+    { path: '/testimonials', label: 'Testimonials', icon: 'reviews' },
+    { path: '/audit', label: 'Activity', icon: 'history' },
   ];
   protected readonly mobileNav: NavItem[] = [
-    { path: '/', label: 'Home', icon: 'pi-home', exact: true, badge: 'stock' },
-    { path: '/orders', label: 'Orders', icon: 'pi-shopping-bag', badge: 'orders' },
-    { path: '/products/new', label: 'Add', icon: 'pi-plus-circle' },
-    { path: '/products', label: 'Products', icon: 'pi-box', exact: true },
+    { path: '/', label: 'Home', icon: 'home', exact: true, badge: 'stock' },
+    { path: '/orders', label: 'Orders', icon: 'receipt_long', badge: 'orders' },
+    { path: '/products/new', label: 'Add', icon: 'add_circle' },
+    { path: '/products', label: 'Products', icon: 'inventory_2', exact: true },
   ];
   protected readonly moreNav: NavItem[] = [
-    { path: '/categories', label: 'Categories', icon: 'pi-th-large' },
-    { path: '/brands', label: 'Brands', icon: 'pi-tag' },
+    { path: '/categories', label: 'Categories', icon: 'category' },
+    { path: '/brands', label: 'Brands', icon: 'sell' },
     ...this.contentNav,
-    { path: '/settings', label: 'Settings', icon: 'pi-cog' },
+    { path: '/settings', label: 'Settings', icon: 'settings' },
   ];
 
   protected badgeOf(item: NavItem): number {
     return item.badge === 'orders' ? this.alerts.newOrders() : item.badge === 'stock' ? this.alerts.stock() : 0;
   }
 
+  protected openMore(): void {
+    this.moreOpen.set(true);
+    this.sheetRef = this.sheet.open(this.moreSheet(), { ariaLabel: 'More' });
+    this.sheetRef.afterDismissed().subscribe(() => { this.moreOpen.set(false); this.sheetRef = null; });
+  }
+
+  protected closeMore(): void { this.sheetRef?.dismiss(); }
+
   protected async signOut(): Promise<void> {
-    this.moreOpen.set(false);
+    this.closeMore();
     await this.auth.logout();
     await this.router.navigate(['/login']);
   }

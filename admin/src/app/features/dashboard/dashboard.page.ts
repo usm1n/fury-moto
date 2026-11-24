@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { ButtonModule } from 'primeng/button';
-import { SkeletonModule } from 'primeng/skeleton';
-import { TagModule } from 'primeng/tag';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { Skeleton, Tag } from '../../shared/ui/ui';
 import { Api } from '../../api/api';
 import { apiAdminDashboardGet } from '../../api/fn/admin-orders/api-admin-dashboard-get';
 import { Dashboard } from '../../api/models/dashboard';
@@ -11,7 +11,7 @@ import { problemOf } from '../../core/http';
 
 @Component({
   selector: 'gd-dashboard.page',
-  imports: [RouterLink, ButtonModule, SkeletonModule, TagModule],
+  imports: [RouterLink, MatButtonModule, MatIconModule, Skeleton, Tag],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     :host { display: block; }
@@ -34,20 +34,20 @@ import { problemOf } from '../../core/http';
   template: `
     <div class="page-head">
       <h1 class="page-title">Dashboard</h1>
-      <a pButton class="add" routerLink="/products/new" size="large"><span pButtonIcon class="pi pi-plus"></span><span pButtonLabel>Add product</span></a>
+      <a mat-flat-button class="add" routerLink="/products/new"><mat-icon>add</mat-icon>Add product</a>
     </div>
 
     @if (error(); as err) {
       <div class="card empty error">
-        <i class="pi pi-exclamation-triangle" style="font-size:1.6rem"></i>
+        <mat-icon style="font-size:1.6rem;width:1.6rem;height:1.6rem">warning</mat-icon>
         <div>{{ err }}</div>
-        <button pButton type="button" (click)="load()"><span pButtonIcon class="pi pi-refresh"></span><span pButtonLabel>Try again</span></button>
+        <button mat-flat-button type="button" (click)="load()"><mat-icon>refresh</mat-icon>Try again</button>
       </div>
     } @else if (!data()) {
       <div class="stats">
-        <p-skeleton height="96px" /><p-skeleton height="96px" /><p-skeleton height="96px" />
+        <gd-skeleton height="96px" /><gd-skeleton height="96px" /><gd-skeleton height="96px" />
       </div>
-      <p-skeleton height="56px"/><p-skeleton height="56px" />
+      <gd-skeleton height="56px" /><div style="height:.5rem"></div><gd-skeleton height="56px" />
     } @else {
       @let d = data()!;
       <div class="stats">
@@ -75,7 +75,7 @@ import { problemOf } from '../../core/http';
           @for (l of d.lowStock; track $index) {
             <a [routerLink]="['/products', l.productId]">
               <span><span class="t">{{ l.title }}</span><br /><span class="s">{{ l.size }} / {{ l.color }}</span></span>
-              <p-tag [value]="l.stock === 0 ? 'Out' : l.stock + ' left'" [severity]="l.stock === 0 ? 'danger' : 'warn'" />
+              <gd-tag [value]="l.stock === 0 ? 'Out' : l.stock + ' left'" [severity]="l.stock === 0 ? 'danger' : 'warn'" />
             </a>
           }
         </div>

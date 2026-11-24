@@ -5,7 +5,7 @@ Umair's riding-gear store ([@fury__moto](https://www.instagram.com/fury__moto/) 
 | Part | Folder | Tech | URL path |
 |---|---|---|---|
 | Storefront | [`web/`](web) | Plain HTML/CSS/JS modules (no build step), scroll-driven canvas background | `/` |
-| Admin panel | [`admin/`](admin) | Angular 22 + PrimeNG 22 (standalone, signals, zoneless) | `/admin` |
+| Admin panel | [`admin/`](admin) | Angular 22 + Angular Material 22 (standalone, signals, zoneless; all MIT, no license keys) | `/admin` |
 | API | [`api/`](api) | .NET 10 minimal APIs + EF Core (Npgsql) + ASP.NET Identity | `/api` |
 | Database | Neon Postgres | products, variants, images, orders, settings, admin user | n/a |
 | Product photos | Cloudflare R2 | uploaded straight from the admin (never through the API) | `images.<domain>` |

@@ -1,12 +1,10 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { ButtonModule } from 'primeng/button';
-import { PaginatorModule, PaginatorState } from 'primeng/paginator';
-import { SelectModule } from 'primeng/select';
-import { SkeletonModule } from 'primeng/skeleton';
-import { TableModule } from 'primeng/table';
-import { TagModule } from 'primeng/tag';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { Skeleton, Tag } from '../../shared/ui/ui';
 import { Api } from '../../api/api';
 import { apiAdminAuditGet } from '../../api/fn/admin-audit/api-admin-audit-get';
 import { AuditEntry } from '../../api/models/audit-entry';
@@ -17,12 +15,19 @@ import { AUDIT_ENTITIES, auditActionSeverity, auditLink } from '../content/conte
 
 @Component({
   selector: 'gd-audit.page',
-  imports: [FormsModule, RouterLink, ButtonModule, PaginatorModule, SelectModule, SkeletonModule, TableModule, TagModule],
+  imports: [FormsModule, RouterLink, MatButtonModule, MatIconModule, MatPaginatorModule, Skeleton, Tag],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     :host { display: block; }
     .filters { display: flex; gap: .5rem; align-items: center; margin-bottom: 1rem; }
-    .filters p-select { min-width: 12rem; flex: 1; max-width: 20rem; }
+    .filters select { min-width: 12rem; flex: 1; max-width: 20rem; }
+    table { width: 100%; min-width: 46rem; border-collapse: collapse; font-size: .92rem; }
+    th { text-align: left; padding: .7rem .85rem; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--p-surface-300);
+      background: var(--p-surface-800); border-bottom: 1px solid var(--p-surface-700); }
+    td { padding: .7rem .85rem; border-bottom: 1px solid var(--p-surface-700); vertical-align: top; }
+    tr:last-child td { border-bottom: 0; }
+    .tablewrap { overflow-x: auto; }
+    mat-paginator { background: transparent; margin-top: .75rem; }
     .sub { color: var(--p-surface-300); font-size: .8rem; }
     .strong { font-weight: 600; color: var(--p-surface-0); }
     .cards { display: grid; gap: .6rem; }
@@ -37,22 +42,24 @@ import { AUDIT_ENTITIES, auditActionSeverity, auditLink } from '../content/conte
     <div class="page-head"><h1 class="page-title">Activity</h1></div>
 
     <div class="filters">
-      <p-select [options]="entities" [ngModel]="entity()" (ngModelChange)="setEntity($event)" optionLabel="label" optionValue="value" aria-label="Filter by type" appendTo="body" />
+      <select class="gd-input" aria-label="Filter by type" [ngModel]="entity()" (ngModelChange)="setEntity($event)">
+        @for (o of entities; track o.label) { <option [ngValue]="o.value">{{ o.label }}</option> }
+      </select>
     </div>
 
     @if (error(); as err) {
       <div class="card empty error">
-        <i class="pi pi-exclamation-triangle" style="font-size:1.6rem"></i>
+        <mat-icon style="font-size:1.6rem;width:1.6rem;height:1.6rem">warning</mat-icon>
         <div>{{ err }}</div>
-        <button pButton type="button" (click)="load()"><span pButtonIcon class="pi pi-refresh"></span><span pButtonLabel>Try again</span></button>
+        <button mat-flat-button type="button" (click)="load()"><mat-icon>refresh</mat-icon>Try again</button>
       </div>
     } @else if (loading() && rows().length === 0) {
-      @for (i of [1, 2, 3, 4, 5]; track i) { <p-skeleton height="72px" styleClass="mb-2" /><div style="height:.5rem"></div> }
+      @for (i of [1, 2, 3, 4, 5]; track i) { <gd-skeleton height="72px" /><div style="height:.5rem"></div> }
     } @else if (rows().length === 0) {
       <div class="card empty">
         @if (entity()) {
           <p>No activity for this type yet.</p>
-          <button pButton type="button" severity="secondary" (click)="setEntity(null)"><span pButtonLabel>Show all</span></button>
+          <button mat-stroked-button type="button" (click)="setEntity(null)">Show all</button>
         } @else { <p>No activity recorded yet. Changes you make in the admin will show up here.</p> }
       </div>
     } @else {
@@ -60,7 +67,7 @@ import { AUDIT_ENTITIES, auditActionSeverity, auditLink } from '../content/conte
         <div class="cards" [style.opacity]="loading() ? .6 : 1">
           @for (r of rows(); track r.id) {
             <div class="acard">
-              <div class="r1"><p-tag [value]="r.action" [severity]="sev(r.action)" /><span class="sub" [title]="exact(r.at)">{{ ago(r.at) }}</span></div>
+              <div class="r1"><gd-tag [value]="r.action" [severity]="sev(r.action)" /><span class="sub" [title]="exact(r.at)">{{ ago(r.at) }}</span></div>
               <div class="sum">{{ r.summary }}</div>
               <div class="sub">{{ r.by || 'system' }}
                 @if (link(r); as l) { · <a class="link" [routerLink]="l">{{ r.entity }} #{{ r.entityId }}</a> } @else { · {{ r.entity }} }</div>
@@ -68,22 +75,24 @@ import { AUDIT_ENTITIES, auditActionSeverity, auditLink } from '../content/conte
           }
         </div>
       } @else {
-        <div class="card" style="padding:0;overflow:hidden" [style.opacity]="loading() ? .6 : 1">
-          <p-table [value]="rows()" dataKey="id" [tableStyle]="{ 'min-width': '46rem' }">
-            <ng-template #header><tr><th>When</th><th>By</th><th>Action</th><th>Item</th><th>What changed</th></tr></ng-template>
-            <ng-template #body let-r>
+        <div class="card tablewrap" style="padding:0" [style.opacity]="loading() ? .6 : 1">
+          <table>
+            <thead><tr><th>When</th><th>By</th><th>Action</th><th>Item</th><th>What changed</th></tr></thead>
+            <tbody>
+              @for (r of rows(); track r.id) {
               <tr>
                 <td class="sub" [title]="exact(r.at)">{{ ago(r.at) }}</td>
                 <td>{{ r.by || 'system' }}</td>
-                <td><p-tag [value]="r.action" [severity]="sev(r.action)" /></td>
+                <td><gd-tag [value]="r.action" [severity]="sev(r.action)" /></td>
                 <td>@if (link(r); as l) { <a class="link" [routerLink]="l">{{ r.entity }} #{{ r.entityId }}</a> } @else { {{ r.entity }}@if (r.entityId) { <span class="sub"> #{{ r.entityId }}</span> } }</td>
                 <td>{{ r.summary }}</td>
               </tr>
-            </ng-template>
-          </p-table>
+              }
+            </tbody>
+          </table>
         </div>
       }
-      <p-paginator [first]="(page() - 1) * pageSize" [rows]="pageSize" [totalRecords]="total()" (onPageChange)="onPage($event)" [showCurrentPageReport]="!mobile()" currentPageReportTemplate="{first}-{last} of {totalRecords}" />
+      <mat-paginator [length]="total()" [pageSize]="pageSize" [pageIndex]="page() - 1" [hidePageSize]="true" [showFirstLastButtons]="!mobile()" (page)="onPage($event)" aria-label="Activity pages" />
     }
   `,
 })
@@ -138,5 +147,5 @@ export class AuditPage {
   }
 
   protected setEntity(v: string | null): void { this.entity.set(v); this.page.set(1); }
-  protected onPage(e: PaginatorState): void { this.page.set(Math.floor((e.first ?? 0) / this.pageSize) + 1); }
+  protected onPage(e: PageEvent): void { this.page.set(e.pageIndex + 1); }
 }

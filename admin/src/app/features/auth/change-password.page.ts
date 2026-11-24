@@ -1,10 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { AbstractControl, NonNullableFormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
-import { PasswordModule } from 'primeng/password';
-import { ButtonModule } from 'primeng/button';
-import { MessageModule } from 'primeng/message';
-import { MessageService } from 'primeng/api';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { Message } from '../../shared/ui/ui';
 import { AuthService } from '../../core/auth.service';
 import { fieldError, Problem, problemOf } from '../../core/http';
 
@@ -17,27 +17,35 @@ const matches = (g: AbstractControl): ValidationErrors | null =>
 
 @Component({
   selector: 'gd-change-password',
-  imports: [ReactiveFormsModule, PasswordModule, ButtonModule, MessageModule],
+  imports: [ReactiveFormsModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule, Message],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './auth.scss',
-  providers: [MessageService],
   template: `
     <main class="auth">
       <form class="auth__card" [formGroup]="form" (ngSubmit)="submit()" novalidate>
         <h1><span class="dot"></span>New password</h1>
         @if (forced()) { <p class="muted">For security, set your own password before continuing.</p> }
-        @if (problem()?.title && !problem()?.errors) { <p-message severity="error">{{ problem()!.title }}</p-message> }
+        @if (problem()?.title && !problem()?.errors) { <gd-message severity="error">{{ problem()!.title }}</gd-message> }
         <label for="current">Current password</label>
-        <p-password inputId="current" formControlName="currentPassword" [feedback]="false" [toggleMask]="true" autocomplete="current-password" styleClass="w-full" inputStyleClass="w-full" />
+        <div class="pw">
+          <input class="gd-input" id="current" [type]="showCur() ? 'text' : 'password'" formControlName="currentPassword" autocomplete="current-password" />
+          <button mat-icon-button type="button" class="pw__toggle" [attr.aria-label]="showCur() ? 'Hide password' : 'Show password'" [attr.aria-pressed]="showCur()" (click)="showCur.set(!showCur())"><mat-icon>{{ showCur() ? 'visibility_off' : 'visibility' }}</mat-icon></button>
+        </div>
         @if (err('currentPassword')) { <small class="field-error">{{ err('currentPassword') }}</small> }
         <label for="new">New password</label>
-        <p-password inputId="new" formControlName="newPassword" [toggleMask]="true" autocomplete="new-password" styleClass="w-full" inputStyleClass="w-full" />
+        <div class="pw">
+          <input class="gd-input" id="new" [type]="showNew() ? 'text' : 'password'" formControlName="newPassword" autocomplete="new-password" />
+          <button mat-icon-button type="button" class="pw__toggle" [attr.aria-label]="showNew() ? 'Hide password' : 'Show password'" [attr.aria-pressed]="showNew()" (click)="showNew.set(!showNew())"><mat-icon>{{ showNew() ? 'visibility_off' : 'visibility' }}</mat-icon></button>
+        </div>
         <small class="hint">At least 12 characters with upper-case, lower-case and a number.</small>
         @if (err('newPassword')) { <small class="field-error">{{ err('newPassword') }}</small> }
         <label for="confirm">Repeat new password</label>
-        <p-password inputId="confirm" formControlName="confirm" [feedback]="false" [toggleMask]="true" autocomplete="new-password" styleClass="w-full" inputStyleClass="w-full" />
+        <div class="pw">
+          <input class="gd-input" id="confirm" [type]="showConf() ? 'text' : 'password'" formControlName="confirm" autocomplete="new-password" />
+          <button mat-icon-button type="button" class="pw__toggle" [attr.aria-label]="showConf() ? 'Hide password' : 'Show password'" [attr.aria-pressed]="showConf()" (click)="showConf.set(!showConf())"><mat-icon>{{ showConf() ? 'visibility_off' : 'visibility' }}</mat-icon></button>
+        </div>
         @if (form.hasError('mismatch') && form.controls.confirm.dirty) { <small class="field-error">Passwords don't match.</small> }
-        <button pButton type="submit" [loading]="busy()" [disabled]="form.invalid"><span pButtonLabel>Save password</span></button>
+        <button mat-flat-button type="submit" [disabled]="form.invalid || busy()">@if (busy()) { <mat-progress-spinner mode="indeterminate" diameter="18" /> }Save password</button>
       </form>
     </main>
   `,
@@ -47,6 +55,9 @@ export class ChangePasswordPage {
   private readonly router = inject(Router);
   protected readonly forced = computed(() => this.auth.mustChangePassword());
   protected readonly busy = signal(false);
+  protected readonly showCur = signal(false);
+  protected readonly showNew = signal(false);
+  protected readonly showConf = signal(false);
   protected readonly problem = signal<Problem | null>(null);
   protected readonly form = inject(NonNullableFormBuilder).group({
     currentPassword: ['', Validators.required],

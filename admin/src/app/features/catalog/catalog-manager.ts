@@ -1,11 +1,13 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CdkDragDrop, CdkDrag, CdkDragHandle, CdkDropList, moveItemInArray } from '@angular/cdk/drag-drop';
-import { ButtonModule } from 'primeng/button';
-import { InputTextModule } from 'primeng/inputtext';
-import { ToggleSwitchModule } from 'primeng/toggleswitch';
-import { SkeletonModule } from 'primeng/skeleton';
-import { ConfirmationService, MessageService } from 'primeng/api';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { Skeleton } from '../../shared/ui/ui';
+import { Toast } from '../../shared/ui/toast.service';
+import { Confirm } from '../../shared/ui/confirm.service';
 import { problemOf } from '../../core/http';
 
 export interface CatalogItem { id: number; name: string; slug: string; isActive: boolean; productCount?: number }
@@ -23,7 +25,7 @@ export interface CatalogAdapter {
 /** Drag-to-reorder list with inline add / rename, active toggle and delete (409 "in use" -> deactivate hint). */
 @Component({
   selector: 'gd-catalog-manager',
-  imports: [FormsModule, CdkDropList, CdkDrag, CdkDragHandle, ButtonModule, InputTextModule, ToggleSwitchModule, SkeletonModule],
+  imports: [FormsModule, CdkDropList, CdkDrag, CdkDragHandle, MatButtonModule, MatIconModule, MatSlideToggleModule, MatProgressSpinnerModule, Skeleton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     :host { display: block; max-width: 720px; }
@@ -48,31 +50,31 @@ export interface CatalogAdapter {
     .error { display: grid; gap: .75rem; justify-items: center; }
   `,
   template: `
-    <form class="add" (ngSubmit)="add()">
-      <input pInputText name="newName" [(ngModel)]="newName" [placeholder]="'New ' + noun() + ' name'" [attr.aria-label]="'New ' + noun() + ' name'" maxlength="80" autocomplete="off" />
-      <button pButton type="submit" [loading]="adding()" [disabled]="!newName.trim()"><span pButtonIcon class="pi pi-plus"></span><span pButtonLabel>Add</span></button>
+    <form class="add" (submit)="$event.preventDefault(); add()">
+      <input class="gd-input" name="newName" [(ngModel)]="newName" [placeholder]="'New ' + noun() + ' name'" [attr.aria-label]="'New ' + noun() + ' name'" maxlength="80" autocomplete="off" />
+      <button mat-flat-button type="submit" [disabled]="adding() || !newName.trim()">@if (adding()) { <mat-progress-spinner mode="indeterminate" diameter="18" /> } @else { <mat-icon>add</mat-icon> }Add</button>
     </form>
 
     @if (error(); as err) {
       <div class="card empty error">
         <div>{{ err }}</div>
-        <button pButton type="button" (click)="load()"><span pButtonIcon class="pi pi-refresh"></span><span pButtonLabel>Try again</span></button>
+        <button mat-flat-button type="button" (click)="load()"><mat-icon>refresh</mat-icon>Try again</button>
       </div>
     } @else if (loading()) {
-      <div class="list">@for (i of [1, 2, 3, 4]; track i) { <p-skeleton height="56px" borderRadius="12px" /> }</div>
+      <div class="list">@for (i of [1, 2, 3, 4]; track i) { <gd-skeleton height="56px" radius="12px" /> }</div>
     } @else if (items().length === 0) {
       <div class="card empty">No {{ noun() }}s yet. Add one above.</div>
     } @else {
       <div class="list" cdkDropList (cdkDropListDropped)="drop($event)">
         @for (it of items(); track it.id) {
           <div class="item" [class.is-inactive]="!it.isActive" cdkDrag [cdkDragData]="it">
-            <span class="handle" cdkDragHandle aria-label="Drag to reorder"><i class="pi pi-bars"></i></span>
+            <span class="handle" cdkDragHandle aria-label="Drag to reorder"><mat-icon>drag_indicator</mat-icon></span>
             <div class="body">
               @if (editingId() === it.id) {
-                <form class="edit" (ngSubmit)="saveName(it)">
-                  <input pInputText name="rename" [(ngModel)]="editName" maxlength="80" aria-label="Name" autofocus (keydown.escape)="editingId.set(null)" />
-                  <button pButton type="submit" severity="success" size="small" aria-label="Save name"><span pButtonIcon class="pi pi-check"></span></button>
-                  <button pButton type="button" severity="secondary" size="small" aria-label="Cancel" (click)="editingId.set(null)"><span pButtonIcon class="pi pi-times"></span></button>
+                <form class="edit" (submit)="$event.preventDefault(); saveName(it)">
+                  <input class="gd-input" name="rename" [(ngModel)]="editName" maxlength="80" aria-label="Name" autofocus (keydown.escape)="editingId.set(null)" />
+                  <button mat-icon-button type="submit" class="gd-success" aria-label="Save name"><mat-icon>check</mat-icon></button>
+                  <button mat-icon-button type="button" aria-label="Cancel" (click)="editingId.set(null)"><mat-icon>close</mat-icon></button>
                 </form>
               } @else {
                 <div class="name">{{ it.name }}@if (it.productCount !== undefined) { <span class="count">{{ it.productCount }} product{{ it.productCount === 1 ? '' : 's' }}</span> }</div>
@@ -81,10 +83,10 @@ export interface CatalogAdapter {
             </div>
             <div class="actions">
               @if (editingId() !== it.id) {
-                <button pButton type="button" class="p-button-text" severity="secondary" [attr.aria-label]="'Rename ' + it.name" (click)="startEdit(it)"><span pButtonIcon class="pi pi-pencil"></span></button>
+                <button mat-icon-button type="button" [attr.aria-label]="'Rename ' + it.name" (click)="startEdit(it)"><mat-icon>edit</mat-icon></button>
               }
-              <p-toggleswitch [ngModel]="it.isActive" (onChange)="toggleActive(it, $event.checked)" [ariaLabel]="'Active: ' + it.name" />
-              <button pButton type="button" class="p-button-text" severity="danger" [attr.aria-label]="'Delete ' + it.name" (click)="confirmDelete(it)"><span pButtonIcon class="pi pi-trash"></span></button>
+              <mat-slide-toggle [checked]="it.isActive" (change)="toggleActive(it, $event.checked)" [aria-label]="'Active: ' + it.name" />
+              <button mat-icon-button type="button" class="gd-danger" [attr.aria-label]="'Delete ' + it.name" (click)="confirmDelete(it)"><mat-icon>delete</mat-icon></button>
             </div>
           </div>
         }
@@ -93,8 +95,8 @@ export interface CatalogAdapter {
   `,
 })
 export class CatalogManager implements OnInit {
-  private readonly toast = inject(MessageService);
-  private readonly confirm = inject(ConfirmationService);
+  private readonly toast = inject(Toast);
+  private readonly confirm = inject(Confirm);
 
   readonly adapter = input.required<CatalogAdapter>();
   readonly noun = input('item');
@@ -168,7 +170,7 @@ export class CatalogManager implements OnInit {
     this.confirm.confirm({
       header: `Delete ${it.name}?`,
       message: `This permanently deletes the ${this.noun()}. If products still use it, deactivate it instead.`,
-      icon: 'pi pi-trash', acceptLabel: 'Delete', rejectLabel: 'Cancel', acceptButtonStyleClass: 'p-button-danger',
+      acceptLabel: 'Delete', rejectLabel: 'Cancel', danger: true,
       accept: () => void this.remove(it),
     });
   }

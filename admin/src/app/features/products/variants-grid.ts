@@ -1,10 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, linkedSignal, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ButtonModule } from 'primeng/button';
-import { InputTextModule } from 'primeng/inputtext';
-import { InputNumberModule } from 'primeng/inputnumber';
-import { ToggleSwitchModule } from 'primeng/toggleswitch';
-import { MessageService } from 'primeng/api';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { Toast } from '../../shared/ui/toast.service';
 import { Api } from '../../api/api';
 import { apiAdminProductsIdVariantsPut } from '../../api/fn/admin-products/api-admin-products-id-variants-put';
 import { Variant } from '../../api/models/variant';
@@ -20,7 +20,7 @@ const snapshot = (rows: readonly VariantRow[]): string => JSON.stringify(rows.ma
 /** Sizes + colours as chips -> size x colour matrix with stock, SKU and active toggle. Saves with PUT /variants. */
 @Component({
   selector: 'gd-variants-grid',
-  imports: [FormsModule, ButtonModule, InputTextModule, InputNumberModule, ToggleSwitchModule],
+  imports: [FormsModule, MatButtonModule, MatIconModule, MatSlideToggleModule, MatProgressSpinnerModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     :host { display: block; }
@@ -28,6 +28,7 @@ const snapshot = (rows: readonly VariantRow[]): string => JSON.stringify(rows.ma
     .chip { display: inline-flex; align-items: center; gap: .35rem; padding: .25rem .3rem .25rem .7rem; border-radius: 999px; background: var(--p-surface-800); border: 1px solid var(--p-surface-600); font-size: .85rem; min-height: 32px; }
     .chip button { all: unset; cursor: pointer; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; color: var(--p-surface-300); }
     .chip button:hover { background: var(--p-surface-700); }
+    .chip mat-icon { font-size: 18px; width: 18px; height: 18px; }
     .swatch { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--p-surface-400); flex: none; }
     .adder { display: flex; gap: .4rem; align-items: center; }
     .adder input[type=text], .adder input.name { flex: 1; min-width: 0; min-height: 44px; }
@@ -45,41 +46,41 @@ const snapshot = (rows: readonly VariantRow[]): string => JSON.stringify(rows.ma
   `,
   template: `
     @if (!productId()) {
-      <p class="muted"><i class="pi pi-info-circle"></i> Save the product once to add sizes and stock.</p>
+      <p class="muted"><mat-icon>info</mat-icon> Save the product once to add sizes and stock.</p>
     } @else {
       <h4>Sizes</h4>
       <div class="chips">
         @for (s of sizes(); track s) {
-          <span class="chip">{{ s }}<button type="button" (click)="removeSize(s)" [attr.aria-label]="'Remove size ' + s"><i class="pi pi-times"></i></button></span>
+          <span class="chip">{{ s }}<button type="button" (click)="removeSize(s)" [attr.aria-label]="'Remove size ' + s"><mat-icon>close</mat-icon></button></span>
         }
       </div>
-      <form class="adder" (ngSubmit)="addSizes()">
-        <input pInputText type="text" name="size" [(ngModel)]="sizeInput" placeholder="e.g. S, M, L (comma separated)" aria-label="Add sizes" />
-        <button pButton type="submit" severity="secondary" aria-label="Add size" [disabled]="!sizeInput.trim()"><span pButtonIcon class="pi pi-plus"></span></button>
+      <form class="adder" (submit)="$event.preventDefault(); addSizes()">
+        <input class="gd-input" type="text" name="size" [(ngModel)]="sizeInput" placeholder="e.g. S, M, L (comma separated)" aria-label="Add sizes" />
+        <button mat-icon-button type="submit" aria-label="Add size" [disabled]="!sizeInput.trim()"><mat-icon>add</mat-icon></button>
       </form>
 
       <h4>Colours</h4>
       <div class="chips">
         @for (c of colors(); track c.name) {
-          <span class="chip"><span class="swatch" [style.background]="c.hex ?? 'transparent'"></span>{{ c.name }}<button type="button" (click)="removeColor(c.name)" [attr.aria-label]="'Remove colour ' + c.name"><i class="pi pi-times"></i></button></span>
+          <span class="chip"><span class="swatch" [style.background]="c.hex ?? 'transparent'"></span>{{ c.name }}<button type="button" (click)="removeColor(c.name)" [attr.aria-label]="'Remove colour ' + c.name"><mat-icon>close</mat-icon></button></span>
         }
       </div>
-      <form class="adder" (ngSubmit)="addColor()">
-        <input pInputText class="name" type="text" name="colorName" [(ngModel)]="colorName" placeholder="Colour name, e.g. Matte black" aria-label="Colour name" />
+      <form class="adder" (submit)="$event.preventDefault(); addColor()">
+        <input class="gd-input name" type="text" name="colorName" [(ngModel)]="colorName" placeholder="Colour name, e.g. Matte black" aria-label="Colour name" />
         <input type="color" name="colorHex" [(ngModel)]="colorHex" aria-label="Colour swatch" />
-        <button pButton type="submit" severity="secondary" aria-label="Add colour" [disabled]="!colorName.trim()"><span pButtonIcon class="pi pi-plus"></span></button>
+        <button mat-icon-button type="submit" aria-label="Add colour" [disabled]="!colorName.trim()"><mat-icon>add</mat-icon></button>
       </form>
 
       <div class="grid">
         @for (r of rows(); track r.size + '|' + r.color; let i = $index) {
           <div class="vrow" [class.off]="!r.isActive">
             <div class="vname"><span class="swatch" [style.background]="r.colorHex ?? 'transparent'"></span>{{ r.size }} · {{ r.color }}</div>
-            <p-toggleswitch [ngModel]="r.isActive" (onChange)="patch(i, { isActive: $event.checked })" [ariaLabel]="'Active ' + r.size + ' ' + r.color" />
+            <mat-slide-toggle [checked]="r.isActive" (change)="patch(i, { isActive: $event.checked })" [aria-label]="'Active ' + r.size + ' ' + r.color" />
             <div class="vfields">
               <div><label class="lbl" [attr.for]="'stk' + i">Stock</label>
-                <p-inputnumber [inputId]="'stk' + i" [ngModel]="r.stock" (ngModelChange)="patch(i, { stock: $event ?? 0 })" [min]="0" [showButtons]="false" inputStyleClass="w-full" styleClass="w-full" /></div>
+                <input class="gd-input" type="number" inputmode="numeric" min="0" [id]="'stk' + i" [name]="'stk' + i" [ngModel]="r.stock" (ngModelChange)="patch(i, { stock: $event ?? 0 })" /></div>
               <div><label class="lbl" [attr.for]="'sku' + i">SKU (blank = auto)</label>
-                <input pInputText [id]="'sku' + i" [ngModel]="r.sku" (ngModelChange)="patch(i, { sku: $event })" [placeholder]="'auto'" maxlength="60" /></div>
+                <input class="gd-input" [id]="'sku' + i" [name]="'sku' + i" [ngModel]="r.sku" (ngModelChange)="patch(i, { sku: $event })" [placeholder]="'auto'" maxlength="60" /></div>
             </div>
           </div>
         } @empty {
@@ -88,10 +89,10 @@ const snapshot = (rows: readonly VariantRow[]): string => JSON.stringify(rows.ma
       </div>
 
       @if (stale()) {
-        <div class="stale"><span>Variants changed elsewhere. Reload to see the latest.</span><button pButton type="button" size="small" (click)="reload.emit()"><span pButtonLabel>Reload</span></button></div>
+        <div class="stale"><span>Variants changed elsewhere. Reload to see the latest.</span><button mat-flat-button type="button" (click)="reload.emit()">Reload</button></div>
       }
       <div class="foot">
-        <button pButton type="button" [loading]="saving()" [disabled]="!dirty() || saving()" (click)="save()"><span pButtonIcon class="pi pi-save"></span><span pButtonLabel>Save variants</span></button>
+        <button mat-flat-button type="button" [disabled]="!dirty() || saving()" (click)="save()">@if (saving()) { <mat-progress-spinner mode="indeterminate" diameter="18" /> } @else { <mat-icon>save</mat-icon> }Save variants</button>
         @if (dirty()) { <span class="muted">Unsaved variant changes</span> }
         <span class="muted">Removed combinations are deactivated, not deleted.</span>
       </div>
@@ -100,7 +101,7 @@ const snapshot = (rows: readonly VariantRow[]): string => JSON.stringify(rows.ma
 })
 export class VariantsGrid {
   private readonly api = inject(Api);
-  private readonly toast = inject(MessageService);
+  private readonly toast = inject(Toast);
 
   readonly productId = input<number | null>(null);
   readonly variants = input<readonly Variant[]>([]);

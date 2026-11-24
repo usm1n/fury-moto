@@ -11,7 +11,6 @@ Read the status box first. Some of the deployment path has not been run yet.
 > - **Not verified:** `ci.yml` has never run on GitHub. The EF migration bundle has never been run against Neon. The R2 CORS rule has not been tested in a browser.
 > - **Dashboard details** (button names, plan limits, prices) are written from the planning research in `docs/backend/PLAN.md` and general knowledge of the consoles. Check each one in the dashboard before you rely on it.
 > - **Not verified on Vercel:** the multi-service `vercel.json` (container API + Angular admin + static storefront under one domain) uses beta features and has not been deployed yet. See step 13 for the fallback.
-> - **PrimeUI license:** the admin uses PrimeNG 22, which needs a free **Community License** key for a shop this size. Without one, every admin page shows an "Invalid PrimeUI License" notice. See step 6 (`PRIMEUI_LICENSE`).
 
 ---
 
@@ -127,7 +126,6 @@ Full list with comments: `.env.example` in the repo root. This table says where 
 
 | Variable | Vercel Production | Vercel Preview | GitHub secret | Notes |
 |---|---|---|---|---|
-| `PRIMEUI_LICENSE` | yes (admin build) | yes (admin build) | yes, if CI builds the admin | Free PrimeUI Community key, embedded in the admin bundle at build time; not a server secret |
 | `NEON_DATABASE_URL` | yes, pooled | yes, a Neon branch (optional) | no | Runtime connection |
 | `NEON_DIRECT_URL` | **no** | no | yes | Migrations and seed only. The running app never reads it, so keep it out of Vercel. |
 | `R2_ACCOUNT_ID` | yes | yes | no | |

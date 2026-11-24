@@ -4,15 +4,12 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
-import { ButtonModule } from 'primeng/button';
-import { InputTextModule } from 'primeng/inputtext';
-import { SelectModule } from 'primeng/select';
-import { TableModule } from 'primeng/table';
-import { TagModule } from 'primeng/tag';
-import { SkeletonModule } from 'primeng/skeleton';
-import { PaginatorModule, PaginatorState } from 'primeng/paginator';
-import { ToggleSwitchModule } from 'primeng/toggleswitch';
-import { MessageService } from 'primeng/api';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { Skeleton, Tag } from '../../shared/ui/ui';
+import { Toast } from '../../shared/ui/toast.service';
 import { Api } from '../../api/api';
 import { apiAdminProductsGet } from '../../api/fn/admin-products/api-admin-products-get';
 import { apiAdminProductsIdPublishPost } from '../../api/fn/admin-products/api-admin-products-id-publish-post';
@@ -35,15 +32,20 @@ const STATUS_OPTIONS: Option[] = [
 
 @Component({
   selector: 'gd-products-list.page',
-  imports: [AssetUrlPipe, FormsModule, RouterLink, ButtonModule, InputTextModule, SelectModule, TableModule, TagModule, SkeletonModule, PaginatorModule, ToggleSwitchModule],
+  imports: [AssetUrlPipe, FormsModule, RouterLink, MatButtonModule, MatIconModule, MatPaginatorModule, MatSlideToggleModule, Skeleton, Tag],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     :host { display: block; }
     .filters { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; margin-bottom: 1rem; }
     .filters .search { grid-column: 1 / -1; position: relative; }
-    .filters .search i { position: absolute; left: .8rem; top: 50%; transform: translateY(-50%); color: var(--p-surface-400); }
+    .filters .search mat-icon { position: absolute; left: .8rem; top: 50%; transform: translateY(-50%); color: var(--p-surface-400); }
     .filters .search input { width: 100%; padding-left: 2.3rem; min-height: 44px; }
-    .filters p-select { width: 100%; }
+    .filters select { width: 100%; min-height: 44px; }
+    table { width: 100%; min-width: 52rem; border-collapse: collapse; }
+    th { text-align: left; font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--p-surface-300); padding: .7rem .75rem; border-bottom: 1px solid var(--p-surface-700); }
+    td { padding: .6rem .75rem; border-bottom: 1px solid var(--p-surface-800); vertical-align: middle; }
+    tr.row:hover td { background: var(--p-surface-800); }
+    .tablewrap { overflow-x: auto; }
     @media (min-width: 760px) { .filters { grid-template-columns: 2fr 1fr 1fr 1fr; } .filters .search { grid-column: auto; } }
     .thumb { width: 48px; height: 60px; border-radius: 6px; object-fit: cover; background: var(--p-surface-800); display: block; flex: none; }
     .thumb--empty { display: grid; place-items: center; color: var(--p-surface-500); }
@@ -63,37 +65,43 @@ const STATUS_OPTIONS: Option[] = [
   template: `
     <div class="page-head">
       <h1 class="page-title">Products</h1>
-      <a pButton routerLink="/products/new"><span pButtonIcon class="pi pi-plus"></span><span pButtonLabel>Add product</span></a>
+      <a mat-flat-button routerLink="/products/new"><mat-icon>add</mat-icon>Add product</a>
     </div>
 
     <div class="filters">
       <span class="search">
-        <i class="pi pi-search"></i>
-        <input pInputText type="search" placeholder="Search title, brand, SKU" aria-label="Search products" [ngModel]="q()" (ngModelChange)="search$.next($event)" />
+        <mat-icon>search</mat-icon>
+        <input class="gd-input" type="search" placeholder="Search title, brand, SKU" aria-label="Search products" [ngModel]="q()" (ngModelChange)="search$.next($event)" />
       </span>
-      <p-select [options]="statusOptions" optionLabel="label" optionValue="value" [ngModel]="status()" (ngModelChange)="setStatus($event)" ariaLabel="Status" />
-      <p-select [options]="categoryOptions()" optionLabel="label" optionValue="value" [ngModel]="category()" (ngModelChange)="setCategory($event)" ariaLabel="Category" />
-      <p-select [options]="brandOptions()" optionLabel="label" optionValue="value" [ngModel]="brand()" (ngModelChange)="setBrand($event)" ariaLabel="Brand" />
+      <select class="gd-input" [ngModel]="status()" (ngModelChange)="setStatus($event)" aria-label="Status">
+        @for (o of statusOptions; track o.label) { <option [ngValue]="o.value">{{ o.label }}</option> }
+      </select>
+      <select class="gd-input" [ngModel]="category()" (ngModelChange)="setCategory($event)" aria-label="Category">
+        @for (o of categoryOptions(); track o.label) { <option [ngValue]="o.value">{{ o.label }}</option> }
+      </select>
+      <select class="gd-input" [ngModel]="brand()" (ngModelChange)="setBrand($event)" aria-label="Brand">
+        @for (o of brandOptions(); track o.label) { <option [ngValue]="o.value">{{ o.label }}</option> }
+      </select>
     </div>
 
     @if (error(); as err) {
       <div class="card empty error">
-        <i class="pi pi-exclamation-triangle" style="font-size:1.6rem"></i>
+        <mat-icon style="font-size:1.6rem;width:auto;height:auto">warning</mat-icon>
         <div>{{ err }}</div>
-        <button pButton type="button" (click)="load()"><span pButtonIcon class="pi pi-refresh"></span><span pButtonLabel>Try again</span></button>
+        <button mat-flat-button type="button" (click)="load()"><mat-icon>refresh</mat-icon>Try again</button>
       </div>
     } @else if (loading() && rows().length === 0) {
       @for (i of skeletons; track i) {
-        <div class="skeleton-row"><p-skeleton width="56px" height="70px" /><p-skeleton height="70px" /></div>
+        <div class="skeleton-row"><gd-skeleton width="56px" height="70px" /><gd-skeleton height="70px" /></div>
       }
     } @else if (rows().length === 0) {
       <div class="card empty">
         @if (hasFilters()) {
           <p>No products match these filters.</p>
-          <button pButton type="button" severity="secondary" (click)="clearFilters()"><span pButtonLabel>Clear filters</span></button>
+          <button mat-stroked-button type="button" (click)="clearFilters()">Clear filters</button>
         } @else {
           <p>No products yet. Add your first one.</p>
-          <a pButton routerLink="/products/new"><span pButtonIcon class="pi pi-plus"></span><span pButtonLabel>Add product</span></a>
+          <a mat-flat-button routerLink="/products/new"><mat-icon>add</mat-icon>Add product</a>
         }
       </div>
     } @else {
@@ -101,7 +109,7 @@ const STATUS_OPTIONS: Option[] = [
         <div class="cards" [style.opacity]="loading() ? .6 : 1">
           @for (r of rows(); track r.id) {
             <div class="pcard" (click)="open(r)" role="link" tabindex="0" (keydown.enter)="open(r)">
-              @if (r.thumbUrl) { <img class="thumb" [src]="r.thumbUrl | assetUrl" alt="" loading="lazy" /> } @else { <span class="thumb thumb--empty"><i class="pi pi-image"></i></span> }
+              @if (r.thumbUrl) { <img class="thumb" [src]="r.thumbUrl | assetUrl" alt="" loading="lazy" /> } @else { <span class="thumb thumb--empty"><mat-icon>image</mat-icon></span> }
               <div>
                 <div class="title">{{ r.title }}</div>
                 <div class="sub">{{ r.brand }} · {{ r.category }}</div>
@@ -111,44 +119,46 @@ const STATUS_OPTIONS: Option[] = [
                 </div>
               </div>
               <div class="toggle-cell" (click)="$event.stopPropagation()">
-                <p-toggleswitch [ngModel]="r.status === 'Published'" [disabled]="r.status === 'Archived' || busyIds().has(r.id!)" (onChange)="toggle(r, $event.checked)" [ariaLabel]="'Publish ' + r.title" />
+                <mat-slide-toggle [checked]="r.status === 'Published'" [disabled]="r.status === 'Archived' || busyIds().has(r.id!)" (change)="toggle(r, $event.checked)" [aria-label]="'Publish ' + r.title" />
                 <span>{{ r.status }}</span>
               </div>
             </div>
           }
         </div>
       } @else {
-        <div class="card" style="padding:0;overflow:hidden" [style.opacity]="loading() ? .6 : 1">
-          <p-table [value]="rows()" dataKey="id" [tableStyle]="{ 'min-width': '52rem' }">
-            <ng-template #header>
+        <div class="card tablewrap" style="padding:0" [style.opacity]="loading() ? .6 : 1">
+          <table>
+            <thead>
               <tr><th style="width:64px"></th><th>Product</th><th>Brand</th><th>Category</th><th>Status</th><th>Price</th><th>Stock</th><th>Updated</th><th>Publish</th></tr>
-            </ng-template>
-            <ng-template #body let-r>
+            </thead>
+            <tbody>
+              @for (r of rows(); track r.id) {
               <tr class="row" (click)="open(r)">
-                <td>@if (r.thumbUrl) { <img class="thumb" [src]="r.thumbUrl | assetUrl" alt="" loading="lazy" /> } @else { <span class="thumb thumb--empty"><i class="pi pi-image"></i></span> }</td>
+                <td>@if (r.thumbUrl) { <img class="thumb" [src]="r.thumbUrl | assetUrl" alt="" loading="lazy" /> } @else { <span class="thumb thumb--empty"><mat-icon>image</mat-icon></span> }</td>
                 <td><span class="title">{{ r.title }}</span><div class="sub">/{{ r.slug }}</div></td>
                 <td>{{ r.brand }}</td>
                 <td>{{ r.category }}</td>
-                <td><p-tag [value]="r.status" [severity]="severity(r.status)" /></td>
+                <td><gd-tag [value]="r.status" [severity]="severity(r.status)" /></td>
                 <td class="money">{{ pkr(r.price) }}</td>
                 <td [class.zero]="r.totalStock === 0">{{ r.totalStock }}</td>
                 <td class="sub">{{ date(r.updatedAt) }}</td>
                 <td (click)="$event.stopPropagation()">
-                  <p-toggleswitch [ngModel]="r.status === 'Published'" [disabled]="r.status === 'Archived' || busyIds().has(r.id)" (onChange)="toggle(r, $event.checked)" [ariaLabel]="'Publish ' + r.title" />
+                  <mat-slide-toggle [checked]="r.status === 'Published'" [disabled]="r.status === 'Archived' || busyIds().has(r.id!)" (change)="toggle(r, $event.checked)" [aria-label]="'Publish ' + r.title" />
                 </td>
               </tr>
-            </ng-template>
-          </p-table>
+              }
+            </tbody>
+          </table>
         </div>
       }
-      <p-paginator [first]="page() * pageSize" [rows]="pageSize" [totalRecords]="total()" (onPageChange)="onPage($event)" [showCurrentPageReport]="!mobile()" currentPageReportTemplate="{first}-{last} of {totalRecords}" />
+      <mat-paginator [length]="total()" [pageSize]="pageSize" [pageIndex]="page()" [hidePageSize]="true" (page)="onPage($event)" aria-label="Product pages" />
     }
   `,
 })
 export class ProductsListPage implements OnInit {
   private readonly api = inject(Api);
   private readonly router = inject(Router);
-  private readonly toast = inject(MessageService);
+  private readonly toast = inject(Toast);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly pageSize = 20;
@@ -222,7 +232,7 @@ export class ProductsListPage implements OnInit {
   protected setStatus(v: ProductStatus | null): void { this.status.set(v); this.page.set(0); }
   protected setCategory(v: number | null): void { this.category.set(v); this.page.set(0); }
   protected setBrand(v: number | null): void { this.brand.set(v); this.page.set(0); }
-  protected onPage(e: PaginatorState): void { this.page.set(Math.floor((e.first ?? 0) / this.pageSize)); }
+  protected onPage(e: PageEvent): void { this.page.set(e.pageIndex); }
   protected clearFilters(): void { this.search$.next(''); this.q.set(''); this.status.set(null); this.category.set(null); this.brand.set(null); this.page.set(0); }
   protected open(r: AdminProductRow): void { void this.router.navigate(['/products', r.id]); }
   protected severity(s: ProductStatus | undefined): 'success' | 'secondary' | 'warn' { return s === 'Published' ? 'success' : s === 'Archived' ? 'warn' : 'secondary'; }

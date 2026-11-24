@@ -1,16 +1,16 @@
 import { ChangeDetectionStrategy, Component, inject, input, signal } from '@angular/core';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
-import { InputTextModule } from 'primeng/inputtext';
-import { PasswordModule } from 'primeng/password';
-import { ButtonModule } from 'primeng/button';
-import { MessageModule } from 'primeng/message';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { Message } from '../../shared/ui/ui';
 import { AuthService } from '../../core/auth.service';
 import { problemOf } from '../../core/http';
 
 @Component({
   selector: 'gd-login',
-  imports: [ReactiveFormsModule, InputTextModule, PasswordModule, ButtonModule, MessageModule],
+  imports: [ReactiveFormsModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule, Message],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './auth.scss',
   template: `
@@ -18,13 +18,15 @@ import { problemOf } from '../../core/http';
       <form class="auth__card" [formGroup]="form" (ngSubmit)="submit()" novalidate>
         <h1><span class="dot"></span>Gear Doctor</h1>
         <p class="muted">Sign in to manage products and orders.</p>
-        @if (error()) { <p-message severity="error">{{ error() }}</p-message> }
+        @if (error()) { <gd-message severity="error">{{ error() }}</gd-message> }
         <label for="email">Email</label>
-        <input pInputText id="email" type="email" formControlName="email" autocomplete="username" inputmode="email" />
+        <input class="gd-input" id="email" type="email" formControlName="email" autocomplete="username" inputmode="email" />
         <label for="password">Password</label>
-        <p-password inputId="password" formControlName="password" [feedback]="false" [toggleMask]="true"
-                    autocomplete="current-password" styleClass="w-full" inputStyleClass="w-full" />
-        <button pButton type="submit" [loading]="busy()" [disabled]="form.invalid"><span pButtonLabel>Sign in</span></button>
+        <div class="pw">
+          <input class="gd-input" id="password" [type]="showPw() ? 'text' : 'password'" formControlName="password" autocomplete="current-password" />
+          <button mat-icon-button type="button" class="pw__toggle" [attr.aria-label]="showPw() ? 'Hide password' : 'Show password'" [attr.aria-pressed]="showPw()" (click)="showPw.set(!showPw())"><mat-icon>{{ showPw() ? 'visibility_off' : 'visibility' }}</mat-icon></button>
+        </div>
+        <button mat-flat-button type="submit" [disabled]="form.invalid || busy()">@if (busy()) { <mat-progress-spinner mode="indeterminate" diameter="18" /> }Sign in</button>
       </form>
     </main>
   `,
@@ -34,6 +36,7 @@ export class LoginPage {
   private readonly router = inject(Router);
   readonly next = input<string>();
   protected readonly busy = signal(false);
+  protected readonly showPw = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly form = inject(NonNullableFormBuilder).group({
     email: ['', [Validators.required, Validators.email]],

@@ -1,6 +1,7 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, CanDeactivateFn, Router } from '@angular/router';
 import { AuthService } from './auth.service';
+import { Confirm } from '../shared/ui/confirm.service';
 
 /** Signed-in admin only; seeded admin is sent to change the initial password first. */
 export const authGuard: CanActivateFn = async (_route, state) => {
@@ -28,4 +29,7 @@ export const signedInGuard: CanActivateFn = async () => {
 /** Components with unsaved edits implement this; the guard asks before leaving. */
 export interface HasUnsavedChanges { hasUnsavedChanges(): boolean }
 export const unsavedChangesGuard: CanDeactivateFn<HasUnsavedChanges> = (c) =>
-  !c?.hasUnsavedChanges?.() || confirm('You have unsaved changes. Leave this page and lose them?');
+  !c?.hasUnsavedChanges?.() || inject(Confirm).ask({
+    header: 'Unsaved changes', message: 'You have unsaved changes. Leave this page and lose them?',
+    acceptLabel: 'Leave', rejectLabel: 'Stay', danger: true,
+  });

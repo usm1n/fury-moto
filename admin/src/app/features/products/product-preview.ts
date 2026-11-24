@@ -1,10 +1,11 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { MatIconModule } from '@angular/material/icon';
 import { AssetUrlPipe } from '../../shared/asset-url.pipe';
 import { formatPkr } from '../../core/format';
 
 /** Live mirror of the storefront product card (4:5 image, badge pills, brand, title, price, cert pills; dark style). */
 @Component({
-  imports: [AssetUrlPipe],
+  imports: [AssetUrlPipe, MatIconModule],
   selector: 'gd-product-preview',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
@@ -27,7 +28,7 @@ import { formatPkr } from '../../core/format';
   template: `
     <div class="card" aria-label="Storefront card preview">
       <div class="img">
-        @if (imageUrl()) { <img [src]="imageUrl() | assetUrl" alt="" /> } @else { <i class="pi pi-image" style="font-size:2rem"></i> }
+        @if (imageUrl()) { <img [src]="imageUrl() | assetUrl" alt="" /> } @else { <mat-icon style="font-size:2rem;width:auto;height:auto">image</mat-icon> }
         @if (badges().length) {
           <div class="badges">@for (b of badges(); track b) { <span class="pill" [class.pill--sale]="b === 'Sale'">{{ b }}</span> }</div>
         }

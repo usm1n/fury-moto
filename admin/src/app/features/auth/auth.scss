@@ -8,7 +8,11 @@ h1 { display: flex; align-items: center; gap: .55rem; margin: 0 0 .25rem; font-f
 .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--p-primary-500); box-shadow: 0 0 12px var(--p-primary-500); }
 .muted { margin: 0 0 .5rem; color: var(--p-surface-300); font-size: .9rem; }
 label { margin-top: .4rem; font-size: .85rem; color: var(--p-surface-200); }
-input, :host ::ng-deep .p-password, :host ::ng-deep .p-password input { width: 100%; }
-button { margin-top: .9rem; min-height: 46px; }
+.pw { position: relative; }
+.pw .gd-input { padding-right: 3rem; }
+.pw__toggle { position: absolute; top: 50%; right: 2px; transform: translateY(-50%); color: var(--p-surface-300); }
+button[type=submit] { margin-top: .9rem; min-height: 46px; }
+button[type=submit] mat-progress-spinner { margin-right: .5rem; }
+gd-message { margin-bottom: .25rem; }
 .hint { color: var(--p-surface-400); font-size: .75rem; }
 .field-error { color: var(--p-red-400); font-size: .8rem; }

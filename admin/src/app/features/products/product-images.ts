@@ -2,10 +2,11 @@ import { ChangeDetectionStrategy, Component, inject, input, linkedSignal, output
 import { AssetUrlPipe } from '../../shared/asset-url.pipe';
 import { FormsModule } from '@angular/forms';
 import { CdkDrag, CdkDragDrop, CdkDragHandle, CdkDropList, moveItemInArray } from '@angular/cdk/drag-drop';
-import { ButtonModule } from 'primeng/button';
-import { InputTextModule } from 'primeng/inputtext';
-import { MessageModule } from 'primeng/message';
-import { ConfirmationService, MessageService } from 'primeng/api';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { Message } from '../../shared/ui/ui';
+import { Toast } from '../../shared/ui/toast.service';
+import { Confirm } from '../../shared/ui/confirm.service';
 import { Api } from '../../api/api';
 import { apiAdminUploadsPresignPost } from '../../api/fn/admin-images/api-admin-uploads-presign-post';
 import { apiAdminProductsIdImagesPost } from '../../api/fn/admin-images/api-admin-products-id-images-post';
@@ -21,7 +22,7 @@ interface UploadItem { key: number; name: string; stage: 'Preparing' | 'Uploadin
 /** Photo manager: pick/drop/camera -> resize + WebP in the browser -> presign -> PUT to R2 -> register. */
 @Component({
   selector: 'gd-product-images',
-  imports: [AssetUrlPipe, FormsModule, CdkDropList, CdkDrag, CdkDragHandle, ButtonModule, InputTextModule, MessageModule],
+  imports: [AssetUrlPipe, FormsModule, CdkDropList, CdkDrag, CdkDragHandle, MatButtonModule, MatIconModule, Message],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     :host { display: block; }
@@ -45,15 +46,15 @@ interface UploadItem { key: number; name: string; stage: 'Preparing' | 'Uploadin
   `,
   template: `
     @if (!productId()) {
-      <p class="muted"><i class="pi pi-info-circle"></i> Save once to add photos.</p>
+      <p class="muted"><mat-icon>info</mat-icon> Save once to add photos.</p>
     } @else {
       @if (storageDown()) {
-        <p-message severity="warn" styleClass="w-full">Photo storage is not configured on this server (local development has no R2 bucket). Uploads will work once storage credentials are set.</p-message>
+        <gd-message severity="warn">Photo storage is not configured on this server (local development has no R2 bucket). Uploads will work once storage credentials are set.</gd-message>
       }
       <div class="drop" [class.over]="over()" (dragover)="$event.preventDefault(); over.set(true)" (dragleave)="over.set(false)" (drop)="onDrop($event)">
-        <i class="pi pi-camera" style="font-size:1.6rem"></i>
+        <mat-icon style="font-size:1.6rem;width:auto;height:auto">photo_camera</mat-icon>
         <span>Drag photos here, or</span>
-        <button pButton type="button" (click)="fileInput.click()"><span pButtonIcon class="pi pi-camera"></span><span pButtonLabel>Take photo / Choose photos</span></button>
+        <button mat-flat-button type="button" (click)="fileInput.click()"><mat-icon>photo_camera</mat-icon>Take photo / Choose photos</button>
         <input #fileInput type="file" accept="image/*" multiple capture="environment" hidden (change)="onPick($event)" />
         <small>Resized to 2000 px WebP automatically. First photo is the main one.</small>
       </div>
@@ -61,7 +62,7 @@ interface UploadItem { key: number; name: string; stage: 'Preparing' | 'Uploadin
       @for (u of uploads(); track u.key) {
         <div class="up">
           @if (u.stage === 'Failed') {
-            <div class="err"><span>{{ u.name }}: {{ u.error }}</span><button pButton type="button" class="p-button-text" size="small" (click)="dismiss(u.key)"><span pButtonLabel>Dismiss</span></button></div>
+            <div class="err"><span>{{ u.name }}: {{ u.error }}</span><button mat-button type="button" (click)="dismiss(u.key)">Dismiss</button></div>
           } @else {
             <div>{{ u.name }} · {{ u.stage }}...</div>
             <div class="bar"><i [style.width.%]="u.progress"></i></div>
@@ -75,11 +76,11 @@ interface UploadItem { key: number; name: string; stage: 'Preparing' | 'Uploadin
             <div class="img" cdkDrag>
               <img [src]="im.thumbUrl | assetUrl" [alt]="im.alt || 'Product photo'" loading="lazy" />
               <div class="tools">
-                <span class="handle" cdkDragHandle aria-label="Drag to reorder"><i class="pi pi-arrows-alt"></i></span>
-                <button type="button" (click)="confirmDelete(im)" aria-label="Delete photo"><i class="pi pi-trash"></i></button>
+                <span class="handle" cdkDragHandle aria-label="Drag to reorder"><mat-icon>drag_indicator</mat-icon></span>
+                <button type="button" (click)="confirmDelete(im)" aria-label="Delete photo"><mat-icon>delete</mat-icon></button>
               </div>
               @if (i === 0) { <span class="main">Main</span> }
-              <div class="alt"><input pInputText [ngModel]="im.alt" (blur)="saveAlt(im, $any($event.target).value)" (keydown.enter)="$any($event.target).blur()" placeholder="Alt text" maxlength="200" aria-label="Alt text" /></div>
+              <div class="alt"><input class="gd-input" [ngModel]="im.alt" (blur)="saveAlt(im, $any($event.target).value)" (keydown.enter)="$any($event.target).blur()" placeholder="Alt text" maxlength="200" aria-label="Alt text" /></div>
             </div>
           }
         </div>
@@ -91,8 +92,8 @@ interface UploadItem { key: number; name: string; stage: 'Preparing' | 'Uploadin
 })
 export class ProductImages {
   private readonly api = inject(Api);
-  private readonly toast = inject(MessageService);
-  private readonly confirm = inject(ConfirmationService);
+  private readonly toast = inject(Toast);
+  private readonly confirm = inject(Confirm);
 
   readonly productId = input<number | null>(null);
   readonly images = input<readonly Image[]>([]);
@@ -197,8 +198,8 @@ export class ProductImages {
 
   protected confirmDelete(im: Image): void {
     this.confirm.confirm({
-      header: 'Delete this photo?', message: 'It will be removed from the product and from storage.', icon: 'pi pi-trash',
-      acceptLabel: 'Delete', rejectLabel: 'Cancel', acceptButtonStyleClass: 'p-button-danger',
+      header: 'Delete this photo?', message: 'It will be removed from the product and from storage.',
+      acceptLabel: 'Delete', rejectLabel: 'Cancel', danger: true,
       accept: async () => {
         try {
           await this.api.invoke(apiAdminImagesImageIdDelete, { imageId: im.id! });

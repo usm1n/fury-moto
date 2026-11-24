@@ -1,13 +1,12 @@
-import { ChangeDetectionStrategy, Component, ViewEncapsulation, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, TemplateRef, ViewEncapsulation, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { ButtonModule } from 'primeng/button';
-import { DialogModule } from 'primeng/dialog';
-import { MessageModule } from 'primeng/message';
-import { SkeletonModule } from 'primeng/skeleton';
-import { TagModule } from 'primeng/tag';
-import { TextareaModule } from 'primeng/textarea';
-import { MessageService } from 'primeng/api';
+import { MatButtonModule } from '@angular/material/button';
+import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { MatIconModule } from '@angular/material/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { Message, Skeleton, Tag } from '../../shared/ui/ui';
+import { Toast } from '../../shared/ui/toast.service';
 import { Api } from '../../api/api';
 import { apiAdminOrdersIdGet } from '../../api/fn/admin-orders/api-admin-orders-id-get';
 import { apiAdminOrdersIdNotesPost } from '../../api/fn/admin-orders/api-admin-orders-id-notes-post';
@@ -16,11 +15,11 @@ import { Order } from '../../api/models/order';
 import { OrderStatus } from '../../api/models/order-status';
 import { formatDate, formatPkr } from '../../core/format';
 import { fieldError, problemOf } from '../../core/http';
-import { NextAction, STATUS_SEVERITY, ShortItem, nextActions, packingSlipText, paymentLabel, relativeTime, shortItems } from './order-helpers';
+import { NextAction, STATUS_SEVERITY, ShortItem, isNoteEntry, nextActions, packingSlipText, paymentLabel, relativeTime, shortItems } from './order-helpers';
 
 @Component({
   selector: 'gd-order-detail.page',
-  imports: [ReactiveFormsModule, RouterLink, ButtonModule, DialogModule, MessageModule, SkeletonModule, TagModule, TextareaModule],
+  imports: [ReactiveFormsModule, RouterLink, MatButtonModule, MatDialogModule, MatIconModule, MatProgressSpinnerModule, Message, Skeleton, Tag],
   changeDetection: ChangeDetectionStrategy.OnPush,
   encapsulation: ViewEncapsulation.None,
   styles: `
@@ -43,7 +42,7 @@ import { NextAction, STATUS_SEVERITY, ShortItem, nextActions, packingSlipText, p
     .od .totals div { display: flex; justify-content: space-between; gap: 1rem; }
     .od .totals .grand { font-weight: 700; font-size: 1.1rem; border-top: 1px solid var(--p-surface-700); padding-top: .4rem; }
     .od .actions { display: grid; gap: .5rem; }
-    .od .actions .p-button { min-height: 48px; justify-content: center; width: 100%; }
+    .od .actions .mat-mdc-button-base { min-height: 48px; width: 100%; }
     .od .timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: .8rem; }
     .od .timeline li { position: relative; padding-left: 1.2rem; }
     .od .timeline li::before { content: ''; position: absolute; left: 0; top: .4rem; width: .6rem; height: .6rem; border-radius: 50%; background: var(--p-primary-500); }
@@ -52,7 +51,9 @@ import { NextAction, STATUS_SEVERITY, ShortItem, nextActions, packingSlipText, p
     .od .short { margin: .5rem 0 0; padding-left: 1.1rem; }
     .od .error { display: grid; gap: .75rem; justify-items: center; }
     .od .noteform { display: grid; gap: .5rem; margin-top: .75rem; }
-    .od .linkbtn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 48px; text-decoration: none; }
+    .od .linkbtn { text-decoration: none; }
+    .od .noteform button { justify-self: start; }
+    .gd-status-dlg .short { margin: .5rem 0 0; padding-left: 1.1rem; }
     .od .back { display: inline-flex; align-items: center; gap: .3rem; min-height: 44px; text-decoration: none; margin-bottom: .25rem; }
     .od .phone { display: inline-flex; align-items: center; min-height: 44px; }
     @media (max-width: 640px) { .od table.items .hide-sm { display: none; } }
@@ -66,27 +67,65 @@ import { NextAction, STATUS_SEVERITY, ShortItem, nextActions, packingSlipText, p
     }
   `,
   template: `
+    <ng-template #statusDlg>
+      @if (order(); as o) {
+        <h2 mat-dialog-title>{{ pending()?.label }}</h2>
+        <mat-dialog-content class="gd-status-dlg">
+          <p style="margin-top:0">
+            @if (pending()?.status === 'Cancelled') { Cancel {{ o.orderNumber }}? @if (o.stockDeducted) { Reserved stock will be returned. } }
+            @else { Change {{ o.orderNumber }} from {{ o.status }} to {{ pending()?.status }}? }
+          </p>
+          @if (shortList().length) {
+            <gd-message severity="error">
+              <div>
+                Not enough stock to confirm:
+                <ul class="short">
+                  @for (s of shortList(); track s.variantId) {
+                    <li>
+                      @if (s.productId) { <a [routerLink]="['/products', s.productId]" (click)="cancelAsk()">{{ s.title }}</a> } @else { {{ s.title }} }
+                      ({{ s.size }} / {{ s.color }}): need {{ s.requested }}, have {{ s.available }}
+                    </li>
+                  }
+                </ul>
+              </div>
+            </gd-message>
+          }
+          <div class="field" style="margin-top:.75rem">
+            <label for="snote">Note (optional)</label>
+            <textarea class="gd-input" id="snote" rows="2" maxlength="500" [formControl]="statusNote"></textarea>
+          </div>
+          @if (statusError(); as se) { <small class="field-error">{{ se }}</small> }
+        </mat-dialog-content>
+        <mat-dialog-actions align="end">
+          <button mat-button type="button" [disabled]="busy()" (click)="cancelAsk()">Back</button>
+          <button mat-flat-button type="button" [class.gd-danger]="pending()?.severity === 'danger'" [disabled]="busy()" (click)="submit()">
+            @if (busy()) { <mat-progress-spinner mode="indeterminate" diameter="18" /> }{{ pending()?.label ?? 'Confirm' }}
+          </button>
+        </mat-dialog-actions>
+      }
+    </ng-template>
+
     <div class="od">
-      <a class="back" routerLink="/orders"><i class="pi pi-arrow-left"></i> Orders</a>
+      <a class="back" routerLink="/orders"><mat-icon>arrow_back</mat-icon> Orders</a>
 
       @if (error(); as err) {
         <div class="card empty error">
-          <i class="pi pi-exclamation-triangle" style="font-size:1.6rem"></i>
+          <mat-icon aria-hidden="true">warning</mat-icon>
           <div>{{ err }}</div>
-          <button pButton type="button" (click)="load()"><span pButtonIcon class="pi pi-refresh"></span><span pButtonLabel>Try again</span></button>
+          <button mat-flat-button type="button" (click)="load()"><mat-icon>refresh</mat-icon>Try again</button>
         </div>
       } @else if (!order()) {
-        <p-skeleton height="2.5rem" width="60%" /><br /><p-skeleton height="12rem" /><br /><p-skeleton height="10rem" />
+        <gd-skeleton height="2.5rem" width="60%" /><br /><gd-skeleton height="12rem" /><br /><gd-skeleton height="10rem" />
       } @else {
         @let o = order()!;
         <div class="head">
           <h1 class="page-title">{{ o.orderNumber }}</h1>
-          <p-tag [value]="o.status" [severity]="sev(o.status)" />
+          <gd-tag [value]="o.status" [severity]="sev(o.status)" />
           <span class="muted">Placed {{ date(o.createdAt) }} ({{ ago(o.createdAt) }})</span>
         </div>
 
         @if (staleNotice()) {
-          <p-message severity="warn" styleClass="w-full">This order was changed by someone else. It has been reloaded; check the details and try again.</p-message><br />
+          <gd-message severity="warn">This order was changed by someone else. It has been reloaded; check the details and try again.</gd-message><br />
         }
 
         <div class="grid">
@@ -131,12 +170,13 @@ import { NextAction, STATUS_SEVERITY, ShortItem, nextActions, packingSlipText, p
               <h2>Actions</h2>
               <div class="actions">
                 @for (a of actions(); track a.status) {
-                  <p-button styleClass="w-full" [label]="a.label" [severity]="a.severity === 'danger' ? 'danger' : undefined" [outlined]="a.severity === 'danger'" (onClick)="ask(a)" />
+                  @if (a.severity === 'danger') { <button mat-stroked-button class="gd-danger" type="button" (click)="ask(a)">{{ a.label }}</button> }
+                  @else { <button mat-flat-button type="button" (click)="ask(a)">{{ a.label }}</button> }
                 }
                 @if (actions().length === 0) { <p class="muted" style="margin:0">This order is {{ (o.status ?? "").toLowerCase() }}; no further status changes.</p> }
-                <a pButton class="linkbtn" severity="success" [outlined]="true" [href]="o.whatsappUrl" target="_blank" rel="noopener noreferrer"><i class="pi pi-whatsapp"></i> Message customer on WhatsApp</a>
-                <button pButton type="button" severity="secondary" (click)="copySlip()"><span pButtonIcon class="pi pi-copy"></span><span pButtonLabel>Copy packing slip</span></button>
-                <button pButton type="button" severity="secondary" (click)="print()"><span pButtonIcon class="pi pi-print"></span><span pButtonLabel>Print packing slip</span></button>
+                <a mat-stroked-button class="linkbtn" [href]="o.whatsappUrl" target="_blank" rel="noopener noreferrer"><mat-icon>chat</mat-icon> Message customer on WhatsApp</a>
+                <button mat-stroked-button type="button" (click)="copySlip()"><mat-icon>content_copy</mat-icon>Copy packing slip</button>
+                <button mat-stroked-button type="button" (click)="print()"><mat-icon>print</mat-icon>Print packing slip</button>
               </div>
             </section>
 
@@ -146,7 +186,7 @@ import { NextAction, STATUS_SEVERITY, ShortItem, nextActions, packingSlipText, p
                 @for (h of historyDesc(); track $index) {
                   <li>
                     <div>
-                      @if (h.from) { {{ h.from }} → <strong>{{ h.to }}</strong> } @else { <strong>{{ h.to }}</strong> }
+                      @if (isNote(h)) { <span class="muted">Note ·</span> <strong>{{ h.to }}</strong> } @else if (h.from) { {{ h.from }} → <strong>{{ h.to }}</strong> } @else { <strong>{{ h.to }}</strong> }
                     </div>
                     @if (h.note) { <div>{{ h.note }}</div> }
                     <div class="sub">{{ h.by || 'Customer' }} · {{ date(h.at) }}</div>
@@ -157,42 +197,15 @@ import { NextAction, STATUS_SEVERITY, ShortItem, nextActions, packingSlipText, p
                    browser would do a native submit (page reload, note lost) -->
               <form class="noteform" (submit)="$event.preventDefault(); addNote()">
                 <label for="note" class="sub">Add a note</label>
-                <textarea pTextarea id="note" rows="2" maxlength="500" [formControl]="note" placeholder="Internal note (e.g. called customer, no answer)"></textarea>
+                <textarea class="gd-input" id="note" rows="2" maxlength="500" [formControl]="note" placeholder="Internal note (e.g. called customer, no answer)"></textarea>
                 @if (noteError(); as ne) { <small class="field-error">{{ ne }}</small> }
-                <button pButton type="submit" severity="secondary" [loading]="noteBusy()" [disabled]="noteBusy() || !note.value.trim()"><span pButtonIcon class="pi pi-plus"></span><span pButtonLabel>Add note</span></button>
+                <button mat-stroked-button type="submit" [disabled]="noteBusy() || !note.value.trim()">@if (noteBusy()) { <mat-progress-spinner mode="indeterminate" diameter="18" /> } @else { <mat-icon>add</mat-icon> }Add note</button>
               </form>
             </section>
           </div>
         </div>
 
-        <p-dialog closeAriaLabel="Close" [visible]="!!pending()" (visibleChange)="!$event && cancelAsk()" [modal]="true" [draggable]="false" [header]="pending()?.label ?? ''" [style]="{ width: '28rem', 'max-width': '94vw' }" [closable]="!busy()">
-          <p style="margin-top:0">
-            @if (pending()?.status === 'Cancelled') { Cancel {{ o.orderNumber }}? @if (o.stockDeducted) { Reserved stock will be returned. } }
-            @else { Change {{ o.orderNumber }} from {{ o.status }} to {{ pending()?.status }}? }
-          </p>
-          @if (shortList().length) {
-            <p-message severity="error" styleClass="w-full">
-              Not enough stock to confirm:
-              <ul class="short">
-                @for (s of shortList(); track s.variantId) {
-                  <li>
-                    @if (s.productId) { <a [routerLink]="['/products', s.productId]">{{ s.title }}</a> } @else { {{ s.title }} }
-                    ({{ s.size }} / {{ s.color }}): need {{ s.requested }}, have {{ s.available }}
-                  </li>
-                }
-              </ul>
-            </p-message>
-          }
-          <div class="field" style="margin-top:.75rem">
-            <label for="snote">Note (optional)</label>
-            <textarea pTextarea id="snote" rows="2" maxlength="500" [formControl]="statusNote"></textarea>
-          </div>
-          @if (statusError(); as se) { <small class="field-error">{{ se }}</small> }
-          <ng-template #footer>
-            <button pButton type="button" severity="secondary" [disabled]="busy()" (click)="cancelAsk()"><span pButtonLabel>Back</span></button>
-            <p-button [label]="pending()?.label ?? 'Confirm'" [severity]="pending()?.severity === 'danger' ? 'danger' : undefined" [loading]="busy()" (onClick)="submit()" />
-          </ng-template>
-        </p-dialog>
+        
 
         <div class="slip" aria-hidden="true">
           <h1>The Gear Doctor</h1>
@@ -204,7 +217,10 @@ import { NextAction, STATUS_SEVERITY, ShortItem, nextActions, packingSlipText, p
 })
 export class OrderDetailPage {
   private readonly api = inject(Api);
-  private readonly toast = inject(MessageService);
+  private readonly toast = inject(Toast);
+  private readonly dialog = inject(MatDialog);
+  private readonly statusDlg = viewChild.required<TemplateRef<unknown>>('statusDlg');
+  private dlgRef: MatDialogRef<unknown> | null = null;
 
   readonly id = input.required<string>();
 
@@ -212,6 +228,7 @@ export class OrderDetailPage {
   protected readonly date = formatDate;
   protected readonly ago = (iso: string | undefined) => relativeTime(iso);
   protected readonly payment = paymentLabel;
+  protected readonly isNote = isNoteEntry;
   protected readonly sev = (s: OrderStatus | undefined) => STATUS_SEVERITY[s ?? 'New'];
 
   protected readonly order = signal<Order | null>(null);
@@ -253,8 +270,19 @@ export class OrderDetailPage {
     this.statusError.set(null);
     this.shortList.set([]);
     this.pending.set(a);
+    const ref = this.dialog.open(this.statusDlg(), { width: '28rem', maxWidth: '94vw', disableClose: true, ariaLabel: a.label });
+    this.dlgRef = ref;
+    const dismiss = () => this.cancelAsk();
+    ref.backdropClick().subscribe(dismiss);
+    ref.keydownEvents().subscribe((e) => { if (e.key === 'Escape') dismiss(); });
+    ref.afterClosed().subscribe(() => { if (this.dlgRef === ref) { this.dlgRef = null; this.pending.set(null); } });
   }
-  protected cancelAsk(): void { if (!this.busy()) this.pending.set(null); }
+  protected cancelAsk(): void {
+    if (this.busy()) return;
+    this.pending.set(null);
+    this.dlgRef?.close();
+  }
+  private closeDialog(): void { this.pending.set(null); this.dlgRef?.close(); }
 
   protected async submit(): Promise<void> {
     const a = this.pending();
@@ -269,7 +297,7 @@ export class OrderDetailPage {
       });
       this.order.set(updated);
       this.staleNotice.set(false);
-      this.pending.set(null);
+      this.closeDialog();
       this.toast.add({ severity: 'success', summary: `Order ${updated.status?.toLowerCase()}`, detail: updated.orderNumber, life: 2500 });
     } catch (e) {
       const p = problemOf(e);
@@ -277,7 +305,7 @@ export class OrderDetailPage {
         this.shortList.set(shortItems(p, o));
         this.statusError.set(null);
       } else if (p.status === 409) {
-        this.pending.set(null);
+        this.closeDialog();
         this.staleNotice.set(true);
         await this.load();
       } else {

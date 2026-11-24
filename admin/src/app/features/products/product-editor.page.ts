@@ -2,16 +2,15 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, input, si
 import { toSignal } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormArray, NonNullableFormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { ButtonModule } from 'primeng/button';
-import { InputTextModule } from 'primeng/inputtext';
-import { InputNumberModule } from 'primeng/inputnumber';
-import { TextareaModule } from 'primeng/textarea';
-import { SelectModule } from 'primeng/select';
-import { MultiSelectModule } from 'primeng/multiselect';
-import { ToggleSwitchModule } from 'primeng/toggleswitch';
-import { TagModule } from 'primeng/tag';
-import { SkeletonModule } from 'primeng/skeleton';
-import { ConfirmationService, MessageService } from 'primeng/api';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatChipsModule } from '@angular/material/chips';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { Skeleton, Tag } from '../../shared/ui/ui';
+import { Toast } from '../../shared/ui/toast.service';
+import { Confirm } from '../../shared/ui/confirm.service';
 import { Api } from '../../api/api';
 import { apiAdminProductsIdGet } from '../../api/fn/admin-products/api-admin-products-id-get';
 import { apiAdminProductsPost } from '../../api/fn/admin-products/api-admin-products-post';
@@ -49,8 +48,8 @@ function compareAtValidator(c: AbstractControl): ValidationErrors | null {
 
 @Component({
   selector: 'gd-product-editor.page',
-  imports: [ReactiveFormsModule, RouterLink, ButtonModule, InputTextModule, InputNumberModule, TextareaModule, SelectModule, MultiSelectModule,
-    ToggleSwitchModule, TagModule, SkeletonModule, ProductImages, ProductPreview, SpecsEditor, VariantsGrid],
+  imports: [ReactiveFormsModule, RouterLink, MatButtonModule, MatIconModule, MatChipsModule, MatMenuModule,
+    MatSlideToggleModule, MatProgressSpinnerModule, Tag, Skeleton, ProductImages, ProductPreview, SpecsEditor, VariantsGrid],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     :host { display: block; }
@@ -59,8 +58,8 @@ function compareAtValidator(c: AbstractControl): ValidationErrors | null {
     .main { display: grid; gap: 1rem; min-width: 0; }
     section.card h2 { margin: 0 0 .9rem; font-size: 1.05rem; }
     .row2 { display: grid; gap: .75rem; } @media (min-width: 640px) { .row2 { grid-template-columns: 1fr 1fr; } }
-    input[pInputText], textarea, p-select, p-multiselect, p-inputnumber { width: 100%; }
-    input[pInputText], textarea { min-height: 44px; }
+    .gd-input { width: 100%; min-height: 44px; }
+    textarea.gd-input { field-sizing: content; min-height: 6rem; }
     .hint { color: var(--p-surface-400); font-size: .75rem; }
     .inline { display: flex; align-items: center; gap: .6rem; min-height: 44px; }
     .banner { padding: .8rem 1rem; border-radius: 10px; border: 1px solid var(--p-yellow-500); display: flex; gap: .75rem; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 1rem; }
@@ -70,23 +69,35 @@ function compareAtValidator(c: AbstractControl): ValidationErrors | null {
     .bar .sp { flex: 1; }
     .head { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; }
     .head .page-title { margin: 0; }
-    .unsaved { color: var(--p-yellow-400); font-size: .8rem; }
+    .unsaved { color: var(--p-yellow-400); font-size: .8rem; display: inline-flex; align-items: center; gap: .35rem; }
+    .unsaved .dot { display: none; width: 8px; height: 8px; border-radius: 50%; background: var(--p-yellow-400); }
+    .more { display: none; }
+    .danger-item { color: var(--p-red-400); }
+    @media (max-width: 640px) {
+      .bar { flex-wrap: nowrap; gap: .35rem; padding: .4rem; }
+      .bar .desk { display: none; }
+      .bar .more { display: inline-flex; }
+      .bar .sp { flex: 1; min-width: 0; }
+      .bar .txt { display: none; }
+      .bar .unsaved .dot { display: inline-block; }
+      .bar .mdc-button, .bar .mat-mdc-button-base:not(.mat-mdc-icon-button) { --mat-button-filled-container-height: 40px; --mat-button-outlined-container-height: 40px; padding-inline: .8rem; }
+    }
   `,
   template: `
     <div class="head">
-      <a routerLink="/products" pButton class="p-button-text" severity="secondary" aria-label="Back to products"><span pButtonIcon class="pi pi-arrow-left"></span></a>
+      <a routerLink="/products" mat-icon-button aria-label="Back to products"><mat-icon>arrow_back</mat-icon></a>
       <h1 class="page-title">{{ isNew() ? 'New product' : (form.controls.title.value || 'Edit product') }}</h1>
-      @if (product(); as p) { <p-tag [value]="p.status ?? 'Draft'" [severity]="p.status === 'Published' ? 'success' : 'secondary'" /> }
+      @if (product(); as p) { <gd-tag [value]="p.status ?? 'Draft'" [severity]="p.status === 'Published' ? 'success' : 'secondary'" /> }
     </div>
 
     @if (loadError(); as err) {
-      <div class="card empty"><p>{{ err }}</p><button pButton type="button" (click)="load()"><span pButtonIcon class="pi pi-refresh"></span><span pButtonLabel>Try again</span></button></div>
+      <div class="card empty"><p>{{ err }}</p><button mat-flat-button type="button" (click)="load()"><mat-icon>refresh</mat-icon>Try again</button></div>
     } @else if (loading()) {
-      <p-skeleton height="14rem" borderRadius="12px" /><div style="height:1rem"></div><p-skeleton height="12rem" borderRadius="12px" />
+      <gd-skeleton height="14rem" radius="12px" /><div style="height:1rem"></div><gd-skeleton height="12rem" radius="12px" />
     } @else {
       @if (stale()) {
         <div class="banner"><span>Changed elsewhere. Reload to get the latest version (your unsaved edits here will be lost).</span>
-          <button pButton type="button" size="small" (click)="reload()"><span pButtonIcon class="pi pi-refresh"></span><span pButtonLabel>Reload</span></button></div>
+          <button mat-flat-button type="button" (click)="reload()"><mat-icon>refresh</mat-icon>Reload</button></div>
       }
       @if (formError(); as fe) { <div class="banner" style="border-color:var(--p-red-400)">{{ fe }}</div> }
 
@@ -95,48 +106,58 @@ function compareAtValidator(c: AbstractControl): ValidationErrors | null {
           <section class="card">
             <h2>Details</h2>
             <div class="field"><label for="title">Title</label>
-              <input pInputText id="title" formControlName="title" maxlength="160" (input)="onTitle()" />
+              <input class="gd-input" id="title" formControlName="title" maxlength="160" (input)="onTitle()" />
               @if (err('title'); as m) { <small class="field-error">{{ m }}</small> }</div>
             <div class="field"><label for="slug">URL slug</label>
-              <input pInputText id="slug" formControlName="slug" maxlength="160" (input)="slugTouched = true" />
+              <input class="gd-input" id="slug" formControlName="slug" maxlength="160" (input)="slugTouched = true" />
               <small class="hint">{{ slugPreview() }}</small>
               @if (err('slug'); as m) { <small class="field-error">{{ m }}</small> }</div>
             <div class="row2">
               <div class="field"><label for="brand">Brand</label>
-                <p-select inputId="brand" formControlName="brandId" [options]="brands()" optionLabel="label" optionValue="value" placeholder="Choose brand" [filter]="true" appendTo="body" />
+                <select class="gd-input" id="brand" formControlName="brandId">
+                  <option [ngValue]="null">Choose brand</option>
+                  @for (o of brands(); track o.value) { <option [ngValue]="o.value">{{ o.label }}</option> }
+                </select>
                 @if (err('brandId'); as m) { <small class="field-error">{{ m }}</small> }</div>
               <div class="field"><label for="category">Category</label>
-                <p-select inputId="category" formControlName="categoryId" [options]="categories()" optionLabel="label" optionValue="value" placeholder="Choose category" appendTo="body" />
+                <select class="gd-input" id="category" formControlName="categoryId">
+                  <option [ngValue]="null">Choose category</option>
+                  @for (o of categories(); track o.value) { <option [ngValue]="o.value">{{ o.label }}</option> }
+                </select>
                 @if (err('categoryId'); as m) { <small class="field-error">{{ m }}</small> }</div>
             </div>
             <div class="field"><label for="short">Short description</label>
-              <input pInputText id="short" formControlName="shortDescription" maxlength="240" /></div>
+              <input class="gd-input" id="short" formControlName="shortDescription" maxlength="240" /></div>
             <div class="field"><label for="desc">Description</label>
-              <textarea pTextarea id="desc" formControlName="description" rows="6" [autoResize]="true"></textarea>
+              <textarea class="gd-input" id="desc" formControlName="description" rows="6"></textarea>
               <small class="hint">Markdown-lite: blank line = new paragraph, "- item" = bullet, **bold**.</small></div>
             <div class="field"><label for="note">Gear Doctor note</label>
-              <textarea pTextarea id="note" formControlName="gearDoctorNote" rows="3" [autoResize]="true" placeholder="Why Umair recommends it, fit advice..."></textarea></div>
+              <textarea class="gd-input" id="note" formControlName="gearDoctorNote" rows="3" placeholder="Why Umair recommends it, fit advice..."></textarea></div>
           </section>
 
           <section class="card">
             <h2>Pricing</h2>
             <div class="row2">
               <div class="field"><label for="price">Price (Rs)</label>
-                <p-inputnumber inputId="price" formControlName="price" [min]="0" [useGrouping]="true" inputStyleClass="w-full" styleClass="w-full" />
+                <input class="gd-input" type="number" inputmode="numeric" min="0" id="price" formControlName="price" />
                 @if (err('price'); as m) { <small class="field-error">{{ m }}</small> }</div>
               <div class="field"><label for="cmp">Compare-at price (Rs)</label>
-                <p-inputnumber inputId="cmp" formControlName="compareAtPrice" [min]="0" [useGrouping]="true" inputStyleClass="w-full" styleClass="w-full" placeholder="Optional" />
+                <input class="gd-input" type="number" inputmode="numeric" min="0" id="cmp" formControlName="compareAtPrice" placeholder="Optional" />
                 @if (form.controls.compareAtPrice.errors?.['compareAt']) { <small class="field-error">Must be higher than the price.</small> }
                 @else if (err('compareAtPrice'); as m) { <small class="field-error">{{ m }}</small> }</div>
             </div>
-            <div class="field"><label for="badges">Badges</label>
-              <p-multiselect inputId="badges" formControlName="badges" [options]="badgeOptions" placeholder="None" appendTo="body" display="chip" /></div>
-            <div class="inline"><p-toggleswitch formControlName="isFeatured" inputId="feat" ariaLabel="Featured" /><label for="feat">Featured on the storefront home</label></div>
+            <div class="field"><label id="badges-lbl">Badges</label>
+              <mat-chip-listbox multiple formControlName="badges" aria-labelledby="badges-lbl">
+                @for (b of badgeOptions; track b) { <mat-chip-option [value]="b">{{ b }}</mat-chip-option> }
+              </mat-chip-listbox></div>
+            <div class="inline"><mat-slide-toggle formControlName="isFeatured">Featured on the storefront home</mat-slide-toggle></div>
           </section>
 
           <section class="card">
             <h2>Certifications</h2>
-            <p-multiselect formControlName="certificationIds" [options]="certOptions()" optionLabel="label" optionValue="value" placeholder="Select certifications" appendTo="body" display="chip" ariaLabel="Certifications" />
+            <mat-chip-listbox multiple formControlName="certificationIds" aria-label="Certifications">
+              @for (o of certOptions(); track o.value) { <mat-chip-option [value]="o.value">{{ o.label }}</mat-chip-option> }
+            </mat-chip-listbox>
           </section>
 
           <section class="card">
@@ -163,19 +184,27 @@ function compareAtValidator(c: AbstractControl): ValidationErrors | null {
       </div>
 
       <div class="bar" role="toolbar" aria-label="Product actions">
-        <button pButton type="button" [loading]="busy() === 'save'" [disabled]="!!busy()" (click)="save()"><span pButtonIcon class="pi pi-save"></span><span pButtonLabel>{{ isNew() ? 'Save draft' : 'Save' }}</span></button>
+        <button mat-flat-button type="button" [disabled]="!!busy()" (click)="save()">@if (busy() === 'save') { <mat-progress-spinner mode="indeterminate" diameter="18" /> } @else { <mat-icon>save</mat-icon> }{{ isNew() ? 'Save draft' : 'Save' }}</button>
         @if (product()?.status === 'Published') {
-          <button pButton type="button" severity="secondary" [loading]="busy() === 'unpublish'" [disabled]="!!busy()" (click)="setPublished(false)"><span pButtonIcon class="pi pi-eye-slash"></span><span pButtonLabel>Unpublish</span></button>
+          <button mat-stroked-button type="button" [disabled]="!!busy()" (click)="setPublished(false)">@if (busy() === 'unpublish') { <mat-progress-spinner mode="indeterminate" diameter="18" /> } @else { <mat-icon>visibility_off</mat-icon> }Unpublish</button>
         } @else {
-          <button pButton type="button" severity="success" [loading]="busy() === 'publish'" [disabled]="!!busy()" (click)="setPublished(true)"><span pButtonIcon class="pi pi-send"></span><span pButtonLabel>Publish</span></button>
+          <button mat-flat-button type="button" class="gd-success" [disabled]="!!busy()" (click)="setPublished(true)">@if (busy() === 'publish') { <mat-progress-spinner mode="indeterminate" diameter="18" /> } @else { <mat-icon>send</mat-icon> }Publish</button>
         }
         @if (!isNew()) {
-          <button pButton type="button" severity="secondary" [loading]="busy() === 'dup'" [disabled]="!!busy()" (click)="duplicate()"><span pButtonIcon class="pi pi-copy"></span><span pButtonLabel>Duplicate</span></button>
-          <a pButton severity="secondary" class="p-button-outlined" [href]="storeUrl()" target="_blank" rel="noopener"><span pButtonIcon class="pi pi-external-link"></span><span pButtonLabel>View on store</span></a>
+          <button mat-stroked-button type="button" class="desk" [disabled]="!!busy()" (click)="duplicate()">@if (busy() === 'dup') { <mat-progress-spinner mode="indeterminate" diameter="18" /> } @else { <mat-icon>content_copy</mat-icon> }Duplicate</button>
+          <a mat-stroked-button class="desk" [href]="storeUrl()" target="_blank" rel="noopener"><mat-icon>open_in_new</mat-icon>View on store</a>
         }
         <span class="sp"></span>
-        @if (hasUnsavedChanges()) { <span class="unsaved">Unsaved changes</span> }
-        @if (!isNew()) { <button pButton type="button" severity="danger" class="p-button-text" [disabled]="!!busy()" (click)="confirmDelete()"><span pButtonIcon class="pi pi-trash"></span><span pButtonLabel>Delete</span></button> }
+        @if (hasUnsavedChanges()) { <span class="unsaved" title="Unsaved changes"><span class="dot"></span><span class="txt">Unsaved changes</span></span> }
+        @if (!isNew()) {
+          <button mat-button type="button" class="gd-danger desk" [disabled]="!!busy()" (click)="confirmDelete()"><mat-icon>delete</mat-icon>Delete</button>
+          <button mat-icon-button type="button" class="more" aria-label="More actions" [matMenuTriggerFor]="moreMenu"><mat-icon>more_horiz</mat-icon></button>
+          <mat-menu #moreMenu="matMenu">
+            <button mat-menu-item type="button" [disabled]="!!busy()" (click)="duplicate()"><mat-icon>content_copy</mat-icon>Duplicate</button>
+            <a mat-menu-item [href]="storeUrl()" target="_blank" rel="noopener"><mat-icon>open_in_new</mat-icon>View on store</a>
+            <button mat-menu-item type="button" class="danger-item" [disabled]="!!busy()" (click)="confirmDelete()"><mat-icon class="danger-item">delete</mat-icon>Delete</button>
+          </mat-menu>
+        }
       </div>
       @if (isNew()) { <p class="hint" style="margin-top:.5rem">Save once to add photos and variants.</p> }
     }
@@ -185,8 +214,8 @@ export class ProductEditorPage implements HasUnsavedChanges {
   private readonly api = inject(Api);
   private readonly fb = inject(NonNullableFormBuilder);
   private readonly router = inject(Router);
-  private readonly toast = inject(MessageService);
-  private readonly confirm = inject(ConfirmationService);
+  private readonly toast = inject(Toast);
+  private readonly confirm = inject(Confirm);
 
   /** route param (absent on /products/new) */
   readonly id = input<string>();
@@ -231,7 +260,7 @@ export class ProductEditorPage implements HasUnsavedChanges {
   protected readonly brandName = computed(() => this.brands().find((b) => b.value === this.v().brandId)?.label ?? '');
   protected readonly certNames = computed(() => {
     const ids = this.v().certificationIds ?? [];
-    return this.certs().filter((c) => ids.includes(c.id!)).map((c) => c.code ?? c.name ?? '');
+    return this.certs().filter((c) => ids.includes(c.id!)).map((c) => c.name ?? c.code ?? '');
   });
   protected readonly slugPreview = computed(() => `${location.origin}/products/${this.v().slug || slugify(this.v().title ?? '') || '...'}`);
   protected readonly storeUrl = computed(() => this.product()?.storefrontUrl || storefrontUrl(`products/${this.product()?.slug ?? ''}`));
@@ -384,7 +413,10 @@ export class ProductEditorPage implements HasUnsavedChanges {
   protected async duplicate(): Promise<void> {
     const id = this.productId();
     if (!id || this.busy()) return;
-    if (this.hasUnsavedChanges() && !confirm('Duplicate the saved version? Your unsaved edits are not included.')) return;
+    if (this.hasUnsavedChanges() && !(await this.confirm.ask({
+      header: 'Duplicate product', message: 'Duplicate the saved version? Your unsaved edits are not included.',
+      acceptLabel: 'Duplicate', rejectLabel: 'Cancel',
+    }))) return;
     this.busy.set('dup');
     try {
       const copy = await this.api.invoke(apiAdminProductsIdDuplicatePost, { id });
@@ -403,7 +435,7 @@ export class ProductEditorPage implements HasUnsavedChanges {
     if (!id) return;
     this.confirm.confirm({
       header: 'Delete this product?', message: `"${this.product()?.title}" and its photos will be permanently removed. Past orders keep their own copy.`,
-      icon: 'pi pi-trash', acceptLabel: 'Delete', rejectLabel: 'Cancel', acceptButtonStyleClass: 'p-button-danger',
+      acceptLabel: 'Delete', rejectLabel: 'Cancel', danger: true,
       accept: async () => {
         this.busy.set('delete');
         try {

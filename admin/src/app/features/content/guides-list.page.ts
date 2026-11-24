@@ -2,11 +2,11 @@ import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@ang
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { CdkDragDrop, CdkDrag, CdkDragHandle, CdkDropList } from '@angular/cdk/drag-drop';
-import { ButtonModule } from 'primeng/button';
-import { SkeletonModule } from 'primeng/skeleton';
-import { TagModule } from 'primeng/tag';
-import { ToggleSwitchModule } from 'primeng/toggleswitch';
-import { MessageService } from 'primeng/api';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { Skeleton, Tag } from '../../shared/ui/ui';
+import { Toast } from '../../shared/ui/toast.service';
 import { Api } from '../../api/api';
 import { apiAdminGuidesGet } from '../../api/fn/admin-content/api-admin-guides-get';
 import { apiAdminGuidesIdPut } from '../../api/fn/admin-content/api-admin-guides-id-put';
@@ -18,7 +18,7 @@ import { GUIDE_TYPE_SEVERITY, guideTypeLabel, moveItem } from './content-helpers
 
 @Component({
   selector: 'gd-guides-list.page',
-  imports: [FormsModule, RouterLink, CdkDropList, CdkDrag, CdkDragHandle, ButtonModule, SkeletonModule, TagModule, ToggleSwitchModule],
+  imports: [FormsModule, RouterLink, CdkDropList, CdkDrag, CdkDragHandle, MatButtonModule, MatIconModule, MatSlideToggleModule, Skeleton, Tag],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     :host { display: block; max-width: 820px; }
@@ -39,33 +39,33 @@ import { GUIDE_TYPE_SEVERITY, guideTypeLabel, moveItem } from './content-helpers
   template: `
     <div class="page-head">
       <h1 class="page-title">Guides</h1>
-      <a routerLink="/guides/new" pButton><span pButtonIcon class="pi pi-plus"></span><span pButtonLabel>New guide</span></a>
+      <a routerLink="/guides/new" mat-flat-button><mat-icon>add</mat-icon>New guide</a>
     </div>
 
     @if (error(); as err) {
       <div class="card empty error">
-        <i class="pi pi-exclamation-triangle" style="font-size:1.6rem"></i>
+        <mat-icon aria-hidden="true">warning</mat-icon>
         <div>{{ err }}</div>
-        <button pButton type="button" (click)="load()"><span pButtonIcon class="pi pi-refresh"></span><span pButtonLabel>Try again</span></button>
+        <button mat-flat-button type="button" (click)="load()"><mat-icon>refresh</mat-icon>Try again</button>
       </div>
     } @else if (loading()) {
-      <div class="list">@for (i of [1, 2, 3, 4]; track i) { <p-skeleton height="64px" borderRadius="12px" /> }</div>
+      <div class="list">@for (i of [1, 2, 3, 4]; track i) { <gd-skeleton height="64px" radius="12px" /> }</div>
     } @else if (items().length === 0) {
       <div class="card empty"><p>No guides yet. Guides show on the storefront once published.</p>
-        <a routerLink="/guides/new" pButton><span pButtonIcon class="pi pi-plus"></span><span pButtonLabel>Write the first guide</span></a></div>
+        <a routerLink="/guides/new" mat-flat-button><mat-icon>add</mat-icon>Write the first guide</a></div>
     } @else {
       <div class="list" cdkDropList (cdkDropListDropped)="drop($event)">
         @for (g of items(); track g.id) {
           <div class="item" [class.is-draft]="!g.isPublished" cdkDrag>
-            <span class="handle" cdkDragHandle aria-label="Drag to reorder"><i class="pi pi-bars"></i></span>
+            <span class="handle" cdkDragHandle aria-label="Drag to reorder"><mat-icon>drag_indicator</mat-icon></span>
             <a class="body" [routerLink]="['/guides', g.id]">
               <span class="title">{{ g.title }}</span>
               <span class="meta">
-                <p-tag [value]="typeLabel(g.type)" [severity]="sev(g.type)" />
+                <gd-tag [value]="typeLabel(g.type)" [severity]="sev(g.type)" />
                 <span>/{{ g.slug }}</span><span>· updated {{ ago(g.updatedAt) }}</span>
               </span>
             </a>
-            <label class="pub"><p-toggleswitch [ngModel]="g.isPublished" (onChange)="togglePublish(g, $event.checked)" [ariaLabel]="'Published: ' + g.title" />{{ g.isPublished ? 'Live' : 'Draft' }}</label>
+            <div class="pub"><mat-slide-toggle [ngModel]="g.isPublished" (change)="togglePublish(g, $event.checked)" [aria-label]="'Published: ' + g.title" />{{ g.isPublished ? 'Live' : 'Draft' }}</div>
           </div>
         }
       </div>
@@ -75,7 +75,7 @@ import { GUIDE_TYPE_SEVERITY, guideTypeLabel, moveItem } from './content-helpers
 })
 export class GuidesListPage implements OnInit {
   private readonly api = inject(Api);
-  private readonly toast = inject(MessageService);
+  private readonly toast = inject(Toast);
 
   protected readonly items = signal<AdminGuide[]>([]);
   protected readonly loading = signal(true);

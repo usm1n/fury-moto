@@ -1,14 +1,16 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, TemplateRef, computed, inject, signal, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule, NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CdkDragDrop, CdkDrag, CdkDragHandle, CdkDropList } from '@angular/cdk/drag-drop';
-import { ButtonModule } from 'primeng/button';
-import { DialogModule } from 'primeng/dialog';
-import { InputTextModule } from 'primeng/inputtext';
-import { TextareaModule } from 'primeng/textarea';
-import { SkeletonModule } from 'primeng/skeleton';
-import { ToggleSwitchModule } from 'primeng/toggleswitch';
-import { ConfirmationService, MessageService } from 'primeng/api';
+import { MatButtonModule } from '@angular/material/button';
+import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { MatIconModule } from '@angular/material/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { Skeleton } from '../../shared/ui/ui';
+import { Toast } from '../../shared/ui/toast.service';
+import { Confirm } from '../../shared/ui/confirm.service';
 import { Api } from '../../api/api';
 import { apiAdminFaqsGet } from '../../api/fn/admin-content/api-admin-faqs-get';
 import { apiAdminFaqsPost } from '../../api/fn/admin-content/api-admin-faqs-post';
@@ -21,7 +23,7 @@ import { moveItem } from './content-helpers';
 
 @Component({
   selector: 'gd-faqs.page',
-  imports: [FormsModule, ReactiveFormsModule, CdkDropList, CdkDrag, CdkDragHandle, ButtonModule, DialogModule, InputTextModule, TextareaModule, SkeletonModule, ToggleSwitchModule],
+  imports: [FormsModule, ReactiveFormsModule, CdkDropList, CdkDrag, CdkDragHandle, MatButtonModule, MatDialogModule, MatIconModule, MatProgressSpinnerModule, MatSlideToggleModule, MatTooltipModule, Skeleton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     :host { display: block; max-width: 820px; }
@@ -41,71 +43,75 @@ import { moveItem } from './content-helpers';
     .hint { color: var(--p-surface-400); font-size: .75rem; }
     .counter { text-align: right; } .counter.over { color: var(--p-red-400); }
     .inline { display: flex; align-items: center; gap: .6rem; min-height: 44px; }
-    form input, form textarea { width: 100%; min-height: 44px; }
+    form textarea { min-height: 8rem; }
   `,
   template: `
     <div class="page-head">
       <h1 class="page-title">FAQs</h1>
-      <button pButton type="button" (click)="openNew()"><span pButtonIcon class="pi pi-plus"></span><span pButtonLabel>Add question</span></button>
+      <button mat-flat-button type="button" (click)="openNew()"><mat-icon>add</mat-icon>Add question</button>
     </div>
 
     @if (error(); as err) {
       <div class="card empty error">
-        <i class="pi pi-exclamation-triangle" style="font-size:1.6rem"></i>
+        <mat-icon aria-hidden="true">warning</mat-icon>
         <div>{{ err }}</div>
-        <button pButton type="button" (click)="load()"><span pButtonIcon class="pi pi-refresh"></span><span pButtonLabel>Try again</span></button>
+        <button mat-flat-button type="button" (click)="load()"><mat-icon>refresh</mat-icon>Try again</button>
       </div>
     } @else if (loading()) {
-      <div class="list">@for (i of [1, 2, 3, 4]; track i) { <p-skeleton height="64px" borderRadius="12px" /> }</div>
+      <div class="list">@for (i of [1, 2, 3, 4]; track i) { <gd-skeleton height="64px" radius="12px" /> }</div>
     } @else if (items().length === 0) {
-      <div class="card empty"><p>No FAQs yet.</p><button pButton type="button" (click)="openNew()"><span pButtonIcon class="pi pi-plus"></span><span pButtonLabel>Add the first question</span></button></div>
+      <div class="card empty"><p>No FAQs yet.</p><button mat-flat-button type="button" (click)="openNew()"><mat-icon>add</mat-icon>Add the first question</button></div>
     } @else {
       <div class="list" cdkDropList (cdkDropListDropped)="drop($event)">
         @for (f of items(); track f.id) {
           <div class="item" [class.is-draft]="!f.isPublished" cdkDrag>
-            <span class="handle" cdkDragHandle aria-label="Drag to reorder"><i class="pi pi-bars"></i></span>
+            <span class="handle" cdkDragHandle aria-label="Drag to reorder"><mat-icon>drag_indicator</mat-icon></span>
             <div class="body"><span class="q">{{ f.q }}</span><span class="a">{{ f.a }}</span></div>
             <div class="actions">
-              <p-toggleswitch [ngModel]="f.isPublished" (onChange)="togglePublish(f, $event.checked)" [ariaLabel]="'Published: ' + f.q" />
-              <button pButton type="button" class="p-button-text" severity="secondary" [attr.aria-label]="'Edit ' + f.q" (click)="openEdit(f)"><span pButtonIcon class="pi pi-pencil"></span></button>
-              <button pButton type="button" class="p-button-text" severity="danger" [attr.aria-label]="'Delete ' + f.q" (click)="confirmDelete(f)"><span pButtonIcon class="pi pi-trash"></span></button>
+              <mat-slide-toggle [ngModel]="f.isPublished" (change)="togglePublish(f, $event.checked)" [aria-label]="'Published: ' + f.q" />
+              <button mat-icon-button type="button" [attr.aria-label]="'Edit ' + f.q" (click)="openEdit(f)"><mat-icon>edit</mat-icon></button>
+              <button mat-icon-button type="button" class="gd-danger" [attr.aria-label]="'Delete ' + f.q" (click)="confirmDelete(f)"><mat-icon>delete</mat-icon></button>
             </div>
           </div>
         }
       </div>
     }
 
-    <p-dialog closeAriaLabel="Close" [header]="editing() ? 'Edit question' : 'New question'" [visible]="dialogOpen()" (visibleChange)="dialogOpen.set($event)" [modal]="true"
-      [style]="{ width: 'min(36rem, 94vw)' }" [draggable]="false" [closable]="!saving()" appendTo="body">
+    <ng-template #faqDlg>
+      <h2 mat-dialog-title>{{ editing() ? 'Edit question' : 'New question' }}</h2>
       <form [formGroup]="form" (ngSubmit)="save()" novalidate>
-        <div class="field"><label for="faq-q">Question</label>
-          <input pInputText id="faq-q" formControlName="q" maxlength="200" />
-          <small class="hint counter" [class.over]="qLen() > 200">{{ qLen() }}/200</small>
-          @if (err('q'); as m) { <small class="field-error">{{ m }}</small> }</div>
-        <div class="field"><label for="faq-a">Answer</label>
-          <textarea pTextarea id="faq-a" formControlName="a" rows="6" maxlength="2000" [autoResize]="true"></textarea>
-          <small class="hint counter" [class.over]="aLen() > 2000">{{ aLen() }}/2000</small>
-          @if (err('a'); as m) { <small class="field-error">{{ m }}</small> }</div>
-        <div class="inline"><p-toggleswitch formControlName="isPublished" inputId="faq-pub" ariaLabel="Published" /><label for="faq-pub">Published</label></div>
-        @if (formError(); as fe) { <small class="field-error">{{ fe }}</small> }
-        <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem">
-          <button pButton type="button" severity="secondary" [disabled]="saving()" (click)="dialogOpen.set(false)"><span pButtonLabel>Cancel</span></button>
-          <button pButton type="submit" [loading]="saving()"><span pButtonIcon class="pi pi-save"></span><span pButtonLabel>Save</span></button>
-        </div>
+        <mat-dialog-content>
+          <div class="field"><label for="faq-q">Question</label>
+            <input class="gd-input" id="faq-q" formControlName="q" maxlength="200" />
+            <small class="hint counter" [class.over]="qLen() > 200">{{ qLen() }}/200</small>
+            @if (err('q'); as m) { <small class="field-error">{{ m }}</small> }</div>
+          <div class="field"><label for="faq-a">Answer</label>
+            <textarea class="gd-input" id="faq-a" formControlName="a" rows="6" maxlength="2000"></textarea>
+            <small class="hint counter" [class.over]="aLen() > 2000">{{ aLen() }}/2000</small>
+            @if (err('a'); as m) { <small class="field-error">{{ m }}</small> }</div>
+          <div class="inline"><mat-slide-toggle formControlName="isPublished" aria-label="Published">Published</mat-slide-toggle></div>
+          @if (formError(); as fe) { <small class="field-error">{{ fe }}</small> }
+        </mat-dialog-content>
+        <mat-dialog-actions align="end">
+          <button mat-button type="button" [disabled]="saving()" (click)="closeDialog()">Cancel</button>
+          <button mat-flat-button type="submit" [disabled]="saving()">@if (saving()) { <mat-progress-spinner mode="indeterminate" diameter="18" /> } @else { <mat-icon>save</mat-icon> }Save</button>
+        </mat-dialog-actions>
       </form>
-    </p-dialog>
+    </ng-template>
   `,
 })
 export class FaqsPage implements OnInit {
   private readonly api = inject(Api);
   private readonly fb = inject(NonNullableFormBuilder);
-  private readonly toast = inject(MessageService);
-  private readonly confirm = inject(ConfirmationService);
+  private readonly toast = inject(Toast);
+  private readonly confirm = inject(Confirm);
+  private readonly dialog = inject(MatDialog);
+  private readonly faqDlg = viewChild.required<TemplateRef<unknown>>('faqDlg');
+  private dlgRef: MatDialogRef<unknown> | null = null;
 
   protected readonly items = signal<AdminFaq[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
-  protected readonly dialogOpen = signal(false);
   protected readonly editing = signal<AdminFaq | null>(null);
   protected readonly saving = signal(false);
   protected readonly formError = signal<string | null>(null);
@@ -147,8 +153,10 @@ export class FaqsPage implements OnInit {
     this.serverProblem.set(null);
     this.formError.set(null);
     this.form.reset({ q: f?.q ?? '', a: f?.a ?? '', isPublished: f?.isPublished ?? true });
-    this.dialogOpen.set(true);
+    this.dlgRef = this.dialog.open(this.faqDlg(), { width: '36rem', maxWidth: '94vw', autoFocus: 'first-tabbable', disableClose: this.saving() });
+    this.dlgRef.afterClosed().subscribe(() => (this.dlgRef = null));
   }
+  protected closeDialog(): void { if (!this.saving()) this.dlgRef?.close(); }
 
   protected async save(): Promise<void> {
     if (this.saving()) return;
@@ -168,7 +176,7 @@ export class FaqsPage implements OnInit {
         const created = await this.api.invoke(apiAdminFaqsPost, { body });
         this.items.update((l) => [...l, created]);
       }
-      this.dialogOpen.set(false);
+      this.dlgRef?.close();
       this.toast.add({ severity: 'success', summary: cur ? 'FAQ saved' : 'FAQ added', life: 2500 });
     } catch (e) {
       const p = problemOf(e);
@@ -192,8 +200,8 @@ export class FaqsPage implements OnInit {
 
   protected confirmDelete(f: AdminFaq): void {
     this.confirm.confirm({
-      header: 'Delete this question?', message: f.q ?? '', icon: 'pi pi-trash', acceptLabel: 'Delete', rejectLabel: 'Cancel',
-      acceptButtonStyleClass: 'p-button-danger', accept: () => void this.remove(f),
+      header: 'Delete this question?', message: f.q ?? '', acceptLabel: 'Delete', rejectLabel: 'Cancel',
+      danger: true, accept: () => void this.remove(f),
     });
   }
 

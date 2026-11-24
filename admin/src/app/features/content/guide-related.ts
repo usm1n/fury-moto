@@ -4,8 +4,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { CdkDrag, CdkDragDrop, CdkDragHandle, CdkDropList } from '@angular/cdk/drag-drop';
 import { Subject, debounceTime } from 'rxjs';
-import { ButtonModule } from 'primeng/button';
-import { InputTextModule } from 'primeng/inputtext';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 import { Api } from '../../api/api';
 import { apiAdminProductsGet } from '../../api/fn/admin-products/api-admin-products-get';
 import { AdminProductRow } from '../../api/models/admin-product-row';
@@ -16,12 +16,12 @@ export interface RelatedItem { id: number; title: string; thumbUrl?: string | nu
 /** Related-products picker: search the admin catalogue, add up to 8 chips, drag to reorder. */
 @Component({
   selector: 'gd-guide-related',
-  imports: [AssetUrlPipe, FormsModule, CdkDropList, CdkDrag, CdkDragHandle, ButtonModule, InputTextModule],
+  imports: [AssetUrlPipe, FormsModule, CdkDropList, CdkDrag, CdkDragHandle, MatButtonModule, MatIconModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     :host { display: block; }
     .search { position: relative; }
-    .search i { position: absolute; left: .8rem; top: 50%; transform: translateY(-50%); color: var(--p-surface-400); }
+    .search mat-icon { position: absolute; left: .8rem; top: 50%; transform: translateY(-50%); color: var(--p-surface-400); pointer-events: none; }
     .search input { width: 100%; min-height: 44px; padding-left: 2.3rem; }
     .results { display: grid; gap: .3rem; margin-top: .5rem; }
     .res { display: flex; align-items: center; gap: .6rem; min-height: 48px; padding: .3rem .6rem; width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer;
@@ -38,8 +38,8 @@ export interface RelatedItem { id: number; title: string; thumbUrl?: string | nu
   `,
   template: `
     <div class="search">
-      <i class="pi pi-search"></i>
-      <input pInputText type="search" placeholder="Search products to add" aria-label="Search products to add" [ngModel]="q()" (ngModelChange)="onQ($event)"
+      <mat-icon aria-hidden="true">search</mat-icon>
+      <input class="gd-input" type="search" placeholder="Search products to add" aria-label="Search products to add" [ngModel]="q()" (ngModelChange)="onQ($event)"
         [disabled]="items().length >= max" autocomplete="off" />
     </div>
     @if (items().length >= max) { <p class="hint">Maximum of {{ max }} related products reached.</p> }
@@ -52,7 +52,7 @@ export interface RelatedItem { id: number; title: string; thumbUrl?: string | nu
           <button type="button" class="res" [disabled]="has(r.id!) || items().length >= max" (click)="add(r)">
             @if (r.thumbUrl) { <img class="thumb" [src]="r.thumbUrl | assetUrl" alt="" loading="lazy" /> } @else { <span class="thumb"></span> }
             <span class="grow">{{ r.title }}<br /><small class="hint">{{ r.brand }} · {{ r.status }}</small></span>
-            <i class="pi" [class.pi-check]="has(r.id!)" [class.pi-plus]="!has(r.id!)"></i>
+            <mat-icon aria-hidden="true">{{ has(r.id!) ? 'check' : 'add' }}</mat-icon>
           </button>
         }
       </div>
@@ -61,10 +61,10 @@ export interface RelatedItem { id: number; title: string; thumbUrl?: string | nu
       <div class="chips" cdkDropList (cdkDropListDropped)="drop($event)">
         @for (it of items(); track it.id) {
           <div class="chip" cdkDrag>
-            <span class="handle" cdkDragHandle aria-label="Drag to reorder"><i class="pi pi-bars"></i></span>
+            <span class="handle" cdkDragHandle aria-label="Drag to reorder"><mat-icon>drag_indicator</mat-icon></span>
             @if (it.thumbUrl) { <img class="thumb" [src]="it.thumbUrl | assetUrl" alt="" /> } @else { <span class="thumb"></span> }
             <span class="grow">{{ it.title }}</span>
-            <button pButton type="button" class="p-button-text" severity="danger" [attr.aria-label]="'Remove ' + it.title" (click)="remove(it.id)"><span pButtonIcon class="pi pi-times"></span></button>
+            <button mat-icon-button type="button" class="gd-danger" [attr.aria-label]="'Remove ' + it.title" (click)="remove(it.id)"><mat-icon>close</mat-icon></button>
           </div>
         }
       </div>

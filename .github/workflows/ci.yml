@@ -79,8 +79,6 @@ jobs:
         if: hashFiles('admin/package.json') != ''
         working-directory: admin
         run: npm run build --if-present
-        env:
-          PRIMEUI_LICENSE: ${{ secrets.PRIMEUI_LICENSE }}
 
       - name: Test
         if: hashFiles('admin/package.json') != ''

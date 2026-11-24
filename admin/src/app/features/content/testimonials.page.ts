@@ -1,15 +1,15 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, TemplateRef, computed, inject, signal, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule, NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CdkDragDrop, CdkDrag, CdkDragHandle, CdkDropList } from '@angular/cdk/drag-drop';
-import { ButtonModule } from 'primeng/button';
-import { DialogModule } from 'primeng/dialog';
-import { InputTextModule } from 'primeng/inputtext';
-import { RatingModule } from 'primeng/rating';
-import { TextareaModule } from 'primeng/textarea';
-import { SkeletonModule } from 'primeng/skeleton';
-import { ToggleSwitchModule } from 'primeng/toggleswitch';
-import { ConfirmationService, MessageService } from 'primeng/api';
+import { MatButtonModule } from '@angular/material/button';
+import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { MatIconModule } from '@angular/material/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { Skeleton } from '../../shared/ui/ui';
+import { Toast } from '../../shared/ui/toast.service';
+import { Confirm } from '../../shared/ui/confirm.service';
 import { Api } from '../../api/api';
 import { apiAdminTestimonialsGet } from '../../api/fn/admin-content/api-admin-testimonials-get';
 import { apiAdminTestimonialsPost } from '../../api/fn/admin-content/api-admin-testimonials-post';
@@ -22,7 +22,7 @@ import { moveItem } from './content-helpers';
 
 @Component({
   selector: 'gd-testimonials.page',
-  imports: [FormsModule, ReactiveFormsModule, CdkDropList, CdkDrag, CdkDragHandle, ButtonModule, DialogModule, InputTextModule, RatingModule, TextareaModule, SkeletonModule, ToggleSwitchModule],
+  imports: [FormsModule, ReactiveFormsModule, CdkDropList, CdkDrag, CdkDragHandle, MatButtonModule, MatDialogModule, MatIconModule, MatProgressSpinnerModule, MatSlideToggleModule, Skeleton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     :host { display: block; max-width: 820px; }
@@ -44,81 +44,94 @@ import { moveItem } from './content-helpers';
     .hint { color: var(--p-surface-400); font-size: .75rem; }
     .counter { text-align: right; } .counter.over { color: var(--p-red-400); }
     .inline { display: flex; align-items: center; gap: .6rem; min-height: 44px; }
-    form input, form textarea { width: 100%; min-height: 44px; }
+    form textarea { min-height: 7rem; }
+    .rating { display: flex; flex-wrap: wrap; gap: .1rem; }
+    .rating .mat-icon { color: var(--p-yellow-400); }
   `,
   template: `
     <div class="page-head">
       <h1 class="page-title">Testimonials</h1>
-      <button pButton type="button" (click)="openNew()"><span pButtonIcon class="pi pi-plus"></span><span pButtonLabel>Add testimonial</span></button>
+      <button mat-flat-button type="button" (click)="openNew()"><mat-icon>add</mat-icon>Add testimonial</button>
     </div>
 
     @if (error(); as err) {
       <div class="card empty error">
-        <i class="pi pi-exclamation-triangle" style="font-size:1.6rem"></i>
+        <mat-icon aria-hidden="true">warning</mat-icon>
         <div>{{ err }}</div>
-        <button pButton type="button" (click)="load()"><span pButtonIcon class="pi pi-refresh"></span><span pButtonLabel>Try again</span></button>
+        <button mat-flat-button type="button" (click)="load()"><mat-icon>refresh</mat-icon>Try again</button>
       </div>
     } @else if (loading()) {
-      <div class="list">@for (i of [1, 2, 3, 4]; track i) { <p-skeleton height="72px" borderRadius="12px" /> }</div>
+      <div class="list">@for (i of [1, 2, 3, 4]; track i) { <gd-skeleton height="72px" radius="12px" /> }</div>
     } @else if (items().length === 0) {
-      <div class="card empty"><p>No testimonials yet.</p><button pButton type="button" (click)="openNew()"><span pButtonIcon class="pi pi-plus"></span><span pButtonLabel>Add the first one</span></button></div>
+      <div class="card empty"><p>No testimonials yet.</p><button mat-flat-button type="button" (click)="openNew()"><mat-icon>add</mat-icon>Add the first one</button></div>
     } @else {
       <div class="list" cdkDropList (cdkDropListDropped)="drop($event)">
         @for (t of items(); track t.id) {
           <div class="item" [class.is-draft]="!t.isPublished" cdkDrag>
-            <span class="handle" cdkDragHandle aria-label="Drag to reorder"><i class="pi pi-bars"></i></span>
+            <span class="handle" cdkDragHandle aria-label="Drag to reorder"><mat-icon>drag_indicator</mat-icon></span>
             <div class="body">
               <span class="who">{{ t.name }} @if (t.bike) { <span class="bike">· {{ t.bike }}</span> }</span>
               <span class="stars" [attr.aria-label]="t.rating + ' out of 5 stars'">{{ stars(t.rating) }}</span>
               <span class="quote">{{ t.quote }}</span>
             </div>
             <div class="actions">
-              <p-toggleswitch [ngModel]="t.isPublished" (onChange)="togglePublish(t, $event.checked)" [ariaLabel]="'Published: ' + t.name" />
-              <button pButton type="button" class="p-button-text" severity="secondary" [attr.aria-label]="'Edit ' + t.name" (click)="openEdit(t)"><span pButtonIcon class="pi pi-pencil"></span></button>
-              <button pButton type="button" class="p-button-text" severity="danger" [attr.aria-label]="'Delete ' + t.name" (click)="confirmDelete(t)"><span pButtonIcon class="pi pi-trash"></span></button>
+              <mat-slide-toggle [ngModel]="t.isPublished" (change)="togglePublish(t, $event.checked)" [aria-label]="'Published: ' + t.name" />
+              <button mat-icon-button type="button" [attr.aria-label]="'Edit ' + t.name" (click)="openEdit(t)"><mat-icon>edit</mat-icon></button>
+              <button mat-icon-button type="button" class="gd-danger" [attr.aria-label]="'Delete ' + t.name" (click)="confirmDelete(t)"><mat-icon>delete</mat-icon></button>
             </div>
           </div>
         }
       </div>
     }
 
-    <p-dialog closeAriaLabel="Close" [header]="editing() ? 'Edit testimonial' : 'New testimonial'" [visible]="dialogOpen()" (visibleChange)="dialogOpen.set($event)" [modal]="true"
-      [style]="{ width: 'min(36rem, 94vw)' }" [draggable]="false" [closable]="!saving()" appendTo="body">
+    <ng-template #tDlg>
+      <h2 mat-dialog-title>{{ editing() ? 'Edit testimonial' : 'New testimonial' }}</h2>
       <form [formGroup]="form" (ngSubmit)="save()" novalidate>
-        <div class="field"><label for="t-name">Name</label>
-          <input pInputText id="t-name" formControlName="name" maxlength="80" />
-          <small class="hint counter" [class.over]="nameLen() > 80">{{ nameLen() }}/80</small>
-          @if (err('name'); as m) { <small class="field-error">{{ m }}</small> }</div>
-        <div class="field"><label for="t-bike">Bike (optional)</label>
-          <input pInputText id="t-bike" formControlName="bike" maxlength="80" placeholder="e.g. Yamaha R15" />
-          <small class="hint counter" [class.over]="bikeLen() > 80">{{ bikeLen() }}/80</small></div>
-        <div class="field"><label id="t-rating-l">Rating</label>
-          <p-rating formControlName="rating" [stars]="5" aria-labelledby="t-rating-l" />
-          @if (err('rating'); as m) { <small class="field-error">{{ m }}</small> }</div>
-        <div class="field"><label for="t-quote">Quote</label>
-          <textarea pTextarea id="t-quote" formControlName="quote" rows="5" maxlength="600" [autoResize]="true"></textarea>
-          <small class="hint counter" [class.over]="quoteLen() > 600">{{ quoteLen() }}/600</small>
-          @if (err('quote'); as m) { <small class="field-error">{{ m }}</small> }</div>
-        <div class="inline"><p-toggleswitch formControlName="isPublished" inputId="t-pub" ariaLabel="Published" /><label for="t-pub">Published</label></div>
-        @if (formError(); as fe) { <small class="field-error">{{ fe }}</small> }
-        <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem">
-          <button pButton type="button" severity="secondary" [disabled]="saving()" (click)="dialogOpen.set(false)"><span pButtonLabel>Cancel</span></button>
-          <button pButton type="submit" [loading]="saving()"><span pButtonIcon class="pi pi-save"></span><span pButtonLabel>Save</span></button>
-        </div>
+        <mat-dialog-content>
+          <div class="field"><label for="t-name">Name</label>
+            <input class="gd-input" id="t-name" formControlName="name" maxlength="80" />
+            <small class="hint counter" [class.over]="nameLen() > 80">{{ nameLen() }}/80</small>
+            @if (err('name'); as m) { <small class="field-error">{{ m }}</small> }</div>
+          <div class="field"><label for="t-bike">Bike (optional)</label>
+            <input class="gd-input" id="t-bike" formControlName="bike" maxlength="80" placeholder="e.g. Yamaha R15" />
+            <small class="hint counter" [class.over]="bikeLen() > 80">{{ bikeLen() }}/80</small></div>
+          <div class="field"><label id="t-rating-l">Rating</label>
+            <div class="rating" role="group" aria-labelledby="t-rating-l">
+              @for (n of starNumbers; track n) {
+                <button mat-icon-button type="button" [attr.aria-label]="n + (n === 1 ? ' star' : ' stars')" [attr.aria-pressed]="n <= ratingValue()" (click)="setRating(n)">
+                  <mat-icon [style.font-variation-settings]="n <= ratingValue() ? &quot;'FILL' 1&quot; : null">{{ n <= ratingValue() ? 'star' : 'star_border' }}</mat-icon>
+                </button>
+              }
+            </div>
+            @if (err('rating'); as m) { <small class="field-error">{{ m }}</small> }</div>
+          <div class="field"><label for="t-quote">Quote</label>
+            <textarea class="gd-input" id="t-quote" formControlName="quote" rows="5" maxlength="600"></textarea>
+            <small class="hint counter" [class.over]="quoteLen() > 600">{{ quoteLen() }}/600</small>
+            @if (err('quote'); as m) { <small class="field-error">{{ m }}</small> }</div>
+          <div class="inline"><mat-slide-toggle formControlName="isPublished" aria-label="Published">Published</mat-slide-toggle></div>
+          @if (formError(); as fe) { <small class="field-error">{{ fe }}</small> }
+        </mat-dialog-content>
+        <mat-dialog-actions align="end">
+          <button mat-button type="button" [disabled]="saving()" (click)="closeDialog()">Cancel</button>
+          <button mat-flat-button type="submit" [disabled]="saving()">@if (saving()) { <mat-progress-spinner mode="indeterminate" diameter="18" /> } @else { <mat-icon>save</mat-icon> }Save</button>
+        </mat-dialog-actions>
       </form>
-    </p-dialog>
+    </ng-template>
   `,
 })
 export class TestimonialsPage implements OnInit {
   private readonly api = inject(Api);
   private readonly fb = inject(NonNullableFormBuilder);
-  private readonly toast = inject(MessageService);
-  private readonly confirm = inject(ConfirmationService);
+  private readonly toast = inject(Toast);
+  private readonly confirm = inject(Confirm);
+  private readonly dialog = inject(MatDialog);
+  private readonly tDlg = viewChild.required<TemplateRef<unknown>>('tDlg');
+  private dlgRef: MatDialogRef<unknown> | null = null;
+  protected readonly starNumbers = [1, 2, 3, 4, 5];
 
   protected readonly items = signal<AdminTestimonial[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
-  protected readonly dialogOpen = signal(false);
   protected readonly editing = signal<AdminTestimonial | null>(null);
   protected readonly saving = signal(false);
   protected readonly formError = signal<string | null>(null);
@@ -134,7 +147,13 @@ export class TestimonialsPage implements OnInit {
   private readonly v = toSignal(this.form.valueChanges, { initialValue: this.form.getRawValue() });
   protected readonly nameLen = computed(() => (this.v().name ?? '').length);
   protected readonly bikeLen = computed(() => (this.v().bike ?? '').length);
+  protected readonly ratingValue = computed(() => this.v().rating ?? 0);
   protected readonly quoteLen = computed(() => (this.v().quote ?? '').length);
+
+  protected setRating(n: number): void {
+    this.form.controls.rating.setValue(n);
+    this.form.controls.rating.markAsTouched();
+  }
 
   protected stars(n: number | undefined): string {
     const r = Math.max(0, Math.min(5, n ?? 0));
@@ -171,8 +190,10 @@ export class TestimonialsPage implements OnInit {
     this.serverProblem.set(null);
     this.formError.set(null);
     this.form.reset({ name: t?.name ?? '', bike: t?.bike ?? '', quote: t?.quote ?? '', rating: t?.rating ?? 5, isPublished: t?.isPublished ?? true });
-    this.dialogOpen.set(true);
+    this.dlgRef = this.dialog.open(this.tDlg(), { width: '36rem', maxWidth: '94vw', autoFocus: 'first-tabbable' });
+    this.dlgRef.afterClosed().subscribe(() => (this.dlgRef = null));
   }
+  protected closeDialog(): void { if (!this.saving()) this.dlgRef?.close(); }
 
   private bodyOf(r: { name: string; bike: string; quote: string; rating: number; isPublished: boolean }) {
     return { name: r.name.trim(), bike: r.bike.trim() || null, quote: r.quote.trim(), rating: r.rating, isPublished: r.isPublished };
@@ -195,7 +216,7 @@ export class TestimonialsPage implements OnInit {
         const created = await this.api.invoke(apiAdminTestimonialsPost, { body });
         this.items.update((l) => [...l, created]);
       }
-      this.dialogOpen.set(false);
+      this.dlgRef?.close();
       this.toast.add({ severity: 'success', summary: cur ? 'Testimonial saved' : 'Testimonial added', life: 2500 });
     } catch (e) {
       const p = problemOf(e);
@@ -221,8 +242,8 @@ export class TestimonialsPage implements OnInit {
 
   protected confirmDelete(t: AdminTestimonial): void {
     this.confirm.confirm({
-      header: `Delete ${t.name}'s testimonial?`, message: 'This removes it from the storefront.', icon: 'pi pi-trash', acceptLabel: 'Delete', rejectLabel: 'Cancel',
-      acceptButtonStyleClass: 'p-button-danger', accept: () => void this.remove(t),
+      header: `Delete ${t.name}'s testimonial?`, message: 'This removes it from the storefront.', acceptLabel: 'Delete', rejectLabel: 'Cancel',
+      danger: true, accept: () => void this.remove(t),
     });
   }
 

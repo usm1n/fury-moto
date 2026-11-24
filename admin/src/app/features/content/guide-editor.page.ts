@@ -3,14 +3,14 @@ import { AssetUrlPipe } from '../../shared/asset-url.pipe';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { ButtonModule } from 'primeng/button';
-import { InputTextModule } from 'primeng/inputtext';
-import { TextareaModule } from 'primeng/textarea';
-import { SelectModule } from 'primeng/select';
-import { ToggleSwitchModule } from 'primeng/toggleswitch';
-import { SkeletonModule } from 'primeng/skeleton';
-import { TagModule } from 'primeng/tag';
-import { ConfirmationService, MessageService } from 'primeng/api';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { Skeleton, Tag } from '../../shared/ui/ui';
+import { Toast } from '../../shared/ui/toast.service';
+import { Confirm } from '../../shared/ui/confirm.service';
 import { Api } from '../../api/api';
 import { apiAdminGuidesIdGet } from '../../api/fn/admin-content/api-admin-guides-id-get';
 import { apiAdminGuidesPost } from '../../api/fn/admin-content/api-admin-guides-post';
@@ -29,7 +29,7 @@ import { GuideRelated, RelatedItem } from './guide-related';
 
 @Component({
   selector: 'gd-guide-editor.page',
-  imports: [AssetUrlPipe, ReactiveFormsModule, RouterLink, ButtonModule, InputTextModule, TextareaModule, SelectModule, ToggleSwitchModule, SkeletonModule, TagModule, GuideRelated],
+  imports: [AssetUrlPipe, ReactiveFormsModule, RouterLink, MatButtonModule, MatIconModule, MatProgressSpinnerModule, MatSlideToggleModule, MatTooltipModule, Skeleton, Tag, GuideRelated],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     :host { display: block; max-width: 860px; }
@@ -38,8 +38,6 @@ import { GuideRelated, RelatedItem } from './guide-related';
     .main { display: grid; gap: 1rem; }
     section.card h2 { margin: 0 0 .9rem; font-size: 1.05rem; }
     .row2 { display: grid; gap: .75rem; } @media (min-width: 640px) { .row2 { grid-template-columns: 1fr 1fr; } }
-    input[pInputText], textarea, p-select { width: 100%; }
-    input[pInputText], textarea { min-height: 44px; }
     .hint { color: var(--p-surface-400); font-size: .75rem; }
     .counter { text-align: right; }
     .counter.over { color: var(--p-red-400); }
@@ -49,7 +47,7 @@ import { GuideRelated, RelatedItem } from './guide-related';
     .tab { min-height: 44px; padding: 0 .9rem; border-radius: 999px; border: 1px solid var(--p-surface-700); background: var(--p-surface-900); color: var(--p-surface-100); font: inherit; cursor: pointer; }
     .tab.active { background: var(--p-primary-500); border-color: var(--p-primary-500); color: var(--p-primary-contrast-color, #000); font-weight: 600; }
     .tools { display: flex; gap: .4rem; margin-left: auto; }
-    .tools button { min-width: 44px; min-height: 44px; border-radius: 8px; border: 1px solid var(--p-surface-700); background: var(--p-surface-900); color: var(--p-surface-0); font: inherit; font-weight: 700; cursor: pointer; }
+    .tools button { min-width: 44px; min-height: 44px; border-radius: 8px; border: 1px solid var(--p-surface-700); background: var(--p-surface-900); color: var(--p-surface-0); font: inherit; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
     textarea.md-src { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .9rem; line-height: 1.5; min-height: 22rem; resize: vertical; }
     .preview { min-height: 22rem; padding: .8rem 1rem; background: var(--p-surface-950); border: 1px solid var(--p-surface-700); border-radius: 10px; overflow-wrap: anywhere; line-height: 1.65; }
     :host ::ng-deep .preview :is(h2, h3) { margin: 1.2rem 0 .5rem; font-family: 'Anton', Impact, sans-serif; font-weight: 400; letter-spacing: .02em; }
@@ -68,19 +66,19 @@ import { GuideRelated, RelatedItem } from './guide-related';
   `,
   template: `
     <div class="head">
-      <a routerLink="/guides" pButton class="p-button-text" severity="secondary" aria-label="Back to guides"><span pButtonIcon class="pi pi-arrow-left"></span></a>
+      <a routerLink="/guides" mat-icon-button aria-label="Back to guides"><mat-icon>arrow_back</mat-icon></a>
       <h1 class="page-title">{{ isNew() ? 'New guide' : (form.controls.title.value || 'Edit guide') }}</h1>
-      @if (guide(); as g) { <p-tag [value]="g.isPublished ? 'Published' : 'Draft'" [severity]="g.isPublished ? 'success' : 'secondary'" /> }
+      @if (guide(); as g) { <gd-tag [value]="g.isPublished ? 'Published' : 'Draft'" [severity]="g.isPublished ? 'success' : 'secondary'" /> }
     </div>
 
     @if (loadError(); as err) {
-      <div class="card empty"><p>{{ err }}</p><button pButton type="button" (click)="reload()"><span pButtonIcon class="pi pi-refresh"></span><span pButtonLabel>Try again</span></button></div>
+      <div class="card empty"><p>{{ err }}</p><button mat-flat-button type="button" (click)="reload()"><mat-icon>refresh</mat-icon>Try again</button></div>
     } @else if (loading()) {
-      <p-skeleton height="14rem" borderRadius="12px" /><div style="height:1rem"></div><p-skeleton height="18rem" borderRadius="12px" />
+      <gd-skeleton height="14rem" radius="12px" /><div style="height:1rem"></div><gd-skeleton height="18rem" radius="12px" />
     } @else {
       @if (stale()) {
         <div class="banner"><span>This guide was changed elsewhere. Reload to get the latest version (your unsaved edits here will be lost).</span>
-          <button pButton type="button" size="small" (click)="reload()"><span pButtonIcon class="pi pi-refresh"></span><span pButtonLabel>Reload</span></button></div>
+          <button mat-flat-button type="button" (click)="reload()"><mat-icon>refresh</mat-icon>Reload</button></div>
       }
       @if (formError(); as fe) { <div class="banner" style="border-color:var(--p-red-400)">{{ fe }}</div> }
 
@@ -88,19 +86,22 @@ import { GuideRelated, RelatedItem } from './guide-related';
         <section class="card">
           <h2>Details</h2>
           <div class="field"><label for="title">Title</label>
-            <input pInputText id="title" formControlName="title" maxlength="160" (input)="onTitle()" />
+            <input class="gd-input" id="title" formControlName="title" maxlength="160" (input)="onTitle()" />
             @if (err('title'); as m) { <small class="field-error">{{ m }}</small> }</div>
           <div class="row2">
             <div class="field"><label for="slug">URL slug</label>
-              <input pInputText id="slug" formControlName="slug" maxlength="160" (input)="slugTouched = true" />
+              <input class="gd-input" id="slug" formControlName="slug" maxlength="160" (input)="slugTouched = true" />
               <small class="hint">{{ slugPreview() }}</small>
               @if (err('slug'); as m) { <small class="field-error">{{ m }}</small> }</div>
             <div class="field"><label for="type">Type</label>
-              <p-select inputId="type" formControlName="type" [options]="types" optionLabel="label" optionValue="value" appendTo="body" />
+              <select class="gd-input" id="type" formControlName="type">
+                <option [ngValue]="null" disabled>Select a type</option>
+                @for (t of types; track t.value) { <option [ngValue]="t.value">{{ t.label }}</option> }
+              </select>
               @if (err('type'); as m) { <small class="field-error">{{ m }}</small> }</div>
           </div>
           <div class="field"><label for="excerpt">Excerpt</label>
-            <textarea pTextarea id="excerpt" formControlName="excerpt" rows="3" maxlength="300" [autoResize]="true"></textarea>
+            <textarea class="gd-input" id="excerpt" formControlName="excerpt" rows="3" maxlength="300"></textarea>
             <small class="hint counter" [class.over]="excerptLen() > 300">{{ excerptLen() }}/300</small>
             @if (err('excerpt'); as m) { <small class="field-error">{{ m }}</small> }</div>
         </section>
@@ -114,13 +115,13 @@ import { GuideRelated, RelatedItem } from './guide-related';
               <span class="tools" role="toolbar" aria-label="Formatting">
                 <button type="button" aria-label="Heading" title="Heading" (click)="tool('h2')">H2</button>
                 <button type="button" aria-label="Bold" title="Bold" (click)="tool('bold')">B</button>
-                <button type="button" aria-label="Bulleted list" title="List" (click)="tool('list')"><i class="pi pi-list"></i></button>
-                <button type="button" aria-label="Link" title="Link" (click)="tool('link')"><i class="pi pi-link"></i></button>
+                <button type="button" aria-label="Bulleted list" title="List" (click)="tool('list')"><mat-icon>format_list_bulleted</mat-icon></button>
+                <button type="button" aria-label="Link" title="Link" (click)="tool('link')"><mat-icon>link</mat-icon></button>
               </span>
             }
           </div>
           @if (tab() === 'write') {
-            <textarea #bodyEl pTextarea class="md-src" formControlName="body" aria-label="Guide body (Markdown)" maxlength="40000"></textarea>
+            <textarea #bodyEl class="gd-input md-src" formControlName="body" aria-label="Guide body (Markdown)" maxlength="40000"></textarea>
             <small class="hint">Markdown: ## heading, **bold**, *italic*, - list, [text](https://link). Blank line = new paragraph.</small>
           } @else {
             <div class="preview" [innerHTML]="preview()"></div>
@@ -135,8 +136,8 @@ import { GuideRelated, RelatedItem } from './guide-related';
             @if (uploading(); as pct) { <div class="bar-up" role="progressbar" [attr.aria-valuenow]="pct"><i [style.width.%]="pct"></i></div> }
             @if (coverError(); as ce) { <small class="field-error">{{ ce }}</small> }
             <div class="row">
-              <button pButton type="button" severity="secondary" [disabled]="!!uploading()" (click)="fileInput.click()"><span pButtonIcon class="pi pi-image"></span><span pButtonLabel>{{ coverPreview() ? 'Replace image' : 'Choose image' }}</span></button>
-              @if (coverPreview()) { <button pButton type="button" class="p-button-text" severity="danger" (click)="clearCover()"><span pButtonIcon class="pi pi-times"></span><span pButtonLabel>Remove</span></button> }
+              <button mat-stroked-button type="button" [disabled]="!!uploading()" (click)="fileInput.click()"><mat-icon>image</mat-icon>{{ coverPreview() ? 'Replace image' : 'Choose image' }}</button>
+              @if (coverPreview()) { <button mat-button type="button" class="gd-danger" (click)="clearCover()"><mat-icon>close</mat-icon>Remove</button> }
             </div>
             <input #fileInput type="file" accept="image/*" hidden (change)="onCover($event)" />
             <small class="hint">Resized to 1600 px WebP automatically.</small>
@@ -146,10 +147,10 @@ import { GuideRelated, RelatedItem } from './guide-related';
         <section class="card">
           <h2>Links</h2>
           <div class="field"><label for="video">Video id (optional)</label>
-            <input pInputText id="video" formControlName="video" maxlength="80" />
+            <input class="gd-input" id="video" formControlName="video" maxlength="80" />
             <small class="hint">The id of a video already set up on the storefront. Leave blank for none.</small></div>
           <div class="field"><label for="source">Instagram URL (optional)</label>
-            <input pInputText id="source" formControlName="source" type="url" inputmode="url" maxlength="300" placeholder="https://www.instagram.com/reel/..." />
+            <input class="gd-input" id="source" formControlName="source" type="url" inputmode="url" maxlength="300" placeholder="https://www.instagram.com/reel/..." />
             @if (form.controls.source.errors?.['pattern']) { <small class="field-error">Must start with https://</small> }
             @else if (err('source'); as m) { <small class="field-error">{{ m }}</small> }</div>
         </section>
@@ -161,15 +162,15 @@ import { GuideRelated, RelatedItem } from './guide-related';
         </section>
 
         <section class="card">
-          <div class="inline"><p-toggleswitch formControlName="isPublished" inputId="pub" ariaLabel="Published" /><label for="pub">Published on the storefront</label></div>
+          <div class="inline"><mat-slide-toggle formControlName="isPublished">Published on the storefront</mat-slide-toggle></div>
         </section>
       </form>
 
       <div class="bar" role="toolbar" aria-label="Guide actions">
-        <button pButton type="button" [loading]="busy() === 'save'" [disabled]="!!busy() || !!uploading()" (click)="save()"><span pButtonIcon class="pi pi-save"></span><span pButtonLabel>{{ isNew() ? 'Create guide' : 'Save' }}</span></button>
+        <button mat-flat-button type="button" [disabled]="!!busy() || !!uploading()" (click)="save()">@if (busy() === 'save') { <mat-progress-spinner mode="indeterminate" diameter="18" /> } @else { <mat-icon>save</mat-icon> }{{ isNew() ? 'Create guide' : 'Save' }}</button>
         <span class="sp"></span>
         @if (hasUnsavedChanges()) { <span class="unsaved">Unsaved changes</span> }
-        @if (!isNew()) { <button pButton type="button" severity="danger" class="p-button-text" [disabled]="!!busy()" (click)="confirmDelete()"><span pButtonIcon class="pi pi-trash"></span><span pButtonLabel>Delete</span></button> }
+        @if (!isNew()) { <button mat-button type="button" class="gd-danger" [disabled]="!!busy()" (click)="confirmDelete()"><mat-icon>delete</mat-icon>Delete</button> }
       </div>
     }
   `,
@@ -178,8 +179,8 @@ export class GuideEditorPage implements HasUnsavedChanges {
   private readonly api = inject(Api);
   private readonly fb = inject(NonNullableFormBuilder);
   private readonly router = inject(Router);
-  private readonly toast = inject(MessageService);
-  private readonly confirm = inject(ConfirmationService);
+  private readonly toast = inject(Toast);
+  private readonly confirm = inject(Confirm);
 
   /** route param (absent on /guides/new) */
   readonly id = input<string>();
@@ -401,7 +402,7 @@ export class GuideEditorPage implements HasUnsavedChanges {
     if (!g?.id) return;
     this.confirm.confirm({
       header: `Delete "${g.title}"?`, message: 'This permanently removes the guide from the storefront.',
-      icon: 'pi pi-trash', acceptLabel: 'Delete', rejectLabel: 'Cancel', acceptButtonStyleClass: 'p-button-danger',
+      acceptLabel: 'Delete', rejectLabel: 'Cancel', danger: true,
       accept: () => void this.remove(g.id!),
     });
   }

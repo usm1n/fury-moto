@@ -63,3 +63,14 @@ export function shortItems(problem: Record<string, unknown> | null | undefined, 
   const raw = Array.isArray(problem?.['items']) ? problem['items'] as ShortItem[] : [];
   return raw.map((s) => ({ ...s, productId: order?.items?.find((i) => i.variantId === s.variantId)?.productId }));
 }
+
+/** A history row whose from === to is a note on the current status, not a transition. */
+export function isNoteEntry(h: { from?: string | null; to?: string }): boolean {
+  return !!h.from && h.from === h.to;
+}
+
+/** Heading text for a history entry: "Note · Confirmed", "New → Confirmed" or just the status. */
+export function historyTitle(h: { from?: string | null; to?: string }): string {
+  if (isNoteEntry(h)) return `Note · ${h.to}`;
+  return h.from ? `${h.from} → ${h.to}` : (h.to ?? '');
+}

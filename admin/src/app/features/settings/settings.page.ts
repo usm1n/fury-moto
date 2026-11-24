@@ -1,13 +1,12 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ButtonModule } from 'primeng/button';
-import { InputNumberModule } from 'primeng/inputnumber';
-import { InputTextModule } from 'primeng/inputtext';
-import { SkeletonModule } from 'primeng/skeleton';
-import { TextareaModule } from 'primeng/textarea';
-import { ToggleSwitchModule } from 'primeng/toggleswitch';
-import { MessageService } from 'primeng/api';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { Skeleton } from '../../shared/ui/ui';
+import { Toast } from '../../shared/ui/toast.service';
 import { map, startWith } from 'rxjs';
 import { Api } from '../../api/api';
 import { apiAdminSettingsGet } from '../../api/fn/admin-settings/api-admin-settings-get';
@@ -20,15 +19,14 @@ const nullable = (s: string): string | null => (s.trim() === '' ? null : s.trim(
 
 @Component({
   selector: 'gd-settings.page',
-  imports: [ReactiveFormsModule, ButtonModule, InputNumberModule, InputTextModule, SkeletonModule, TextareaModule, ToggleSwitchModule],
+  imports: [ReactiveFormsModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule, MatSlideToggleModule, Skeleton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     :host { display: block; }
     form { display: grid; gap: 1rem; max-width: 46rem; }
     h2 { font-size: 1.05rem; margin: 0 0 .75rem; }
     .hint { color: var(--p-surface-300); font-size: .8rem; }
-    input, textarea, p-inputnumber { width: 100%; }
-    .row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 44px; margin-bottom: .5rem; }
+        .row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 44px; margin-bottom: .5rem; }
     .row label { flex: 1; }
     .two { display: grid; gap: 0 .75rem; }
     @media (min-width: 640px) { .two { grid-template-columns: 1fr 1fr; } }
@@ -43,47 +41,47 @@ const nullable = (s: string): string | null => (s.trim() === '' ? null : s.trim(
 
     @if (loadError(); as err) {
       <div class="card empty error">
-        <i class="pi pi-exclamation-triangle" style="font-size:1.6rem"></i>
+        <mat-icon style="font-size:1.6rem;width:1.6rem;height:1.6rem">warning</mat-icon>
         <div>{{ err }}</div>
-        <button pButton type="button" (click)="load()"><span pButtonIcon class="pi pi-refresh"></span><span pButtonLabel>Try again</span></button>
+        <button mat-flat-button type="button" (click)="load()"><mat-icon>refresh</mat-icon>Try again</button>
       </div>
     } @else if (!loaded()) {
-      <p-skeleton height="12rem" /><br /><p-skeleton height="10rem" />
+      <gd-skeleton height="12rem" /><div style="height:1rem"></div><gd-skeleton height="10rem" />
     } @else {
       <form [formGroup]="form" (ngSubmit)="save()" novalidate>
         <section class="card">
           <h2>Contact</h2>
           <div class="field">
             <label for="wa">WhatsApp number</label>
-            <input pInputText id="wa" formControlName="whatsappNumber" inputmode="numeric" autocomplete="off" placeholder="92300XXXXXXX" />
+            <input class="gd-input" id="wa" formControlName="whatsappNumber" inputmode="numeric" autocomplete="off" placeholder="92300XXXXXXX" />
             <span class="hint">Digits only with country code, no + or spaces (e.g. 923001234567). Customers' order messages go here.</span>
             @if (err('whatsappNumber', 'whatsappNumber'); as e) { <small class="field-error">{{ e }}</small> }
           </div>
           <div class="two">
             <div class="field">
               <label for="phone">Phone (shown on the site)</label>
-              <input pInputText id="phone" formControlName="phoneDisplay" inputmode="tel" placeholder="0300 1234567" />
+              <input class="gd-input" id="phone" formControlName="phoneDisplay" inputmode="tel" placeholder="0300 1234567" />
               @if (err('phoneDisplay'); as e) { <small class="field-error">{{ e }}</small> }
             </div>
             <div class="field">
               <label for="email">Email</label>
-              <input pInputText id="email" type="email" formControlName="email" inputmode="email" />
+              <input class="gd-input" id="email" type="email" formControlName="email" inputmode="email" />
               @if (err('email'); as e) { <small class="field-error">{{ e }}</small> }
             </div>
             <div class="field">
               <label for="city">City</label>
-              <input pInputText id="city" formControlName="city" />
+              <input class="gd-input" id="city" formControlName="city" />
               @if (err('city'); as e) { <small class="field-error">{{ e }}</small> }
             </div>
             <div class="field">
               <label for="hours">Opening hours</label>
-              <input pInputText id="hours" formControlName="hours" placeholder="Mon-Sat, 10am-8pm" />
+              <input class="gd-input" id="hours" formControlName="hours" placeholder="Mon-Sat, 10am-8pm" />
               @if (err('hours'); as e) { <small class="field-error">{{ e }}</small> }
             </div>
           </div>
           <div class="field" style="margin-bottom:0">
             <label for="addr">Shop address</label>
-            <textarea pTextarea id="addr" rows="2" formControlName="address"></textarea>
+            <textarea class="gd-input" id="addr" rows="2" formControlName="address"></textarea>
             @if (err('address'); as e) { <small class="field-error">{{ e }}</small> }
           </div>
         </section>
@@ -93,35 +91,35 @@ const nullable = (s: string): string | null => (s.trim() === '' ? null : s.trim(
           <div class="two">
             <div class="field">
               <label for="fee">Delivery fee (PKR)</label>
-              <p-inputnumber inputId="fee" formControlName="deliveryFee" [min]="0" [useGrouping]="false" mode="decimal" inputStyleClass="w-full" styleClass="w-full" />
+              <input class="gd-input" id="fee" type="number" inputmode="numeric" min="0" step="1" formControlName="deliveryFee" />
               @if (err('deliveryFee'); as e) { <small class="field-error">{{ e }}</small> }
             </div>
             <div class="field">
               <label for="low">Low-stock threshold</label>
-              <p-inputnumber inputId="low" formControlName="lowStockThreshold" [min]="0" [useGrouping]="false" mode="decimal" inputStyleClass="w-full" styleClass="w-full" />
+              <input class="gd-input" id="low" type="number" inputmode="numeric" min="0" step="1" formControlName="lowStockThreshold" />
               <span class="hint">Variants at or below this show on the dashboard.</span>
               @if (err('lowStockThreshold'); as e) { <small class="field-error">{{ e }}</small> }
             </div>
           </div>
-          <div class="row"><label for="cod">Cash on delivery</label><p-toggleswitch inputId="cod" formControlName="codEnabled" /></div>
-          <div class="row"><label for="bank">Bank transfer</label><p-toggleswitch inputId="bank" formControlName="bankTransferEnabled" /></div>
+          <div class="row"><label id="cod-l">Cash on delivery</label><mat-slide-toggle aria-labelledby="cod-l" formControlName="codEnabled" /></div>
+          <div class="row"><label id="bank-l">Bank transfer</label><mat-slide-toggle aria-labelledby="bank-l" formControlName="bankTransferEnabled" /></div>
           @if (err('codEnabled'); as e) { <small class="field-error">{{ e }}</small> }
           @if (bankOn()) {
             <div class="two" style="margin-top:.5rem">
               <div class="field">
                 <label for="bn">Bank name</label>
-                <input pInputText id="bn" formControlName="bankName" />
+                <input class="gd-input" id="bn" formControlName="bankName" />
                 @if (form.controls.bankName.touched && form.controls.bankName.hasError('required')) { <small class="field-error">Bank name is required.</small> }
               </div>
               <div class="field">
                 <label for="at">Account title</label>
-                <input pInputText id="at" formControlName="accountTitle" />
+                <input class="gd-input" id="at" formControlName="accountTitle" />
                 @if (form.controls.accountTitle.touched && form.controls.accountTitle.hasError('required')) { <small class="field-error">Account title is required.</small> }
               </div>
             </div>
             <div class="field">
               <label for="iban">IBAN</label>
-              <input pInputText id="iban" formControlName="iban" autocapitalize="characters" placeholder="PK00 XXXX 0000 0000 0000 0000" />
+              <input class="gd-input" id="iban" formControlName="iban" autocapitalize="characters" placeholder="PK00 XXXX 0000 0000 0000 0000" />
               @if (form.controls.iban.touched && form.controls.iban.hasError('required')) { <small class="field-error">IBAN is required.</small> }
             </div>
             @if (err('bankDetails'); as e) { <small class="field-error">{{ e }}</small> }
@@ -130,7 +128,7 @@ const nullable = (s: string): string | null => (s.trim() === '' ? null : s.trim(
 
         <div class="bar">
           @if (form.dirty) { <span class="unsaved">Unsaved changes</span> }
-          <button pButton type="submit" [loading]="saving()" [disabled]="saving() || !form.dirty"><span pButtonIcon class="pi pi-check"></span><span pButtonLabel>Save settings</span></button>
+          <button mat-flat-button type="submit" [disabled]="saving() || !form.dirty">@if (saving()) { <mat-progress-spinner mode="indeterminate" diameter="18" /> } @else { <mat-icon>check</mat-icon> }Save settings</button>
         </div>
       </form>
     }
@@ -139,7 +137,7 @@ const nullable = (s: string): string | null => (s.trim() === '' ? null : s.trim(
 export class SettingsPage implements OnInit, HasUnsavedChanges {
   private readonly api = inject(Api);
   private readonly fb = inject(NonNullableFormBuilder);
-  private readonly toast = inject(MessageService);
+  private readonly toast = inject(Toast);
 
   protected readonly loaded = signal(false);
   protected readonly loadError = signal<string | null>(null);

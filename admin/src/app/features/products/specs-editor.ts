@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { FormArray, FormControl, FormGroup, NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ButtonModule } from 'primeng/button';
-import { InputTextModule } from 'primeng/inputtext';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 import { inject } from '@angular/core';
 
 export type SpecGroup = FormGroup<{ label: FormControl<string>; value: FormControl<string> }>;
@@ -13,7 +13,7 @@ export function newSpecGroup(fb: NonNullableFormBuilder, label = '', value = '')
 /** Key/value spec rows: add, remove, move up/down. Works directly on the parent's FormArray. */
 @Component({
   selector: 'gd-specs-editor',
-  imports: [ReactiveFormsModule, ButtonModule, InputTextModule],
+  imports: [ReactiveFormsModule, MatButtonModule, MatIconModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     :host { display: block; }
@@ -28,19 +28,19 @@ export function newSpecGroup(fb: NonNullableFormBuilder, label = '', value = '')
     @for (g of array().controls; track g; let i = $index) {
       <div class="row" [formGroup]="g">
         <div class="fields">
-          <input pInputText formControlName="label" placeholder="e.g. Shell material" [attr.aria-label]="'Spec ' + (i + 1) + ' name'" />
-          <input pInputText formControlName="value" placeholder="e.g. Carbon fibre" [attr.aria-label]="'Spec ' + (i + 1) + ' value'" />
+          <input class="gd-input" formControlName="label" placeholder="e.g. Shell material" [attr.aria-label]="'Spec ' + (i + 1) + ' name'" />
+          <input class="gd-input" formControlName="value" placeholder="e.g. Carbon fibre" [attr.aria-label]="'Spec ' + (i + 1) + ' value'" />
         </div>
         <div class="btns">
-          <button pButton type="button" class="p-button-text" size="small" severity="secondary" aria-label="Move up" [disabled]="i === 0" (click)="move(i, -1)"><span pButtonIcon class="pi pi-chevron-up"></span></button>
-          <button pButton type="button" class="p-button-text" size="small" severity="secondary" aria-label="Move down" [disabled]="i === array().length - 1" (click)="move(i, 1)"><span pButtonIcon class="pi pi-chevron-down"></span></button>
-          <button pButton type="button" class="p-button-text" size="small" severity="danger" aria-label="Remove spec" (click)="remove(i)"><span pButtonIcon class="pi pi-trash"></span></button>
+          <button mat-icon-button type="button" aria-label="Move up" [disabled]="i === 0" (click)="move(i, -1)"><mat-icon>arrow_upward</mat-icon></button>
+          <button mat-icon-button type="button" aria-label="Move down" [disabled]="i === array().length - 1" (click)="move(i, 1)"><mat-icon>arrow_downward</mat-icon></button>
+          <button mat-icon-button type="button" class="gd-danger" aria-label="Remove spec" (click)="remove(i)"><mat-icon>delete</mat-icon></button>
         </div>
       </div>
     } @empty {
       <p class="muted">No specs yet (weight, shell material, fit...).</p>
     }
-    <button pButton type="button" class="add" severity="secondary" (click)="add()"><span pButtonIcon class="pi pi-plus"></span><span pButtonLabel>Add spec</span></button>
+    <button mat-stroked-button type="button" class="add" (click)="add()"><mat-icon>add</mat-icon>Add spec</button>
   `,
 })
 export class SpecsEditor {
