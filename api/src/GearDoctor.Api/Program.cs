@@ -31,6 +31,7 @@ builder.Services.ConfigureHttpJsonOptions(o =>
 builder.Services
     .AddInfrastructure(builder.Configuration)
     .AddApplication()
+    .AddSeo()
     .AddApiPlatform(builder.Configuration, builder.Environment);
 
 var app = builder.Build();
@@ -40,6 +41,8 @@ app.UseApiPlatform();          // forwarded headers, errors → ProblemDetails, 
 app.MapGet("/api/health", HealthEndpoint.Handle).WithTags("Public").AllowAnonymous();
 app.MapPublicCatalog();        // GET products / categories / brands / certifications / settings
 app.MapOrders();               // POST /api/orders, POST /api/cart/validate
+app.MapContent();              // GET guides / faqs / testimonials
+app.MapSeo();                  // /api/seo/product/{slug}, /api/seo/sitemap.xml
 app.MapAuth();                 // /api/auth/*
 app.MapAdmin();                // /api/admin/* (Admin role + CSRF)
 app.MapOpenApi("/api/openapi.json");

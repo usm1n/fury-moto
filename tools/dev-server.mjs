@@ -54,7 +54,18 @@ function serveStatic(req, res) {
   });
 }
 
+// Same two rewrites as vercel.json: crawlable product pages and the sitemap come from the API.
+function seoRewrite(req) {
+  const u = new URL(req.url, "http://x");
+  const m = /^\/products\/([^/]+)\/?$/.exec(u.pathname);
+  if (m) return `/api/seo/product/${m[1]}`;
+  if (u.pathname === "/sitemap.xml") return "/api/seo/sitemap.xml";
+  return null;
+}
+
 http.createServer((req, res) => {
+  const seo = seoRewrite(req);
+  if (seo) { req.url = seo; return proxy(req, res, API); }
   if (req.url.startsWith("/api/") || req.url === "/api") return proxy(req, res, API);
   if (req.url === "/admin" || req.url.startsWith("/admin/")) return proxy(req, res, ADMIN);
   return serveStatic(req, res);

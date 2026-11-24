@@ -17,6 +17,7 @@ namespace GearDoctor.Infrastructure.Seed;
 ///   3. Admin role + admin user from ADMIN_EMAIL / ADMIN_INITIAL_PASSWORD (only if no admin exists;
 ///      MustChangePassword = true so the initial password is single-use)
 ///   4. catalog import (categories, brands, products) only when the Products table is empty
+///   5. content import (guides, FAQs, testimonials; seed/content.json), each only when its table is empty
 /// </summary>
 public static class SeedCommand
 {
@@ -38,6 +39,10 @@ public static class SeedCommand
         var catalogPath = ArgValue(args, "--catalog") ?? Path.Combine(AppContext.BaseDirectory, "seed", "catalog.json");
         if (File.Exists(catalogPath)) await CatalogSeeder.ImportAsync(db, catalogPath, log);
         else log.LogInformation("No catalog file at {Path}; skipping catalog import", catalogPath);
+
+        var contentPath = ArgValue(args, "--content") ?? Path.Combine(AppContext.BaseDirectory, "seed", "content.json");
+        if (File.Exists(contentPath)) await ContentSeeder.ImportAsync(db, contentPath, log);
+        else log.LogInformation("No content file at {Path}; skipping content import", contentPath);
 
         log.LogInformation("Seed complete");
     }

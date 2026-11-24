@@ -104,6 +104,16 @@ public sealed class CatalogService(IAppDbContext db, IFileStorage files, ITurnst
         .ThenBy(s => double.TryParse(s, System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : double.MaxValue)
         .ThenBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
 
+    /// <summary>Cards for the given product ids, in the given order. Unpublished/deleted/inactive-category products are dropped.</summary>
+    public async Task<List<ProductCardDto>> CardsByIdsAsync(IReadOnlyList<int> ids, CancellationToken ct)
+    {
+        if (ids.Count == 0) return [];
+        var arr = ids.Distinct().ToArray();
+        var rows = await Rows(Visible().Where(p => arr.Contains(p.Id)), ct);
+        var order = arr.Select((id, i) => (id, i)).ToDictionary(x => x.id, x => x.i);
+        return await BuildCards(rows.OrderBy(r => order[r.Id]).ToList(), ct);
+    }
+
     // ---------------------------------------------------------------- featured
     public async Task<List<ProductCardDto>> FeaturedAsync(CancellationToken ct)
     {

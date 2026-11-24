@@ -6,9 +6,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GearDoctor.Application.Admin;
 
-public sealed class SettingsService(IAppDbContext db, IClock clock, IValidator<AdminSettingsDto> validator)
+public sealed class SettingsService(IAppDbContext db, IClock clock, IAuditLog audit, IValidator<AdminSettingsDto> validator)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+
+    private static bool JsonEquals(string a, string b)
+    {
+        try { return JsonElement.DeepEquals(JsonDocument.Parse(a).RootElement, JsonDocument.Parse(b).RootElement); }
+        catch (JsonException) { return a == b; }
+    }
 
     public async Task<Result<AdminSettingsDto>> GetAsync(CancellationToken ct = default)
     {
@@ -56,12 +62,27 @@ public sealed class SettingsService(IAppDbContext db, IClock clock, IValidator<A
         var keys = values.Keys.ToList();
         var existing = await db.Settings.Where(s => keys.Contains(s.Key)).ToDictionaryAsync(s => s.Key, ct);
         var now = clock.Now;
+        var changed = new List<string>();
         foreach (var (key, val) in values)
         {
             var json = JsonSerializer.Serialize(val, Json);
-            if (existing.TryGetValue(key, out var row)) { row.Value = json; row.UpdatedAt = now; }
-            else db.Settings.Add(new Setting { Key = key, Value = json, UpdatedAt = now });
+            if (existing.TryGetValue(key, out var row))
+            {
+                if (!JsonEquals(row.Value, json)) changed.Add(key);
+                row.Value = json; row.UpdatedAt = now;
+            }
+            else
+            {
+                if (json != "null") changed.Add(key);
+                db.Settings.Add(new Setting { Key = key, Value = json, UpdatedAt = now });
+            }
         }
+        // Keys only. Values are never logged; bank details are reduced to a fixed phrase.
+        var named = changed.Where(k => k != SettingKeys.BankDetails).ToList();
+        if (changed.Count > 0)
+            audit.Record("settings.update", "Settings", null,
+                (named.Count > 0 ? "Changed: " + string.Join(", ", named) : "") +
+                (changed.Contains(SettingKeys.BankDetails) ? (named.Count > 0 ? "; " : "") + "bank details changed" : ""));
         await db.SaveChangesAsync(ct);
         return await GetAsync(ct);
     }

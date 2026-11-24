@@ -26,6 +26,58 @@ namespace GearDoctor.Infrastructure.Persistence.Migrations
             modelBuilder.HasSequence("order_number_seq")
                 .StartsAt(1001L);
 
+            modelBuilder.Entity("GearDoctor.Domain.AuditEntry", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTimeOffset>("At")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Entity")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("EntityId")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("Ip")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("UserEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("UserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("character varying(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("At")
+                        .IsDescending();
+
+                    b.HasIndex("Entity", "EntityId");
+
+                    b.ToTable("AuditEntries");
+                });
+
             modelBuilder.Entity("GearDoctor.Domain.Brand", b =>
                 {
                     b.Property<int>("Id")
@@ -126,6 +178,114 @@ namespace GearDoctor.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("Certifications");
+                });
+
+            modelBuilder.Entity("GearDoctor.Domain.Faq", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("A")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<bool>("IsPublished")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Q")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsPublished", "SortOrder");
+
+                    b.ToTable("Faqs");
+                });
+
+            modelBuilder.Entity("GearDoctor.Domain.Guide", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(40000)
+                        .HasColumnType("character varying(40000)");
+
+                    b.Property<string>("CoverKey")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Excerpt")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<bool>("IsPublished")
+                        .HasColumnType("boolean");
+
+                    b.PrimitiveCollection<int[]>("RelatedProductIds")
+                        .IsRequired()
+                        .HasColumnType("integer[]");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Source")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("Video")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Slug")
+                        .IsUnique();
+
+                    b.HasIndex("IsPublished", "SortOrder");
+
+                    b.ToTable("Guides");
                 });
 
             modelBuilder.Entity("GearDoctor.Domain.Order", b =>
@@ -510,6 +670,47 @@ namespace GearDoctor.Infrastructure.Persistence.Migrations
                     b.HasKey("Key");
 
                     b.ToTable("Settings");
+                });
+
+            modelBuilder.Entity("GearDoctor.Domain.Testimonial", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Bike")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<bool>("IsPublished")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("Quote")
+                        .IsRequired()
+                        .HasMaxLength(600)
+                        .HasColumnType("character varying(600)");
+
+                    b.Property<int>("Rating")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsPublished", "SortOrder");
+
+                    b.ToTable("Testimonials", t =>
+                        {
+                            t.HasCheckConstraint("CK_Testimonial_Rating", "\"Rating\" BETWEEN 1 AND 5");
+                        });
                 });
 
             modelBuilder.Entity("GearDoctor.Infrastructure.Persistence.AppUser", b =>

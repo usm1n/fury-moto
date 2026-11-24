@@ -22,6 +22,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     {
         Environment.SetEnvironmentVariable("NEON_DATABASE_URL", ConnectionString);
         Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development");
+        Environment.SetEnvironmentVariable("SITE_URL", "https://shop.example.test");
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -30,6 +31,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         // Order flows need Turnstile to pass. Unless TEST_REAL_TURNSTILE=1, swap in a local stub that
         // accepts only StubTurnstileVerifier.PassingToken (no network). The real verifier is exercised
         // directly in Orders/TurnstileNetworkTests.cs.
+        // SEO pages fetch {SITE_URL}/product.html; tests answer from SeoStub instead of the network.
+        builder.ConfigureTestServices(s => s.AddHttpClient(GearDoctor.Api.Endpoints.SeoEndpoints.TemplateClient)
+            .ConfigurePrimaryHttpMessageHandler(() => new SeoStub.Handler()));
         if (Environment.GetEnvironmentVariable("TEST_REAL_TURNSTILE") != "1")
             builder.ConfigureTestServices(s =>
             {
@@ -57,7 +61,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     /// <summary>Wipes catalog + order data (identity/data-protection tables are kept).</summary>
     public Task ResetAsync() => WithDb(db => db.Database.ExecuteSqlRawAsync(
         "TRUNCATE TABLE \"OrderStatusEvents\", \"OrderItems\", \"Orders\", \"ProductCertification\", \"ProductImages\", " +
-        "\"ProductVariants\", \"Products\", \"Certifications\", \"Brands\", \"Categories\", \"Settings\" RESTART IDENTITY CASCADE; " +
+        "\"ProductVariants\", \"Products\", \"Certifications\", \"Brands\", \"Categories\", \"Settings\", " +
+        "\"Guides\", \"Faqs\", \"Testimonials\", \"AuditEntries\" RESTART IDENTITY CASCADE; " +
         "ALTER SEQUENCE order_number_seq RESTART WITH 1001;"));
 
     // ------------------------------------------------------------------ builders

@@ -54,7 +54,8 @@ public sealed class LocalDevFileStorage : IFileStorage
 
     public string GetPublicUrl(string key) =>
         string.IsNullOrEmpty(key) ? "" :
-        key.StartsWith("http", StringComparison.OrdinalIgnoreCase) || key.StartsWith('/') || key.StartsWith("assets/", StringComparison.Ordinal)
+        key.StartsWith("http", StringComparison.OrdinalIgnoreCase) || key.StartsWith('/')
             ? key
+            : key.StartsWith("assets/", StringComparison.Ordinal) ? "/" + key   // legacy static asset: root-relative
             : $"/api/dev-storage/{key}";
 }

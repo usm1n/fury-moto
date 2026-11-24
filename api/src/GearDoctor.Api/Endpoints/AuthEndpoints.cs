@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using GearDoctor.Api.Infrastructure;
+using GearDoctor.Application.Common;
 using GearDoctor.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
@@ -56,46 +57,63 @@ public static class AuthEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> Login(LoginRequest req, UserManager<AppUser> users, JwtSettings jwt, HttpContext http)
+    private static async Task<IResult> Login(LoginRequest req, UserManager<AppUser> users, JwtSettings jwt, HttpContext http, IAuditLog audit, IAppDbContext db)
     {
         http.Response.Headers.CacheControl = "no-store";
+        var tried = (req.Email ?? "").Trim();
+        if (tried.Length > 100) tried = tried[..100];
+
+        // Failed attempts are audited with the email that was tried (entity Auth, never a user id).
+        async Task<IResult> Fail(IResult result, string why)
+        {
+            audit.Record("auth.login-failed", "Auth", null, $"Failed sign-in for {tried}{why}", userId: "", userEmail: "");
+            await db.SaveChangesAsync();
+            return result;
+        }
+
         if (string.IsNullOrWhiteSpace(req.Email) || string.IsNullOrEmpty(req.Password) || req.Password.Length > 256)
-            return Invalid();
+            return await Fail(Invalid(), " (missing email or password)");
 
         var user = await users.FindByEmailAsync(req.Email.Trim());
         if (user is null)
         {
             // same work + same response as a wrong password (no account enumeration)
             users.PasswordHasher.HashPassword(new AppUser(), req.Password);
-            return Invalid();
+            return await Fail(Invalid(), "");
         }
-        if (await users.IsLockedOutAsync(user)) return Locked();
+        if (await users.IsLockedOutAsync(user)) return await Fail(Locked(), " (account locked)");
 
         if (!await users.CheckPasswordAsync(user, req.Password))
         {
             await users.AccessFailedAsync(user);
-            return await users.IsLockedOutAsync(user) ? Locked() : Invalid();
+            return await users.IsLockedOutAsync(user) ? await Fail(Locked(), " (account now locked)") : await Fail(Invalid(), "");
         }
         await users.ResetAccessFailedCountAsync(user);
 
         var roles = await users.GetRolesAsync(user);
-        if (!roles.Contains(Platform.AdminRole)) return Invalid();
+        if (!roles.Contains(Platform.AdminRole)) return await Fail(Invalid(), " (not an admin)");
 
         IssueSessionCookie(http, jwt, user, roles);
+        audit.Record("auth.login", "Auth", user.Id, "Signed in", userId: user.Id, userEmail: user.Email);
+        await db.SaveChangesAsync();
         return Results.Ok(new Me(user.Email!, [.. roles], user.MustChangePassword));
 
         static IResult Invalid() => Results.Problem(title: "Email or password is incorrect", statusCode: 401);
         static IResult Locked() => Results.Problem(title: "Too many failed attempts. Try again in 15 minutes.", statusCode: 423);
     }
 
-    private static async Task<IResult> Logout(HttpContext http, UserManager<AppUser> users)
+    private static async Task<IResult> Logout(HttpContext http, UserManager<AppUser> users, IAuditLog audit, IAppDbContext db)
     {
         // Revoke server-side too: rotating the security stamp invalidates this JWT (and any copy of it)
         // immediately, instead of leaving it valid until expiry. Single-admin store, so ending other
         // sessions as well is the safer behaviour.
         var auth = await http.AuthenticateAsync(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme);
         if (auth.Succeeded && await users.FindByIdAsync(auth.Principal!.FindFirstValue("sub") ?? "") is { } user)
+        {
             await users.UpdateSecurityStampAsync(user);
+            audit.Record("auth.logout", "Auth", user.Id, "Signed out", userId: user.Id, userEmail: user.Email);
+            await db.SaveChangesAsync();
+        }
         http.Response.Cookies.Delete(Platform.AuthCookie, new CookieOptions { Path = "/api", Secure = true, SameSite = SameSiteMode.Strict, HttpOnly = true });
         return Results.NoContent();
     }
@@ -110,7 +128,7 @@ public static class AuthEndpoints
     }
 
     private static async Task<IResult> ChangePassword(ChangePasswordRequest req, ClaimsPrincipal principal,
-        UserManager<AppUser> users, JwtSettings jwt, HttpContext http)
+        UserManager<AppUser> users, JwtSettings jwt, HttpContext http, IAuditLog audit, IAppDbContext db)
     {
         var user = await users.FindByIdAsync(principal.FindFirstValue("sub") ?? "");
         if (user is null) return Results.Problem(title: "Not signed in", statusCode: 401);
@@ -126,6 +144,8 @@ public static class AuthEndpoints
         }
         user.MustChangePassword = false;
         await users.UpdateAsync(user);                 // ChangePasswordAsync already rotated the security stamp
+        audit.Record("auth.password-change", "Auth", user.Id, "Password changed", userId: user.Id, userEmail: user.Email);
+        await db.SaveChangesAsync();
         IssueSessionCookie(http, jwt, user, await users.GetRolesAsync(user));   // fresh token with the new stamp
         return Results.NoContent();
     }

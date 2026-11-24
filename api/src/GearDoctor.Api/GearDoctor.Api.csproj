@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <None Include="..\GearDoctor.Infrastructure\Seed\catalog.json" Link="seed\catalog.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\GearDoctor.Infrastructure\Seed\content.json" Link="seed\content.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <PropertyGroup>

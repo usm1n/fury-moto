@@ -54,6 +54,7 @@ public static class DependencyInjection
             .PersistKeysToDbContext<AppDbContext>();
 
         services.AddSingleton<IClock, SystemClock>();
+        services.AddScoped<IAuditLog, AuditLog>();
 
         // Cloudflare R2 (S3-compatible). Optional in local dev: without R2_* vars uploads are disabled.
         services.Configure<R2Options>(o =>
