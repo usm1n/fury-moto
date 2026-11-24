@@ -18,3 +18,6 @@ api/**/TestResults/
 admin/node_modules/
 admin/dist/
 admin/.angular/
+
+# Claude Code agent worktrees
+.claude/worktrees/

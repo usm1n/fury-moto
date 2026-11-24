@@ -107,6 +107,10 @@ public static class Platform
             o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
             o.KnownIPNetworks.Clear();
             o.KnownProxies.Clear();
+            // Only the right-most hop is used. Vercel's edge overwrites X-Forwarded-For with the real client
+            // address, so a client-supplied value can't change the rate-limit key in production. Reached
+            // directly, the container would trust XFF; it must only ever be exposed through Vercel.
+            o.ForwardLimit = 1;
         });
         return s;
     }

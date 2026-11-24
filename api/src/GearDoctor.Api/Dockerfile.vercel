@@ -4,7 +4,7 @@
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
-COPY global.json Directory.Build.props GearDoctor.sln ./
+COPY global.json Directory.Build.props ./
 COPY src/GearDoctor.Domain/GearDoctor.Domain.csproj src/GearDoctor.Domain/
 COPY src/GearDoctor.Application/GearDoctor.Application.csproj src/GearDoctor.Application/
 COPY src/GearDoctor.Infrastructure/GearDoctor.Infrastructure.csproj src/GearDoctor.Infrastructure/

@@ -10,7 +10,8 @@ Read the status box first. Some of the deployment path has not been run yet.
 > - **Not verified (needs doing):** the Vercel multi-service setup (container API + static web + static admin under one domain). This is a **Beta** feature and the spike in `docs/backend/PLAN.md` §4.2 has **not been run**. The static-service config keys are not documented on the pages we read.
 > - **Not verified:** `ci.yml` has never run on GitHub. The EF migration bundle has never been run against Neon. The R2 CORS rule has not been tested in a browser.
 > - **Dashboard details** (button names, plan limits, prices) are written from the planning research in `docs/backend/PLAN.md` and general knowledge of the consoles. Check each one in the dashboard before you rely on it.
-> - **Not built yet:** the admin app (`admin/`). The `vercel.json` admin service points at a folder that does not exist yet, so a deploy will fail on that service until Phase 1 adds it.
+> - **Not verified on Vercel:** the multi-service `vercel.json` (container API + Angular admin + static storefront under one domain) uses beta features and has not been deployed yet. See step 13 for the fallback.
+> - **PrimeUI license:** the admin uses PrimeNG 22, which needs a free **Community License** key for a shop this size. Without one, every admin page shows an "Invalid PrimeUI License" notice. See step 6 (`PRIMEUI_LICENSE`).
 
 ---
 
@@ -104,7 +105,7 @@ Free tier, as listed in `PLAN.md` at the time of writing: 10 GB of storage and n
    - **Site key** (public) becomes `TURNSTILE_SITE_KEY`.
    - **Secret key** (private) becomes `TURNSTILE_SECRET`.
 
-**Important:** if `TURNSTILE_SECRET` is missing, the API quietly falls back to Cloudflare's public test secret, which accepts every token. That means no bot protection. Always set it in Vercel Production. It is in the table in step 7.
+**Important:** outside Development the API **refuses to start** if `TURNSTILE_SECRET` (or `JWT_SIGNING_KEY`) is missing. It never falls back to the always-pass test secret in production. Only local Development uses Cloudflare's test keys. The variable is in the table in step 6.
 
 ---
 
@@ -126,6 +127,7 @@ Full list with comments: `.env.example` in the repo root. This table says where 
 
 | Variable | Vercel Production | Vercel Preview | GitHub secret | Notes |
 |---|---|---|---|---|
+| `PRIMEUI_LICENSE` | yes (admin build) | yes (admin build) | yes, if CI builds the admin | Free PrimeUI Community key, embedded in the admin bundle at build time; not a server secret |
 | `NEON_DATABASE_URL` | yes, pooled | yes, a Neon branch (optional) | no | Runtime connection |
 | `NEON_DIRECT_URL` | **no** | no | yes | Migrations and seed only. The running app never reads it, so keep it out of Vercel. |
 | `R2_ACCOUNT_ID` | yes | yes | no | |
@@ -193,7 +195,7 @@ If the `migrate` job fails, read its log before doing anything else. Migrations 
 3. The account is flagged `MustChangePassword`, so the app must send you to a change-password screen. Choose a new password, then log in again.
 4. Then remove `ADMIN_INITIAL_PASSWORD` from GitHub secrets. The seed reads it only when no admin exists, so removing it is safe. Do not change the password through the seed; use the admin change-password screen.
 
-The change-password flow depends on the admin UI, which does not exist yet. Confirm the forced change works once the admin app ships.
+The admin asks for a new password on first sign-in (tested locally). It must be 12+ characters with upper case, lower case and a digit.
 
 Lockout: five wrong passwords lock the account for 15 minutes.
 
