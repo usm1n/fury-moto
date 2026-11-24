@@ -153,7 +153,9 @@ import { NextAction, STATUS_SEVERITY, ShortItem, nextActions, packingSlipText, p
                   </li>
                 }
               </ul>
-              <form class="noteform" (ngSubmit)="addNote()">
+              <!-- plain (submit): this form has no [formGroup]/NgForm, so (ngSubmit) would never fire and the
+                   browser would do a native submit (page reload, note lost) -->
+              <form class="noteform" (submit)="$event.preventDefault(); addNote()">
                 <label for="note" class="sub">Add a note</label>
                 <textarea pTextarea id="note" rows="2" maxlength="500" [formControl]="note" placeholder="Internal note (e.g. called customer, no answer)"></textarea>
                 @if (noteError(); as ne) { <small class="field-error">{{ ne }}</small> }
