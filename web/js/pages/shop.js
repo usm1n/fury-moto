@@ -166,7 +166,11 @@ export default async function mount(main) {
     els.sort.value = state.sort;
     renderChips();
     if (!loaded.length) {
-      renderTemplate(els.grid, `<div class="shop-empty"><h2>${esc(ui().noResultsTitle)}</h2><p class="muted">${esc(ui().noResultsText)}</p><button class="btn btn--primary" type="button" data-chip-clear>${esc(ui().filterClear)}</button></div>`);
+      // No filters and still nothing: the store itself is empty, so don't blame the filters.
+      const filtered = !!els.chips.querySelector("[data-chip-clear]");
+      renderTemplate(els.grid, filtered
+        ? `<div class="shop-empty"><h2>${esc(ui().noResultsTitle)}</h2><p class="muted">${esc(ui().noResultsText)}</p><button class="btn btn--primary" type="button" data-chip-clear>${esc(ui().filterClear)}</button></div>`
+        : `<div class="shop-empty"><h2>${esc(ui().shopEmptyTitle)}</h2><p class="muted">${esc(ui().shopEmptyText)}</p></div>`);
       els.grid.classList.add("is-empty");
     } else {
       renderTemplate(els.grid, cardsHtml(loaded));

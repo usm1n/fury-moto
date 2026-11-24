@@ -10,7 +10,7 @@ info:
     - Errors are RFC 9457 ProblemDetails (`application/problem+json`); validation
       errors add `errors: { field: [message] }`.
     - Lists return `{ items, page, pageSize, total }`. pageSize max 60.
-    - Public GETs: `Cache-Control: public, s-maxage=60, stale-while-revalidate=600`.
+    - Public GETs: `Cache-Control: public, no-cache` for browsers + `Vercel-CDN-Cache-Control: max-age=60, stale-while-revalidate=600` for the edge.
     - Admin endpoints: cookie `gd_auth` (JWT, HttpOnly, Secure, SameSite=Strict, Path=/api)
       + header `X-CSRF-Token` on every non-GET.
 servers:

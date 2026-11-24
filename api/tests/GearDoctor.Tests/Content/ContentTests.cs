@@ -40,7 +40,8 @@ public sealed class ContentTests(ApiFactory f) : IAsyncLifetime
 
         using var c = AdminHttp.NewClient(f);
         var res = await c.GetAsync("/api/content/guides");
-        Assert.Equal("public, s-maxage=60, stale-while-revalidate=600", res.Headers.CacheControl!.ToString());
+        Assert.Equal("public, no-cache", res.Headers.CacheControl!.ToString());
+        Assert.Equal("max-age=60, stale-while-revalidate=600", string.Join(",", res.Headers.GetValues("Vercel-CDN-Cache-Control")));
         var list = await AdminHttp.Body(res, HttpStatusCode.OK);
         Assert.Equal(new[] { "Second", "First" }, list.EnumerateArray().Select(x => x.GetProperty("title").GetString()));
         Assert.False(list[0].TryGetProperty("body", out _));

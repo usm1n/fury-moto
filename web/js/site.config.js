@@ -508,6 +508,8 @@ const config = {
     sortName: "Name A–Z",
     resultsFor: "Results for",
     noResultsTitle: "Nothing matches those filters.",
+    shopEmptyTitle: "New gear is on its way.",
+    shopEmptyText: "Nothing is listed right now. Message us on WhatsApp and we will tell you what is coming in.",
     noResultsText: "Try removing a filter or searching for something else.",
     quickView: "Quick view",
     viewDetails: "View full details",

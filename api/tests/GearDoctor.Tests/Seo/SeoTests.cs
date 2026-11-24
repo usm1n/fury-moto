@@ -38,7 +38,8 @@ public sealed class SeoTests(ApiFactory f) : IAsyncLifetime
 
         var res = await _c.GetAsync("/api/seo/product/agv-pista");
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
-        Assert.Equal("public, s-maxage=300, stale-while-revalidate=600", res.Headers.CacheControl!.ToString());
+        Assert.Equal("public, no-cache", res.Headers.CacheControl!.ToString());
+        Assert.Equal("max-age=300, stale-while-revalidate=600", string.Join(",", res.Headers.GetValues("Vercel-CDN-Cache-Control")));
         Assert.StartsWith("text/html", res.Content.Headers.ContentType!.ToString());
         var html = await res.Content.ReadAsStringAsync();
 
@@ -165,7 +166,8 @@ public sealed class SeoTests(ApiFactory f) : IAsyncLifetime
         var res = await _c.GetAsync("/api/seo/sitemap.xml");
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
         Assert.StartsWith("application/xml", res.Content.Headers.ContentType!.ToString());
-        Assert.Equal("public, s-maxage=300, stale-while-revalidate=600", res.Headers.CacheControl!.ToString());
+        Assert.Equal("public, no-cache", res.Headers.CacheControl!.ToString());
+        Assert.Equal("max-age=300, stale-while-revalidate=600", string.Join(",", res.Headers.GetValues("Vercel-CDN-Cache-Control")));
         var xml = await res.Content.ReadAsStringAsync();
         System.Xml.Linq.XDocument.Parse(xml);   // well-formed
         Assert.Contains("<loc>https://shop.example.test/</loc>", xml);

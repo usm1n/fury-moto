@@ -145,9 +145,18 @@ public static class Platform
 
     public static string ClientIp(HttpContext ctx) => ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
-    /// <summary>Public, CDN-cacheable GET (Vercel edge honours s-maxage).</summary>
-    public static void CachePublic(this HttpResponse res) =>
-        res.Headers.CacheControl = "public, s-maxage=60, stale-while-revalidate=600";
+    /// <summary>
+    /// Public, CDN-cacheable GET. Two audiences:
+    ///  - Browsers: <c>no-cache</c> = always revalidate, so the owner sees an admin edit on the next page
+    ///    load instead of a stale copy kept for minutes by the browser.
+    ///  - Vercel edge: <c>Vercel-CDN-Cache-Control</c> (read by Vercel and stripped before the browser) keeps
+    ///    the response for <paramref name="cdnSeconds"/> and serves stale while refreshing in the background.
+    /// </summary>
+    public static void CachePublic(this HttpResponse res, int cdnSeconds = 60)
+    {
+        res.Headers.CacheControl = "public, no-cache";
+        res.Headers["Vercel-CDN-Cache-Control"] = $"max-age={cdnSeconds}, stale-while-revalidate=600";
+    }
 
     /// <summary>Endpoint filter: validate the antiforgery token on state-changing admin requests.</summary>
     public static RouteGroupBuilder RequireCsrf(this RouteGroupBuilder g) => g.AddEndpointFilter(async (ctx, next) =>

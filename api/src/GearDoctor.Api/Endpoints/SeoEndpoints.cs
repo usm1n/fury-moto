@@ -1,3 +1,4 @@
+using GearDoctor.Api.Infrastructure;
 using System.Net;
 using System.Text;
 using System.Text.Encodings.Web;
@@ -19,7 +20,6 @@ namespace GearDoctor.Api.Endpoints;
 public static partial class SeoEndpoints
 {
     public const string TemplateClient = "seo-template";
-    private const string CacheControl = "public, s-maxage=300, stale-while-revalidate=600";
     private static readonly TimeSpan TemplateTtl = TimeSpan.FromMinutes(10);
     private static readonly string[] StaticPages = ["/", "/shop.html", "/gear-doctor.html", "/about.html", "/contact.html"];
 
@@ -62,7 +62,7 @@ public static partial class SeoEndpoints
         var p = await seo.ProductAsync(slug, ct);
         if (p is null)
         {
-            res.Headers.CacheControl = "public, s-maxage=60";
+            res.CachePublic(60);
             return Html(StatusCodes.Status404NotFound, NotFoundPage(store));
         }
 
@@ -83,7 +83,7 @@ public static partial class SeoEndpoints
             return Results.Redirect($"/product.html?slug={Uri.EscapeDataString(slug)}");   // 302: the client-rendered page still works
         }
 
-        res.Headers.CacheControl = CacheControl;
+        res.CachePublic(300);
         return Html(StatusCodes.Status200OK, Render(template, p, site, store));
     }
 
@@ -198,7 +198,7 @@ public static partial class SeoEndpoints
         foreach (var g in guides) Url($"{site}/guide.html?id={Uri.EscapeDataString(g.Slug)}", g.UpdatedAt);
         sb.Append("</urlset>\n");
 
-        res.Headers.CacheControl = CacheControl;
+        res.CachePublic(300);
         return Results.Content(sb.ToString(), "application/xml; charset=utf-8", Encoding.UTF8);
 
     }

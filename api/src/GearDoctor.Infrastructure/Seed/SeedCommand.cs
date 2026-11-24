@@ -10,14 +10,13 @@ using Microsoft.Extensions.Logging;
 namespace GearDoctor.Infrastructure.Seed;
 
 /// <summary>
-/// `dotnet GearDoctor.Api.dll seed [--catalog path/to/catalog.json]`
+/// `dotnet GearDoctor.Api.dll seed`
 /// Idempotent: safe to run on every deploy (CI runs it right after the migration bundle).
 ///   1. certifications (fixed list)
 ///   2. default settings (only keys that don't exist yet)
 ///   3. Admin role + admin user from ADMIN_EMAIL / ADMIN_INITIAL_PASSWORD (only if no admin exists;
 ///      MustChangePassword = true so the initial password is single-use)
-///   4. catalog import (categories, brands, products) only when the Products table is empty
-///   5. content import (guides, FAQs, testimonials; seed/content.json), each only when its table is empty
+/// The catalog and content start empty; they are created in the admin.
 /// </summary>
 public static class SeedCommand
 {
@@ -36,22 +35,12 @@ public static class SeedCommand
         await SeedSettingsAsync(db, log);
         await SeedAdminAsync(scope.ServiceProvider, config, log);
 
-        var catalogPath = ArgValue(args, "--catalog") ?? Path.Combine(AppContext.BaseDirectory, "seed", "catalog.json");
-        if (File.Exists(catalogPath)) await CatalogSeeder.ImportAsync(db, catalogPath, log);
-        else log.LogInformation("No catalog file at {Path}; skipping catalog import", catalogPath);
-
-        var contentPath = ArgValue(args, "--content") ?? Path.Combine(AppContext.BaseDirectory, "seed", "content.json");
-        if (File.Exists(contentPath)) await ContentSeeder.ImportAsync(db, contentPath, log);
-        else log.LogInformation("No content file at {Path}; skipping content import", contentPath);
+        // Catalog (categories, brands, products) and content (guides, FAQs, testimonials) are NOT seeded:
+        // the store starts empty and the owner adds everything in the admin.
 
         log.LogInformation("Seed complete");
     }
 
-    private static string? ArgValue(string[] args, string name)
-    {
-        var i = Array.IndexOf(args, name);
-        return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
-    }
 
     public static readonly (string Code, string Name, string Description)[] Certifications =
     [

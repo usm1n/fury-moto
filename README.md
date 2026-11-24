@@ -131,16 +131,12 @@ The cart re-checks prices and stock with the API whenever it's opened and before
 - `footer.legal`: legal business name
 - `about.intro`, `about.story` (3 paragraphs), `about.stats[2]` (track days)
 - `about.image`: currently a still from the hero video. Replace with a real portrait.
-- `testimonials`: **all 4 are invented**. Replace them with real customer quotes.
-- `faqs`: delivery time, COD coverage, exchange window, authenticity answer
-- **Products (in the database, edited in the admin):** **all 28 are placeholders** imported from the old config. Models, prices, specs and certifications are realistic but unverified, and the images are labelled placeholders. Replace them in the admin.
-- `guides`: 8 drafts. The 4 reel-based guides were written from the reel titles only. Umair should review them all, especially **DOT vs FIM**.
+- **Products, categories, brands, guides, FAQs and testimonials** start empty. Add them in the admin (see [ADMIN_GUIDE.md](docs/ADMIN_GUIDE.md)). Add categories and brands first, then products.
 - `instagramPosts`: 14 posts shown as official embeds (7 per account). Add `image` paths after downloading the media (see below).
 
 **Media:**
 - `assets/source/fury_moto_2026-05-21_1.jpg`, `_2.jpg`, `fury_moto_2026-03-23_1–3.jpg`: the studio and haze photos from the brief haven't been added yet.
 - Instagram media couldn't be downloaded automatically (the browser tool blocks Instagram's media links). The site shows the posts as official embeds for now. To use the files across the site (tiles, About, guide covers, reels), follow [`docs/INSTAGRAM_TODO.md`](docs/INSTAGRAM_TODO.md): export or save the media into `assets/instagram/<account>/`, then ask Claude to process it.
-- Product photos to replace `assets/img/products/*`.
 
 **SEO:** after setting `store.siteUrl`, run `API=https://<domain> node web/tools/sitemap.mjs` (rebuilds `sitemap.xml`, `robots.txt`, `manifest.webmanifest`) and make the `og:image` URL in each page's `<head>` absolute.
 
@@ -153,7 +149,7 @@ web/                     storefront (static): index/shop/product/cart/… .html,
 admin/                   Angular admin → dist/admin/browser, served at /admin
   src/app/api/           generated API client (npm run gen:api, from docs/backend/openapi.draft.yaml)
 api/                     .NET 10 solution: Domain / Application / Infrastructure / Api + tests
-tools/                   dev-server.mjs (one local origin), export-seed.mjs
+tools/                   dev-server.mjs (one local origin)
 docs/                    ADMIN_GUIDE, DEPLOY, backend/ (PLAN, CONTRACTS-API, OpenAPI), CONTRACTS, MEDIA, BUILD_LOG
 vercel.json              one Vercel project: /api → container, /admin → Angular, / → storefront
 .github/workflows/       ci.yml (build, test, migrate + seed on main), pages.yml (manual preview)

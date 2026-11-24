@@ -262,9 +262,8 @@ public sealed class CatalogTests(ApiFactory f) : IAsyncLifetime
         var res = await _http.GetAsync(url);
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
         var cc = res.Headers.CacheControl!.ToString();
-        Assert.Contains("public", cc);
-        Assert.Contains("s-maxage=60", cc);
-        Assert.Contains("stale-while-revalidate=600", cc);
+        Assert.Equal("public, no-cache", cc);          // browsers always revalidate
+        Assert.Equal("max-age=60, stale-while-revalidate=600", string.Join(",", res.Headers.GetValues("Vercel-CDN-Cache-Control")));   // the edge caches
     }
 
     [Fact]
@@ -272,6 +271,7 @@ public sealed class CatalogTests(ApiFactory f) : IAsyncLifetime
     {
         await f.AddProduct(new("Cached", _agv.Id, _helmets.Id));
         var res = await _http.GetAsync("/api/products/cached");
-        Assert.Contains("s-maxage=60", res.Headers.CacheControl!.ToString());
+        Assert.Equal("public, no-cache", res.Headers.CacheControl!.ToString());
+        Assert.Equal("max-age=60, stale-while-revalidate=600", string.Join(",", res.Headers.GetValues("Vercel-CDN-Cache-Control")));
     }
 }

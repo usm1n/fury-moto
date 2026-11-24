@@ -41,7 +41,9 @@ export default async function mount(main) {
   renderTemplate(h("categories"), Array.from({ length: 7 }, () => `<span class="cat-tile cat-tile--skeleton" aria-hidden="true"><span class="skeleton" style="position:absolute;inset:0"></span></span>`).join(""));
   const loadCategories = async () => {
     try {
-      renderList(h("categories"), await getCategories(), (c, i) => html`
+      const cats = await getCategories();
+      if (!cats.length) { h("categories").closest("section")?.setAttribute("hidden", ""); return; }   // empty store: no bare heading
+      renderList(h("categories"), cats, (c, i) => html`
         <a class="cat-tile" href="shop.html?cat=${c.id}" data-reveal data-reveal-delay="${(i % 4) * 0.06}"
            ${raw(c.videoSlot ? `data-video-slot="${esc(c.videoSlot)}" data-video-start="${esc(c.videoStart ?? 0)}"` : "")}>
           ${c.image ? raw(`<img class="cat-tile__img" src="${esc(c.image)}" alt="" loading="lazy" decoding="async">`) : ""}
