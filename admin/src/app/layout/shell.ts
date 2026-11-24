@@ -22,7 +22,7 @@ interface NavItem { path: string; label: string; icon: string; exact?: boolean; 
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <p-toast position="top-center" />
-    <p-confirmdialog />
+    <p-confirmdialog closeAriaLabel="Close" />
     <header class="topbar">
       <a routerLink="/" class="brand"><span class="brand__dot"></span>Gear Doctor <small>admin</small></a>
       <span class="spacer"></span>

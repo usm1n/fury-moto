@@ -230,7 +230,7 @@ Practical advice: before a risky release, create a named Neon branch as a snapsh
 
 ## 11a. Backups
 
-The database holds everything that matters: products, stock, orders, settings and the admin account. Product photos live in R2 and are referenced from the database.
+The database holds everything that matters: products, stock, orders, settings, guides, FAQs, testimonials, the activity (audit) log and the admin account. Product photos live in R2 and are referenced from the database.
 
 **What Neon gives you.** Neon keeps a history of every change and can restore to any moment inside the plan's restore window. That window is shorter on Free than on the paid plans, so check the current numbers on Neon's pricing page. A restore creates a **branch**, so production is not touched until you point `NEON_DATABASE_URL` at the restored branch.
 

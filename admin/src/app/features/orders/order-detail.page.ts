@@ -163,7 +163,7 @@ import { NextAction, STATUS_SEVERITY, ShortItem, nextActions, packingSlipText, p
           </div>
         </div>
 
-        <p-dialog [visible]="!!pending()" (visibleChange)="!$event && cancelAsk()" [modal]="true" [draggable]="false" [header]="pending()?.label ?? ''" [style]="{ width: '28rem', 'max-width': '94vw' }" [closable]="!busy()">
+        <p-dialog closeAriaLabel="Close" [visible]="!!pending()" (visibleChange)="!$event && cancelAsk()" [modal]="true" [draggable]="false" [header]="pending()?.label ?? ''" [style]="{ width: '28rem', 'max-width': '94vw' }" [closable]="!busy()">
           <p style="margin-top:0">
             @if (pending()?.status === 'Cancelled') { Cancel {{ o.orderNumber }}? @if (o.stockDeducted) { Reserved stock will be returned. } }
             @else { Change {{ o.orderNumber }} from {{ o.status }} to {{ pending()?.status }}? }

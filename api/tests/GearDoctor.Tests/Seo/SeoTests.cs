@@ -66,7 +66,7 @@ public sealed class SeoTests(ApiFactory f) : IAsyncLifetime
         Assert.True(desc.Length <= 200, desc.Length.ToString());
 
         // JSON-LD
-        var ld = Regex.Match(html, @"<script type=""application/ld\+json"">(.*?)</script>", RegexOptions.Singleline).Groups[1].Value;
+        var ld = Regex.Match(html, @"<script type=""application/ld\+json"" data-seo="""">(.*?)</script>", RegexOptions.Singleline).Groups[1].Value;
         Assert.DoesNotContain("<", ld);
         using var json = System.Text.Json.JsonDocument.Parse(ld);
         var root = json.RootElement;
@@ -81,6 +81,24 @@ public sealed class SeoTests(ApiFactory f) : IAsyncLifetime
         Assert.Equal("https://shop.example.test/products/agv-pista", offers.GetProperty("url").GetString());
         Assert.Contains("AGV-PISTA", root.GetProperty("sku").GetString());
         Assert.Single(Regex.Matches(html, "application/ld\\+json"));
+    }
+
+    [Fact]
+    public async Task Product_page_has_no_lockdown_csp_answers_head_and_marks_jsonld_for_the_client()
+    {
+        await f.AddProduct(new ProductSpec("Csp Helmet", _brand.Id, _cat.Id) { Slug = "csp-helmet" });
+        // Regression: the API-wide "default-src 'none'" CSP made /products/{slug} render blank.
+        var res = await _c.GetAsync("/api/seo/product/csp-helmet");
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        Assert.False(res.Headers.Contains("Content-Security-Policy"));
+        Assert.Contains("<script type=\"application/ld+json\" data-seo=\"\">", await res.Content.ReadAsStringAsync());
+        using var head = await _c.SendAsync(new HttpRequestMessage(HttpMethod.Head, "/api/seo/product/csp-helmet"));
+        Assert.Equal(HttpStatusCode.OK, head.StatusCode);
+        using var sitemapHead = await _c.SendAsync(new HttpRequestMessage(HttpMethod.Head, "/api/seo/sitemap.xml"));
+        Assert.Equal(HttpStatusCode.OK, sitemapHead.StatusCode);
+        // JSON endpoints keep the lock-down policy.
+        using var json = await _c.GetAsync("/api/health");
+        Assert.True(json.Headers.Contains("Content-Security-Policy"));
     }
 
     [Fact]

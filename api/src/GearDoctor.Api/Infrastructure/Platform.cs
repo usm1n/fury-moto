@@ -128,7 +128,11 @@ public static class Platform
             h["Referrer-Policy"] = "strict-origin-when-cross-origin";
             h["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
             h["Cross-Origin-Opener-Policy"] = "same-origin";
-            h["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'";
+            // JSON API responses get a lock-down CSP. /api/seo/* returns storefront HTML (served at
+            // /products/{slug}) that must load the site's own scripts, styles and CDN libs, so it gets
+            // the same (no) policy as the static storefront pages instead.
+            if (!ctx.Request.Path.StartsWithSegments("/api/seo"))
+                h["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'";
             if (ctx.Request.IsHttps || ctx.Request.Headers["X-Forwarded-Proto"] == "https")
                 h["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains";
             await next();

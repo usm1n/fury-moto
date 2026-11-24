@@ -39,8 +39,9 @@ public static partial class SeoEndpoints
     public static IEndpointRouteBuilder MapSeo(this IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/seo").WithTags("Seo").AllowAnonymous();
-        g.MapGet("/product/{slug}", Product);
-        g.MapGet("/sitemap.xml", Sitemap);
+        // GET + HEAD: crawlers and link-preview bots often probe with HEAD first.
+        g.MapMethods("/product/{slug}", ["GET", "HEAD"], Product);
+        g.MapMethods("/sitemap.xml", ["GET", "HEAD"], Sitemap);
         return app;
     }
 
@@ -106,7 +107,7 @@ public static partial class SeoEndpoints
         head.Append(MetaName("twitter:card", "summary_large_image"));
         head.Append(MetaProp("product:price:amount", p.Price.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         head.Append(MetaProp("product:price:currency", "PKR"));
-        head.Append("<script type=\"application/ld+json\">").Append(JsonLd(p, images, desc, url)).Append("</script>\n");
+        head.Append("<script type=\"application/ld+json\" data-seo=\"\">").Append(JsonLd(p, images, desc, url)).Append("</script>\n");
 
         var html = template;
         // Remove what we are about to set (title, canonical, <base>, our meta tags and any earlier JSON-LD) so nothing is duplicated.

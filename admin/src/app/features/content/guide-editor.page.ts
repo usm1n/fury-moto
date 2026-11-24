@@ -218,7 +218,7 @@ export class GuideEditorPage implements HasUnsavedChanges {
   protected readonly isNew = computed(() => !this.guide()?.id);
   protected readonly excerptLen = computed(() => (this.v().excerpt ?? '').length);
   protected readonly preview = computed(() => (this.tab() === 'preview' ? renderMarkdown(this.v().body ?? '') : ''));
-  protected readonly slugPreview = computed(() => `${location.origin}/guides/${this.v().slug || autoSlug(this.v().title ?? '') || '...'}`);
+  protected readonly slugPreview = computed(() => `${location.origin}/guide.html?id=${this.v().slug || autoSlug(this.v().title ?? '') || '...'}`);
 
   constructor() {
     effect(() => {
@@ -329,7 +329,12 @@ export class GuideEditorPage implements HasUnsavedChanges {
       return true;
     } catch (e) {
       const p = problemOf(e);
-      if (p.status === 409 && (p.type ?? '').includes('stale')) { this.stale.set(true); return false; }
+      if (p.status === 409 && (p.type ?? '').includes('stale')) {
+        this.stale.set(true);
+        this.toast.add({ severity: 'warn', summary: 'Changed elsewhere', detail: 'Someone saved this guide since you opened it. Reload to get the latest version.', life: 6000 });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return false;
+      }
       this.serverProblem.set(p);
       if (p.errors && Object.keys(p.errors).length) {
         this.form.markAllAsTouched();

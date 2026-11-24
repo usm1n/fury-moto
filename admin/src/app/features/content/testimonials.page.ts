@@ -82,7 +82,7 @@ import { moveItem } from './content-helpers';
       </div>
     }
 
-    <p-dialog [header]="editing() ? 'Edit testimonial' : 'New testimonial'" [visible]="dialogOpen()" (visibleChange)="dialogOpen.set($event)" [modal]="true"
+    <p-dialog closeAriaLabel="Close" [header]="editing() ? 'Edit testimonial' : 'New testimonial'" [visible]="dialogOpen()" (visibleChange)="dialogOpen.set($event)" [modal]="true"
       [style]="{ width: 'min(36rem, 94vw)' }" [draggable]="false" [closable]="!saving()" appendTo="body">
       <form [formGroup]="form" (ngSubmit)="save()" novalidate>
         <div class="field"><label for="t-name">Name</label>
