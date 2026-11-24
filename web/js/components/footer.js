@@ -1,5 +1,6 @@
 import { config, waLink } from "../core/config.js";
-import { html, raw, renderTemplate } from "../core/render.js";
+import { html, raw, esc, renderTemplate } from "../core/render.js";
+import { isCategoryMarker, categoryPlaceholder, fillCategoryLinks } from "./nav-categories.js";
 import { getSettings, settingsNow } from "../data/settings.js";
 
 const svg = (d) => raw(`<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${d}</svg>`);
@@ -44,7 +45,9 @@ export default function mount(el) {
       ${body}
     </details>`;
 
-  const linkCols = cols.map((c, i) => column(c.title, html`<ul class="footer__list">${c.links.map((l) => html`<li><a href="${l.href}">${l.label}</a></li>`)}</ul>`, i));
+  const linkCols = cols.map((c, i) => column(c.title, html`<ul class="footer__list">${c.links.map((l) => isCategoryMarker(l)
+    ? raw(categoryPlaceholder(l))
+    : html`<li><a href="${l.href}">${l.label}</a></li>`)}</ul>`, i));
 
   renderTemplate(el, html`
     <footer class="footer" data-scene="footer">
@@ -65,6 +68,9 @@ export default function mount(el) {
         </div>
       </div>
     </footer>`);
+
+  // category links from the admin (see nav-categories.js)
+  fillCategoryLinks(el, (c) => `<li><a href="shop.html?cat=${encodeURIComponent(c.id)}">${esc(c.title)}</a></li>`);
 
   getSettings().then((st) => {
     const list = el.querySelector("[data-footer-contact]");

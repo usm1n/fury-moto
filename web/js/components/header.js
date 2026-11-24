@@ -3,11 +3,12 @@
  * Mounts the search overlay once. Emits "cart:open"; listens to "cart:change".
  */
 import { config, waLink } from "../core/config.js";
-import { html, raw, renderTemplate } from "../core/render.js";
+import { html, raw, esc, renderTemplate } from "../core/render.js";
 import { on, emit } from "../core/bus.js";
 import cart from "../data/cart.js";
 import { getSettings } from "../data/settings.js";
 import mountSearch, { lockScroll, unlockScroll, trapFocus, icons } from "./search.js";
+import { isCategoryMarker, categoryPlaceholder, fillCategoryLinks } from "./nav-categories.js";
 
 const ui = config.ui || {};
 
@@ -41,13 +42,16 @@ function activeHref(links) {
 
 export default function mount(el) {
   if (!el) return;
-  const nav = config.nav || [];
+  const navConfig = config.nav || [];
+  const nav = navConfig.filter((l) => !isCategoryMarker(l));   // fixed links (category links arrive from the API)
   const name = config.store?.shortName || config.store?.name || "";
   const active = activeHref(nav);
   const ig = config.socials?.instagram || [];
   const yt = config.socials?.youtube;
 
-  const navLinks = (cls) => nav.map((l) => html`<li><a class="${cls}" href="${l.href}"${l.href === active ? raw(' aria-current="page"') : ""}>${l.label}</a></li>`);
+  const navLinks = (cls) => navConfig.map((l) => isCategoryMarker(l)
+    ? raw(categoryPlaceholder(l, cls))
+    : html`<li><a class="${cls}" href="${l.href}"${l.href === active ? raw(' aria-current="page"') : ""}>${l.label}</a></li>`);
 
   renderTemplate(el, html`
     <header class="site-header" data-header>
@@ -63,7 +67,9 @@ export default function mount(el) {
 
     <div class="menu" id="site-menu" role="dialog" aria-modal="true" aria-label="${ui.menu}" inert>
       <div class="menu__inner">
-        <ul class="menu__links">${nav.map((l, i) => html`<li style="--i:${i}"><a class="menu__link" href="${l.href}"${l.href === active ? raw(' aria-current="page"') : ""}>${l.label}</a></li>`)}</ul>
+        <ul class="menu__links">${navConfig.map((l, i) => isCategoryMarker(l)
+          ? raw(categoryPlaceholder(l, "menu__link"))
+          : html`<li style="--i:${i}"><a class="menu__link" href="${l.href}"${l.href === active ? raw(' aria-current="page"') : ""}>${l.label}</a></li>`)}</ul>
         <div class="menu__foot">
           <a class="btn btn--primary btn--block" data-wa href="${waLink()}" target="_blank" rel="noopener">${raw(ICON.whatsapp)}${ui.menuWhatsapp}</a>
           <p class="eyebrow menu__follow">${ui.menuFollow}</p>
@@ -84,6 +90,19 @@ export default function mount(el) {
       <button class="bottom-bar__item" type="button" data-cart-open aria-label="${ui.cart}"><span class="bottom-bar__icon">${raw(ICON.bag)}${raw(badge())}</span><span>${ui.cart}</span></button>
     </nav>
   `);
+
+  // Category links from the admin: fill the placeholders, then re-pick the active link (a category
+  // page like shop.html?cat=suits should highlight its own link rather than "Shop").
+  fillCategoryLinks(el, (c, cls, i) =>
+    `<li${cls === "menu__link" ? ` style="--i:${i + 1}"` : ""}><a class="${esc(cls)}" href="shop.html?cat=${encodeURIComponent(c.id)}">${esc(c.title)}</a></li>`)
+    .then((added) => {
+      if (!added.length) return;
+      const now = activeHref([...nav, ...added]);
+      el.querySelectorAll(".site-header__link, .menu__link").forEach((a) => {
+        if (a.getAttribute("href") === now) a.setAttribute("aria-current", "page");
+        else a.removeAttribute("aria-current");
+      });
+    });
 
   mountSearch();
   // WhatsApp number comes from the API settings (config.store is the fallback until/unless they load)

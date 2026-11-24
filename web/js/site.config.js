@@ -193,10 +193,11 @@ const config = {
   /* --------------------------------------------------------------------------
    * NAVIGATION & FOOTER
    * ------------------------------------------------------------------------ */
+  // `{ categories: N }` = the first N active categories from the admin (in the admin's order),
+  // filled in when the API answers. Renamed / hidden / new categories update the menu by themselves.
   nav: [
     { label: "Shop", href: "shop.html" },
-    { label: "Helmets", href: "shop.html?cat=helmets" },
-    { label: "Suits", href: "shop.html?cat=race-suits" },
+    { categories: 2 },
     { label: "Gear Doctor", href: "gear-doctor.html" },
     { label: "About", href: "about.html" },
     { label: "Contact", href: "contact.html" },
@@ -204,16 +205,13 @@ const config = {
   footer: {
     blurb: "Premium riding gear, explained simply by a rider who uses it. Ride. Learn. Repeat.",
     columns: [
+      // `{ categories: N }` here too: up to N categories from the admin, after the fixed links.
       { title: "Shop", links: [
         { label: "All gear", href: "shop.html" },
-        { label: "Helmets", href: "shop.html?cat=helmets" },
-        { label: "Race suits", href: "shop.html?cat=race-suits" },
-        { label: "Gloves", href: "shop.html?cat=gloves" },
+        { categories: 6 },
       ]},
       { title: "Gear Doctor", links: [
         { label: "All guides", href: "gear-doctor.html" },
-        { label: "DOT vs FIM", href: "guide.html?id=dot-vs-fim" },
-        { label: "Suit fit", href: "guide.html?id=race-suit-fit" },
       ]},
       { title: "Store", links: [
         { label: "About Umair", href: "about.html" },
