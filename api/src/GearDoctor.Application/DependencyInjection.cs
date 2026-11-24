@@ -17,6 +17,10 @@ public static class DependencyInjection
         services.AddScoped<Admin.AdminOrderService>();
         services.AddScoped<Admin.SettingsService>();
         services.AddScoped<Admin.DashboardService>();
+        services.AddScoped<Admin.AuditService>();
+        services.AddScoped<Content.ContentService>();
+        services.AddScoped<Content.AdminContentService>();
+        services.AddScoped<Seo.SeoService>();
         return services;
     }
 }

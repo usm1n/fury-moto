@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace GearDoctor.Application.Admin;
 
 /// <summary>Admin products, variants grid and stock adjustments.</summary>
-public sealed partial class AdminProductService(IAppDbContext db, IFileStorage files, IClock clock,
+public sealed partial class AdminProductService(IAppDbContext db, IFileStorage files, IClock clock, IAuditLog audit,
     IValidator<ProductUpsert> productVal, IValidator<VariantUpsert> variantVal, IValidator<StockAdjust> stockVal)
 {
     [GeneratedRegex("[^A-Z0-9-]+")] private static partial Regex NonSku();
@@ -66,6 +66,9 @@ public sealed partial class AdminProductService(IAppDbContext db, IFileStorage f
         Apply(p, req, certs);
         db.Products.Add(p);
         await db.SaveChangesAsync(ct);
+        // the id only exists after the first save, so the entry needs a second (tiny) save
+        audit.Record("product.create", "Product", p.Id.ToString(), $"Created \"{p.Title}\" as draft, price {AuditDiff.Money(p.Price)}");
+        await db.SaveChangesAsync(ct);
         return (await LoadDtoAsync(p.Id, ct))!;
     }
 
@@ -80,11 +83,25 @@ public sealed partial class AdminProductService(IAppDbContext db, IFileStorage f
 
         var certIds = req.CertificationIds ?? [];
         var certs = await db.Certifications.Where(c => certIds.Contains(c.Id)).ToListAsync(ct);
+        var old = (p.Title, p.Slug, p.BrandId, p.CategoryId, p.ShortDescription, p.Description, p.GearDoctorNote,
+            Specs: string.Join("|", p.Specs.Select(s => s.Label + "=" + s.Value)), p.Price, p.CompareAtPrice,
+            Badges: string.Join(",", p.Badges), Certs: string.Join(",", p.Certifications.Select(c => c.Id).Order()), p.IsFeatured);
         p.Title = req.Title.Trim();
         if (!string.IsNullOrWhiteSpace(req.Slug) && req.Slug.Trim() != p.Slug)
             p.Slug = await UniqueProductSlugAsync(req.Slug, req.Title, id, ct);
         Apply(p, req, certs);
         p.UpdatedAt = clock.Now;
+        var diff = new AuditDiff()
+            .Price("price", old.Price, p.Price).Price("compare-at price", old.CompareAtPrice, p.CompareAtPrice)
+            .Text("title", old.Title, p.Title).Text("slug", old.Slug, p.Slug)
+            .Changed("brand", old.BrandId != p.BrandId).Changed("category", old.CategoryId != p.CategoryId)
+            .Changed("short description", old.ShortDescription != p.ShortDescription).Changed("description", old.Description != p.Description)
+            .Changed("Gear Doctor note", old.GearDoctorNote != p.GearDoctorNote)
+            .Changed("specs", old.Specs != string.Join("|", p.Specs.Select(s => s.Label + "=" + s.Value)))
+            .Text("badges", old.Badges, string.Join(",", p.Badges))
+            .Changed("certifications", old.Certs != string.Join(",", p.Certifications.Select(c => c.Id).Order()))
+            .Flag("featured", old.IsFeatured, p.IsFeatured);
+        audit.Record("product.update", "Product", id.ToString(), diff.Any ? diff.ToString() : "Saved with no field changes");
         ((DbContext)db).Entry(p).Property(x => x.Version).OriginalValue = version;
         try { await db.SaveChangesAsync(ct); }
         catch (DbUpdateConcurrencyException) { return AdminValidation.Stale("Product"); }
@@ -137,6 +154,7 @@ public sealed partial class AdminProductService(IAppDbContext db, IFileStorage f
         var p = await db.Products.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (p is null) return Error.NotFound("Product");
         p.DeletedAt = p.UpdatedAt = clock.Now;
+        audit.Record("product.delete", "Product", id.ToString(), $"Deleted \"{p.Title}\"");
         await db.SaveChangesAsync(ct);
         return Result.Ok();
     }
@@ -149,6 +167,7 @@ public sealed partial class AdminProductService(IAppDbContext db, IFileStorage f
         if (!await db.ProductImages.AnyAsync(i => i.ProductId == id, ct)) errors["images"] = ["Add at least one image before publishing."];
         if (!await db.ProductVariants.AnyAsync(v => v.ProductId == id && v.IsActive, ct)) errors["variants"] = ["Add at least one active variant before publishing."];
         if (errors.Count > 0) return Error.Validation(errors);
+        audit.Record("product.publish", "Product", id.ToString(), $"\"{p.Title}\": status {p.Status} → {ProductStatus.Published}");
         p.Status = ProductStatus.Published;
         p.UpdatedAt = clock.Now;
         await db.SaveChangesAsync(ct);
@@ -159,6 +178,7 @@ public sealed partial class AdminProductService(IAppDbContext db, IFileStorage f
     {
         var p = await db.Products.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (p is null) return Error.NotFound("Product");
+        audit.Record("product.unpublish", "Product", id.ToString(), $"\"{p.Title}\": status {p.Status} → {ProductStatus.Draft}");
         p.Status = ProductStatus.Draft;
         p.UpdatedAt = clock.Now;
         await db.SaveChangesAsync(ct);
@@ -170,6 +190,7 @@ public sealed partial class AdminProductService(IAppDbContext db, IFileStorage f
         if (req.Ids is null) return Error.Validation("ids", "ids is required.");
         var rows = await db.Products.Where(x => req.Ids.Contains(x.Id)).ToListAsync(ct);
         for (var i = 0; i < req.Ids.Count; i++) { var r = rows.FirstOrDefault(x => x.Id == req.Ids[i]); if (r is not null) r.SortOrder = i; }
+        audit.Record("product.reorder", "Product", null, $"Reordered {rows.Count} products");
         await db.SaveChangesAsync(ct);
         return Result.Ok();
     }
@@ -200,6 +221,8 @@ public sealed partial class AdminProductService(IAppDbContext db, IFileStorage f
             });
         db.Products.Add(copy);
         await db.SaveChangesAsync(ct);
+        audit.Record("product.duplicate", "Product", copy.Id.ToString(), $"Duplicated #{src.Id} \"{src.Title}\" as \"{copy.Title}\"");
+        await db.SaveChangesAsync(ct);
         return (await LoadDtoAsync(copy.Id, ct))!;
     }
 
@@ -210,6 +233,7 @@ public sealed partial class AdminProductService(IAppDbContext db, IFileStorage f
         var p = await db.Products.Include(x => x.Brand).Include(x => x.Variants).FirstOrDefaultAsync(x => x.Id == productId, ct);
         if (p is null) return Error.NotFound("Product");
 
+        var snap = p.Variants.ToDictionary(v => v.Id, v => (v.Size, v.Color, v.Stock, v.IsActive, v.PriceOverride));
         var errors = new Dictionary<string, string[]>();
         for (var i = 0; i < rows.Count; i++)
             if (await AdminValidation.CheckAsync(variantVal, rows[i], ct, $"[{i}].") is { Errors: { } e })
@@ -276,6 +300,20 @@ public sealed partial class AdminProductService(IAppDbContext db, IFileStorage f
         foreach (var v in p.Variants.Where(v => !claimed.Contains(v))) v.IsActive = false;
         foreach (var v in created) p.Variants.Add(v);
 
+        var changes = new List<string>();
+        foreach (var (vid, o) in snap)
+        {
+            var v = existing[vid];
+            var name = $"{v.Size}/{v.Color}";
+            if (o.Stock != v.Stock) changes.Add($"{name} {o.Stock} → {v.Stock}");
+            if (o.PriceOverride != v.PriceOverride) changes.Add($"{name} price override {AuditDiff.Money(o.PriceOverride)} → {AuditDiff.Money(v.PriceOverride)}");
+            if (o.IsActive && !v.IsActive) changes.Add($"{name} removed");
+            else if (!o.IsActive && v.IsActive) changes.Add($"{name} restored");
+        }
+        changes.AddRange(created.Select(v => $"{v.Size}/{v.Color} added (stock {v.Stock})"));
+        if (changes.Count > 0)
+            audit.Record("variant.update", "Variant", productId.ToString(), $"\"{p.Title}\" variants: " + string.Join("; ", changes));
+
         p.UpdatedAt = clock.Now;
         try { await db.SaveChangesAsync(ct); }
         catch (DbUpdateConcurrencyException) { return AdminValidation.Stale("Variant"); }
@@ -310,7 +348,9 @@ public sealed partial class AdminProductService(IAppDbContext db, IFileStorage f
     public async Task<Result<VariantDto>> AdjustStockAsync(int variantId, StockAdjust req, CancellationToken ct)
     {
         if (await AdminValidation.CheckAsync(stockVal, req, ct) is { } bad) return bad;
-        if (!await db.ProductVariants.AnyAsync(v => v.Id == variantId, ct)) return Error.NotFound("Variant");
+        var info = await db.ProductVariants.AsNoTracking().Where(v => v.Id == variantId)
+            .Select(v => new { v.Stock, v.Size, v.Color, v.ProductId, ProductTitle = v.Product.Title }).FirstOrDefaultAsync(ct);
+        if (info is null) return Error.NotFound("Variant");
         var delta = req.Delta;
         var n = await db.Database.ExecuteSqlInterpolatedAsync(
             $"UPDATE \"ProductVariants\" SET \"Stock\" = \"Stock\" + {delta} WHERE \"Id\" = {variantId} AND \"Stock\" + {delta} >= 0", ct);
@@ -318,6 +358,10 @@ public sealed partial class AdminProductService(IAppDbContext db, IFileStorage f
         var v = await db.ProductVariants.AsNoTracking().FirstAsync(x => x.Id == variantId, ct);
         var now = clock.Now;
         await db.Products.Where(x => x.Id == v.ProductId).ExecuteUpdateAsync(s => s.SetProperty(x => x.UpdatedAt, now), ct);
+        var reason = string.IsNullOrWhiteSpace(req.Reason) ? "none given" : req.Reason.Trim();
+        audit.Record("variant.stock", "Variant", variantId.ToString(),
+            $"\"{info.ProductTitle}\" {info.Size}/{info.Color}: stock {info.Stock} → {v.Stock} ({(delta > 0 ? "+" : "")}{delta}). Reason: {reason}");
+        await db.SaveChangesAsync(ct);   // only the audit entry is pending (the stock change was atomic SQL)
         return ToDto(v);
     }
 

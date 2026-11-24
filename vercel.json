@@ -21,6 +21,8 @@
   },
   "rewrites": [
     { "source": "/api/(.*)", "destination": { "service": "api" } },
+    { "source": "/products/:slug", "destination": { "service": "api", "path": "/api/seo/product/:slug" } },
+    { "source": "/sitemap.xml", "destination": { "service": "api", "path": "/api/seo/sitemap.xml" } },
     { "source": "/admin", "destination": { "service": "admin" } },
     { "source": "/admin/(.*)", "destination": { "service": "admin" } },
     { "source": "/(.*)", "destination": { "service": "web" } }

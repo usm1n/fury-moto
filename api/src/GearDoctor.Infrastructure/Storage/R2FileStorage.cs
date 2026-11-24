@@ -93,7 +93,8 @@ public sealed class R2FileStorage(IAmazonS3 s3, IOptions<R2Options> options) : I
 
     public string GetPublicUrl(string key) =>
         string.IsNullOrEmpty(key) ? "" :
-        key.StartsWith("http", StringComparison.OrdinalIgnoreCase) || key.StartsWith('/') || key.StartsWith("assets/", StringComparison.Ordinal)
-            ? key                                    // legacy/static path (seeded placeholders)
+        key.StartsWith("http", StringComparison.OrdinalIgnoreCase) || key.StartsWith('/')
+            ? key
+            : key.StartsWith("assets/", StringComparison.Ordinal) ? "/" + key   // legacy static asset: root-relative
             : $"{_o.PublicBaseUrl}/{key}";
 }

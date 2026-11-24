@@ -44,15 +44,17 @@ public static class AdminImageEndpoints
     {
         var errors = new Dictionary<string, string[]>();
         var kind = req.Kind?.ToLowerInvariant();
-        if (kind is not ("main" or "thumb")) errors["kind"] = ["kind must be 'main' or 'thumb'."];
+        if (kind is not ("main" or "thumb" or "guide")) errors["kind"] = ["kind must be 'main', 'thumb' or 'guide'."];
         if (req.ContentType is not null && req.ContentType != WebP) errors["contentType"] = ["Only image/webp uploads are accepted (the admin converts photos before upload)."];
         var max = kind == "thumb" ? MaxThumbBytes : MaxMainBytes;
         if (req.Bytes is { } b && (b <= 0 || b > max)) errors["bytes"] = [$"File must be between 1 byte and {max / 1024} KB."];
         if (errors.Count > 0) return Error.Validation(errors).ToProblem();
 
-        if (!await db.Products.AnyAsync(p => p.Id == req.ProductId, ct)) return Error.NotFound("Product").ToProblem();
+        if (kind != "guide" && !await db.Products.AnyAsync(p => p.Id == req.ProductId, ct)) return Error.NotFound("Product").ToProblem();
 
-        var key = $"products/{req.ProductId}/{Guid.NewGuid():N}{(kind == "thumb" ? "-480" : "")}.webp";
+        // guide covers are not tied to a product: guides/{guid}.webp (main-size image)
+        var key = kind == "guide" ? $"guides/{Guid.NewGuid():N}.webp"
+            : $"products/{req.ProductId}/{Guid.NewGuid():N}{(kind == "thumb" ? "-480" : "")}.webp";
         try
         {
             var p = files.GetPresignedUpload(key, WebP, max, TimeSpan.FromMinutes(10));
@@ -64,7 +66,7 @@ public static class AdminImageEndpoints
         }
     }
 
-    private static async Task<IResult> Register(int id, RegisterImageRequest req, IAppDbContext db, IFileStorage files, CancellationToken ct)
+    private static async Task<IResult> Register(int id, RegisterImageRequest req, IAppDbContext db, IFileStorage files, IAuditLog audit, CancellationToken ct)
     {
         var prefix = $"products/{id}/";
         var errors = new Dictionary<string, string[]>();
@@ -103,37 +105,42 @@ public static class AdminImageEndpoints
         db.ProductImages.Add(image);
         await TouchProduct(db, id, ct);
         await db.SaveChangesAsync(ct);
+        audit.Record("image.add", "Image", image.Id.ToString(), $"Product #{id}: image #{image.Id} added (position {image.SortOrder + 1})");
+        await db.SaveChangesAsync(ct);   // the image id only exists after the first save
         return Results.Created($"/api/admin/images/{image.Id}", ToDto(image, files));
     }
 
-    private static async Task<IResult> Reorder(int id, ReorderRequest req, IAppDbContext db, CancellationToken ct)
+    private static async Task<IResult> Reorder(int id, ReorderRequest req, IAppDbContext db, IAuditLog audit, CancellationToken ct)
     {
         var images = await db.ProductImages.Where(i => i.ProductId == id).ToListAsync(ct);
         if (req.Ids is null || req.Ids.Length != images.Count || !req.Ids.ToHashSet().SetEquals(images.Select(i => i.Id)))
             return Error.Validation("ids", "Send every image id of this product exactly once.").ToProblem();
         var order = req.Ids.Select((imgId, idx) => (imgId, idx)).ToDictionary(x => x.imgId, x => x.idx);
         images.ForEach(i => i.SortOrder = order[i.Id]);
+        audit.Record("image.reorder", "Image", id.ToString(), $"Product #{id}: reordered {images.Count} images");
         await TouchProduct(db, id, ct);
         await db.SaveChangesAsync(ct);
         return Results.NoContent();
     }
 
-    private static async Task<IResult> Patch(int imageId, PatchImageRequest req, IAppDbContext db, IFileStorage files, CancellationToken ct)
+    private static async Task<IResult> Patch(int imageId, PatchImageRequest req, IAppDbContext db, IFileStorage files, IAuditLog audit, CancellationToken ct)
     {
         if (req.Alt is { Length: > 200 }) return Error.Validation("alt", "Alt text is at most 200 characters.").ToProblem();
         var img = await db.ProductImages.FirstOrDefaultAsync(i => i.Id == imageId, ct);
         if (img is null) return Error.NotFound("Image").ToProblem();
         img.Alt = req.Alt?.Trim() ?? "";
+        audit.Record("image.update", "Image", img.Id.ToString(), $"Product #{img.ProductId}: image #{img.Id} alt text changed");
         await TouchProduct(db, img.ProductId, ct);
         await db.SaveChangesAsync(ct);
         return Results.Ok(ToDto(img, files));
     }
 
-    private static async Task<IResult> Delete(int imageId, IAppDbContext db, IFileStorage files, ILoggerFactory lf, CancellationToken ct)
+    private static async Task<IResult> Delete(int imageId, IAppDbContext db, IFileStorage files, IAuditLog audit, ILoggerFactory lf, CancellationToken ct)
     {
         var img = await db.ProductImages.FirstOrDefaultAsync(i => i.Id == imageId, ct);
         if (img is null) return Error.NotFound("Image").ToProblem();
         db.ProductImages.Remove(img);
+        audit.Record("image.delete", "Image", img.Id.ToString(), $"Product #{img.ProductId}: image #{img.Id} deleted");
         await TouchProduct(db, img.ProductId, ct);
         await db.SaveChangesAsync(ct);
         // Storage cleanup after the row is gone; a failure here only leaves an orphan object.

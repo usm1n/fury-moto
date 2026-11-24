@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace GearDoctor.Application.Admin;
 
 /// <summary>Admin CRUD + ordering for categories and brands.</summary>
-public sealed class AdminCatalogService(IAppDbContext db, IFileStorage files,
+public sealed class AdminCatalogService(IAppDbContext db, IFileStorage files, IAuditLog audit,
     IValidator<CategoryUpsert> catVal, IValidator<BrandUpsert> brandVal)
 {
     private string? Url(string? key) => key is null ? null : files.GetPublicUrl(key);
@@ -29,6 +29,8 @@ public sealed class AdminCatalogService(IAppDbContext db, IFileStorage files,
         var c = new Category { Name = req.Name.Trim(), Slug = slug, ImageKey = Blank(req.ImageKey), IsActive = req.IsActive ?? true, SortOrder = next + 1 };
         db.Categories.Add(c);
         await db.SaveChangesAsync(ct);
+        audit.Record("category.create", "Category", c.Id.ToString(), $"Created category \"{c.Name}\"");
+        await db.SaveChangesAsync(ct);
         return new CategoryDto(c.Id, c.Name, c.Slug, Url(c.ImageKey), c.SortOrder, c.IsActive, 0);
     }
 
@@ -37,11 +39,15 @@ public sealed class AdminCatalogService(IAppDbContext db, IFileStorage files,
         if (await AdminValidation.CheckAsync(catVal, req, ct) is { } bad) return bad;
         var c = await db.Categories.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (c is null) return Error.NotFound("Category");
+        var (oName, oSlug, oImg, oActive) = (c.Name, c.Slug, c.ImageKey, c.IsActive);
         c.Name = req.Name.Trim();
         if (!string.IsNullOrWhiteSpace(req.Slug))
             c.Slug = Unique(await db.Categories.Where(x => x.Id != id).Select(x => x.Slug).ToListAsync(ct), req.Slug, req.Name);
         if (req.ImageKey is not null) c.ImageKey = Blank(req.ImageKey);   // null = leave unchanged, "" = clear
         c.IsActive = req.IsActive ?? true;
+        var diff = new AuditDiff().Text("name", oName, c.Name).Text("slug", oSlug, c.Slug)
+            .Changed("image", oImg != c.ImageKey).Flag("active", oActive, c.IsActive);
+        audit.Record("category.update", "Category", id.ToString(), diff.Any ? $"\"{c.Name}\": {diff}" : $"\"{c.Name}\": saved with no field changes");
         await db.SaveChangesAsync(ct);
         var count = await db.Products.CountAsync(p => p.CategoryId == id, ct);
         return new CategoryDto(c.Id, c.Name, c.Slug, Url(c.ImageKey), c.SortOrder, c.IsActive, count);
@@ -54,6 +60,7 @@ public sealed class AdminCatalogService(IAppDbContext db, IFileStorage files,
         if (await db.Products.IgnoreQueryFilters().AnyAsync(p => p.CategoryId == id, ct))
             return Error.Conflict("Category is in use", "Products still use this category. Deactivate it instead of deleting.");
         db.Categories.Remove(c);
+        audit.Record("category.delete", "Category", id.ToString(), $"Deleted category \"{c.Name}\"");
         await db.SaveChangesAsync(ct);
         return Result.Ok();
     }
@@ -63,6 +70,7 @@ public sealed class AdminCatalogService(IAppDbContext db, IFileStorage files,
         if (req.Ids is null) return Error.Validation("ids", "ids is required.");
         var rows = await db.Categories.Where(x => req.Ids.Contains(x.Id)).ToListAsync(ct);
         for (var i = 0; i < req.Ids.Count; i++) { var r = rows.FirstOrDefault(x => x.Id == req.Ids[i]); if (r is not null) r.SortOrder = i; }
+        audit.Record("category.reorder", "Category", null, $"Reordered {rows.Count} categories");
         await db.SaveChangesAsync(ct);
         return Result.Ok();
     }
@@ -82,6 +90,8 @@ public sealed class AdminCatalogService(IAppDbContext db, IFileStorage files,
         var b = new Brand { Name = req.Name.Trim(), Slug = slug, LogoKey = Blank(req.LogoKey), IsActive = req.IsActive ?? true, SortOrder = next + 1 };
         db.Brands.Add(b);
         await db.SaveChangesAsync(ct);
+        audit.Record("brand.create", "Brand", b.Id.ToString(), $"Created brand \"{b.Name}\"");
+        await db.SaveChangesAsync(ct);
         return new BrandDto(b.Id, b.Name, b.Slug, Url(b.LogoKey), b.IsActive);
     }
 
@@ -90,11 +100,15 @@ public sealed class AdminCatalogService(IAppDbContext db, IFileStorage files,
         if (await AdminValidation.CheckAsync(brandVal, req, ct) is { } bad) return bad;
         var b = await db.Brands.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (b is null) return Error.NotFound("Brand");
+        var (oName, oSlug, oLogo, oActive) = (b.Name, b.Slug, b.LogoKey, b.IsActive);
         b.Name = req.Name.Trim();
         if (!string.IsNullOrWhiteSpace(req.Slug))
             b.Slug = Unique(await db.Brands.Where(x => x.Id != id).Select(x => x.Slug).ToListAsync(ct), req.Slug, req.Name);
         if (req.LogoKey is not null) b.LogoKey = Blank(req.LogoKey);      // null = leave unchanged, "" = clear
         b.IsActive = req.IsActive ?? true;
+        var diff = new AuditDiff().Text("name", oName, b.Name).Text("slug", oSlug, b.Slug)
+            .Changed("logo", oLogo != b.LogoKey).Flag("active", oActive, b.IsActive);
+        audit.Record("brand.update", "Brand", id.ToString(), diff.Any ? $"\"{b.Name}\": {diff}" : $"\"{b.Name}\": saved with no field changes");
         await db.SaveChangesAsync(ct);
         return new BrandDto(b.Id, b.Name, b.Slug, Url(b.LogoKey), b.IsActive);
     }
@@ -106,6 +120,7 @@ public sealed class AdminCatalogService(IAppDbContext db, IFileStorage files,
         if (await db.Products.IgnoreQueryFilters().AnyAsync(p => p.BrandId == id, ct))
             return Error.Conflict("Brand is in use", "Products still use this brand. Deactivate it instead of deleting.");
         db.Brands.Remove(b);
+        audit.Record("brand.delete", "Brand", id.ToString(), $"Deleted brand \"{b.Name}\"");
         await db.SaveChangesAsync(ct);
         return Result.Ok();
     }
@@ -115,6 +130,7 @@ public sealed class AdminCatalogService(IAppDbContext db, IFileStorage files,
         if (req.Ids is null) return Error.Validation("ids", "ids is required.");
         var rows = await db.Brands.Where(x => req.Ids.Contains(x.Id)).ToListAsync(ct);
         for (var i = 0; i < req.Ids.Count; i++) { var r = rows.FirstOrDefault(x => x.Id == req.Ids[i]); if (r is not null) r.SortOrder = i; }
+        audit.Record("brand.reorder", "Brand", null, $"Reordered {rows.Count} brands");
         await db.SaveChangesAsync(ct);
         return Result.Ok();
     }

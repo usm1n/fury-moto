@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace GearDoctor.Application.Admin;
 
 /// <summary>Admin order list/detail/notes. Status changes delegate to <see cref="OrderService.ChangeStatusAsync"/>.</summary>
-public sealed class AdminOrderService(IAppDbContext db, OrderService orders, ICurrentUser currentUser, IClock clock,
+public sealed class AdminOrderService(IAppDbContext db, OrderService orders, ICurrentUser currentUser, IClock clock, IAuditLog audit,
     IValidator<AddNoteRequest> noteValidator)
 {
     public async Task<Result<OrderRowPage>> ListAsync(OrderStatus? status, DateOnly? from, DateOnly? to, string? q, int page, int pageSize, CancellationToken ct = default)
@@ -58,8 +58,10 @@ public sealed class AdminOrderService(IAppDbContext db, OrderService orders, ICu
         if (!v.IsValid)
             return Error.Validation(v.Errors.GroupBy(e => char.ToLowerInvariant(e.PropertyName[0]) + e.PropertyName[1..])
                 .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray()));
-        var status = await db.Orders.Where(o => o.Id == id).Select(o => (OrderStatus?)o.Status).FirstOrDefaultAsync(ct);
-        if (status is null) return Error.NotFound("Order");
+        var info = await db.Orders.Where(o => o.Id == id).Select(o => new { o.Status, o.OrderNumber }).FirstOrDefaultAsync(ct);
+        if (info is null) return Error.NotFound("Order");
+        OrderStatus? status = info.Status;
+        audit.Record("order.note", "Order", id.ToString(), $"{info.OrderNumber}: note added: {req.Note!.Trim()}");
         db.OrderStatusEvents.Add(new OrderStatusEvent
         {
             OrderId = id, FromStatus = status, ToStatus = status.Value, Note = req.Note!.Trim(),

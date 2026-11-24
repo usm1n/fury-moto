@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <None Update="Seed\catalog.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Seed\content.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <PropertyGroup>

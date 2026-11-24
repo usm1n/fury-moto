@@ -75,6 +75,7 @@ public sealed class OrderService(
     IFileStorage files,
     ITurnstileVerifier turnstile,
     ICurrentUser currentUser,
+    IAuditLog audit,
     IClock clock,
     IValidator<CreateOrderRequest> createValidator,
     IValidator<CartValidateRequest> cartValidator)
@@ -229,6 +230,7 @@ public sealed class OrderService(
                 return Error.Validation("status", $"Can't change an order from {order.Status} to {req.Status}.");
 
             // aggregate quantities per variant
+            var stockNote = "";
             var perVariant = order.Items.GroupBy(i => i.VariantId).Select(g => (VariantId: g.Key, Qty: g.Sum(i => i.Quantity))).ToList();
 
             if (req.Status == OrderStatus.Confirmed && !order.StockDeducted)
@@ -252,14 +254,14 @@ public sealed class OrderService(
                     return Error.Conflict("Not enough stock to confirm this order", "Restock or edit the order first.",
                         type: "/problems/out-of-stock", ext: new { items = short_ });
                 }
-                order.StockDeducted = true;
+                order.StockDeducted = true; stockNote = " (stock deducted)";
             }
             else if (req.Status == OrderStatus.Cancelled && order.StockDeducted)
             {
                 foreach (var (variantId, qty) in perVariant)
                     await db.Database.ExecuteSqlInterpolatedAsync(
                         $"UPDATE \"ProductVariants\" SET \"Stock\" = \"Stock\" + {qty} WHERE \"Id\" = {variantId}", ct);
-                order.StockDeducted = false;
+                order.StockDeducted = false; stockNote = " (stock restored)";
             }
 
             order.History.Add(new OrderStatusEvent
@@ -268,6 +270,9 @@ public sealed class OrderService(
                 Note = string.IsNullOrWhiteSpace(req.Note) ? null : req.Note.Trim()[..Math.Min(500, req.Note.Trim().Length)],
                 ChangedByUserId = currentUser.UserId, At = clock.Now,
             });
+            audit.Record("order.status", "Order", order.Id.ToString(),
+                $"{order.OrderNumber}: {order.Status} → {req.Status}{stockNote}" +
+                (string.IsNullOrWhiteSpace(req.Note) ? "" : $". Note: {req.Note.Trim()}"));
             order.Status = req.Status;
             try
             {

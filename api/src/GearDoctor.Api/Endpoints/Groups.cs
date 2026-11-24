@@ -27,6 +27,7 @@ public static class Groups
         Admin.AdminImageEndpoints.Map(admin);
         Admin.AdminOrderEndpoints.Map(admin);
         Admin.AdminSettingsEndpoints.Map(admin);
+        Admin.AdminContentEndpoints.Map(admin);
         return app;
     }
 }

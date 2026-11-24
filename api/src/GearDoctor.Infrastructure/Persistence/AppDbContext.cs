@@ -27,6 +27,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<OrderStatusEvent> OrderStatusEvents => Set<OrderStatusEvent>();
     public DbSet<Setting> Settings => Set<Setting>();
+    public DbSet<Guide> Guides => Set<Guide>();
+    public DbSet<Faq> Faqs => Set<Faq>();
+    public DbSet<Testimonial> Testimonials => Set<Testimonial>();
+    public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
     /// <summary>ASP.NET Data Protection keys (shared across serverless instances).</summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
@@ -147,6 +151,51 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(x => x.ToStatus).HasConversion<string>().HasMaxLength(12);
             e.Property(x => x.Note).HasMaxLength(500);
             e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.ChangedByUserId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        b.Entity<Guide>(e =>
+        {
+            e.Property(x => x.Slug).HasMaxLength(160);
+            e.HasIndex(x => x.Slug).IsUnique();
+            e.Property(x => x.Title).HasMaxLength(160);
+            e.Property(x => x.Type).HasMaxLength(20);
+            e.Property(x => x.Excerpt).HasMaxLength(300);
+            e.Property(x => x.Body).HasMaxLength(40000);
+            e.Property(x => x.CoverKey).HasMaxLength(300);
+            e.Property(x => x.Video).HasMaxLength(60);
+            e.Property(x => x.Source).HasMaxLength(500);
+            e.Property(x => x.RelatedProductIds).HasColumnType("integer[]");
+            e.Property(x => x.Version).IsRowVersion();                       // xmin
+            e.HasIndex(x => new { x.IsPublished, x.SortOrder });
+        });
+
+        b.Entity<Faq>(e =>
+        {
+            e.Property(x => x.Q).HasMaxLength(200);
+            e.Property(x => x.A).HasMaxLength(2000);
+            e.HasIndex(x => new { x.IsPublished, x.SortOrder });
+        });
+
+        b.Entity<Testimonial>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(80);
+            e.Property(x => x.Bike).HasMaxLength(80);
+            e.Property(x => x.Quote).HasMaxLength(600);
+            e.ToTable(t => t.HasCheckConstraint("CK_Testimonial_Rating", "\"Rating\" BETWEEN 1 AND 5"));
+            e.HasIndex(x => new { x.IsPublished, x.SortOrder });
+        });
+
+        b.Entity<AuditEntry>(e =>
+        {
+            e.Property(x => x.UserId).HasMaxLength(450);
+            e.Property(x => x.UserEmail).HasMaxLength(256);
+            e.Property(x => x.Action).HasMaxLength(40);
+            e.Property(x => x.Entity).HasMaxLength(40);
+            e.Property(x => x.EntityId).HasMaxLength(40);
+            e.Property(x => x.Summary).HasMaxLength(1000);
+            e.Property(x => x.Ip).HasMaxLength(45);
+            e.HasIndex(x => new { x.Entity, x.EntityId });
+            e.HasIndex(x => x.At).IsDescending();
         });
 
         b.Entity<Setting>(e =>

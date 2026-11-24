@@ -17,6 +17,10 @@ export interface GuideUpsert {
    * blank = from title; made unique
    */
   slug?: (string | null);
+
+  /**
+   * null = unchanged, empty = clear
+   */
   source?: (string | null);
   title: string;
   type: GuideType;
@@ -25,5 +29,9 @@ export interface GuideUpsert {
    * required on PUT; mismatch gives 409 /problems/stale
    */
   version?: (string | null);
+
+  /**
+   * null = unchanged, empty = clear
+   */
   video?: (string | null);
 }

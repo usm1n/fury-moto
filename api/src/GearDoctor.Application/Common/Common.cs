@@ -61,6 +61,10 @@ public interface IAppDbContext
     DbSet<OrderItem> OrderItems { get; }
     DbSet<OrderStatusEvent> OrderStatusEvents { get; }
     DbSet<Setting> Settings { get; }
+    DbSet<Guide> Guides { get; }
+    DbSet<Faq> Faqs { get; }
+    DbSet<Testimonial> Testimonials { get; }
+    DbSet<AuditEntry> AuditEntries { get; }
     Microsoft.EntityFrameworkCore.Infrastructure.DatabaseFacade Database { get; }
     Task<int> SaveChangesAsync(CancellationToken ct = default);
     /// <summary>Next value of order_number_seq (starts at 1001).</summary>
@@ -92,6 +96,16 @@ public interface ICurrentUser
 {
     string? UserId { get; }
     string? Email { get; }
+}
+
+/// <summary>
+/// Audit trail port. Record() only ADDS an entry to the current DbContext, so it is saved by the same
+/// SaveChanges as the change itself (atomic, no extra round trip). Rule: every admin mutation records one.
+/// userId/userEmail override the signed-in user (login: the request is not authenticated yet).
+/// </summary>
+public interface IAuditLog
+{
+    void Record(string action, string entity, string? entityId, string summary, string? userId = null, string? userEmail = null);
 }
 
 public interface IClock { DateTimeOffset Now { get; } }

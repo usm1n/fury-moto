@@ -10,6 +10,15 @@ export interface AdminGuide {
   id?: number;
   isPublished?: boolean;
   relatedProductIds?: Array<number>;
+
+  /**
+   * same products in saved order (any status), for the admin picker
+   */
+  relatedProducts?: Array<{
+'id'?: number;
+'title'?: string;
+'thumbUrl'?: (string | null);
+}>;
   slug?: string;
   sortOrder?: number;
   source?: (string | null);

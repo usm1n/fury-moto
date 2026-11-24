@@ -12,9 +12,13 @@ export interface ApiAdminUploadsPresignPost$Params {
       body: {
 
 /**
- * required for main/thumb; omitted or 0 for guide
+ * required for main/thumb; omit or 0 for guide
  */
 'productId'?: (number | null);
+
+/**
+ * guide: key guides/{guid}.webp, 3 MB, image/webp
+ */
 'kind': 'main' | 'thumb' | 'guide';
 'contentType'?: 'image/webp';
 'bytes'?: number;

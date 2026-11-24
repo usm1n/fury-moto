@@ -194,3 +194,71 @@ public static class Slugs
         return sb.ToString().Trim('-');
     }
 }
+
+// ---------------------------------------------------------------- Phase 4: content + audit
+
+public static class GuideTypes
+{
+    public static readonly string[] All = ["safety", "buying", "myth", "maintenance", "riding"];
+}
+
+public sealed class Guide
+{
+    public int Id { get; set; }
+    public required string Slug { get; set; }
+    public required string Title { get; set; }
+    /// <summary>safety | buying | myth | maintenance | riding</summary>
+    public required string Type { get; set; }
+    public string Excerpt { get; set; } = "";
+    /// <summary>Markdown.</summary>
+    public string Body { get; set; } = "";
+    /// <summary>Storage key (guides/...) or a legacy assets/ path.</summary>
+    public string? CoverKey { get; set; }
+    /// <summary>Id of a site.config video (storefront design asset).</summary>
+    public string? Video { get; set; }
+    /// <summary>Instagram reel URL.</summary>
+    public string? Source { get; set; }
+    public int[] RelatedProductIds { get; set; } = [];
+    public bool IsPublished { get; set; }
+    public int SortOrder { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+    /// <summary>Postgres xmin optimistic-concurrency token.</summary>
+    public uint Version { get; set; }
+}
+
+public sealed class Faq
+{
+    public int Id { get; set; }
+    public required string Q { get; set; }
+    public required string A { get; set; }
+    public bool IsPublished { get; set; } = true;
+    public int SortOrder { get; set; }
+}
+
+public sealed class Testimonial
+{
+    public int Id { get; set; }
+    public required string Name { get; set; }
+    public string? Bike { get; set; }
+    public required string Quote { get; set; }
+    /// <summary>1-5 (CHECK constraint).</summary>
+    public int Rating { get; set; } = 5;
+    public bool IsPublished { get; set; } = true;
+    public int SortOrder { get; set; }
+}
+
+/// <summary>Who changed what. Every admin mutation records one (see IAuditLog).</summary>
+public sealed class AuditEntry
+{
+    public long Id { get; set; }
+    public DateTimeOffset At { get; set; }
+    public string? UserId { get; set; }
+    public string? UserEmail { get; set; }
+    /// <summary>entity.verb, e.g. product.update</summary>
+    public required string Action { get; set; }
+    public required string Entity { get; set; }
+    public string? EntityId { get; set; }
+    public required string Summary { get; set; }
+    public string? Ip { get; set; }
+}
