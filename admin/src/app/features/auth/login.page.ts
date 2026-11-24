@@ -26,7 +26,7 @@ import { problemOf } from '../../core/http';
           <input class="gd-input" id="password" [type]="showPw() ? 'text' : 'password'" formControlName="password" autocomplete="current-password" />
           <button mat-icon-button type="button" class="pw__toggle" [attr.aria-label]="showPw() ? 'Hide password' : 'Show password'" [attr.aria-pressed]="showPw()" (click)="showPw.set(!showPw())"><mat-icon>{{ showPw() ? 'visibility_off' : 'visibility' }}</mat-icon></button>
         </div>
-        <button mat-flat-button type="submit" [disabled]="form.invalid || busy()">@if (busy()) { <mat-progress-spinner mode="indeterminate" diameter="18" /> }Sign in</button>
+        <button mat-flat-button type="submit" [disabled]="busy()">@if (busy()) { <mat-progress-spinner mode="indeterminate" diameter="18" /> }Sign in</button>
       </form>
     </main>
   `,
@@ -44,7 +44,13 @@ export class LoginPage {
   });
 
   protected async submit(): Promise<void> {
-    if (this.form.invalid || this.busy()) return;
+    if (this.busy()) return;
+    // Chrome autofill fills the inputs without telling Angular until the user interacts with the page,
+    // so the button stays enabled and the DOM values are copied into the form here.
+    const dom = (id: string) => (document.getElementById(id) as HTMLInputElement | null)?.value ?? "";
+    if (!this.form.controls.email.value && dom("email")) this.form.controls.email.setValue(dom("email"));
+    if (!this.form.controls.password.value && dom("password")) this.form.controls.password.setValue(dom("password"));
+    if (this.form.invalid) { this.form.markAllAsTouched(); this.error.set("Enter your email and password."); return; }
     this.busy.set(true);
     this.error.set(null);
     try {

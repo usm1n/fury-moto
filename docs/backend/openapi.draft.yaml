@@ -238,7 +238,7 @@ paths:
         Returns a presigned PUT URL to R2 (10 min). The admin resizes client-side to
         ≤2000 px WebP (~80%) + a 480 px thumbnail and PUTs each directly to R2.
         Server enforces contentType image/webp and maxBytes (main 3 MB, thumb 300 KB).
-      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [kind], properties: { productId: { type: [integer, "null"], description: "required for main/thumb; omit or 0 for guide" }, kind: { type: string, enum: [main, thumb, guide], description: "guide: key guides/{guid}.webp, 3 MB, image/webp" }, contentType: { type: string, enum: [image/webp] }, bytes: { type: integer } } } } } }
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [kind], properties: { productId: { type: [integer, "null"], description: "required for main/thumb; omit or 0 for guide" }, kind: { type: string, enum: [main, thumb, guide, category], description: "guide: guides/{guid}.webp; category: categories/{guid}.webp; 3 MB, image/webp" }, contentType: { type: string, enum: [image/webp] }, bytes: { type: integer } } } } } }
       responses: { "200": { description: OK, content: { application/json: { schema: { type: object, properties: { uploadUrl: { type: string, format: uri }, key: { type: string, example: "products/42/7f3c….webp" }, headers: { type: object, additionalProperties: { type: string } }, expiresAt: { type: string, format: date-time } } } } } } }
   /api/admin/products/{id}/images:
     post:

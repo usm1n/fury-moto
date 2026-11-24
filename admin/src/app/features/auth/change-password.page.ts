@@ -68,7 +68,8 @@ export class ChangePasswordPage {
   protected err(field: string): string | null { return fieldError(this.problem(), field); }
 
   protected async submit(): Promise<void> {
-    if (this.form.invalid || this.busy()) return;
+    if (this.busy()) return;
+    if (this.form.invalid) { this.form.markAllAsTouched(); return; }
     this.busy.set(true);
     this.problem.set(null);
     try {

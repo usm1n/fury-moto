@@ -9,8 +9,9 @@ import { Skeleton } from '../../shared/ui/ui';
 import { Toast } from '../../shared/ui/toast.service';
 import { Confirm } from '../../shared/ui/confirm.service';
 import { problemOf } from '../../core/http';
+import { AssetUrlPipe } from '../../shared/asset-url.pipe';
 
-export interface CatalogItem { id: number; name: string; slug: string; isActive: boolean; productCount?: number }
+export interface CatalogItem { id: number; name: string; slug: string; isActive: boolean; productCount?: number; imageUrl?: string | null }
 export interface CatalogValues { name: string; slug?: string; isActive: boolean }
 
 /** What a page supplies so one list UI serves both categories and brands. */
@@ -20,12 +21,14 @@ export interface CatalogAdapter {
   update(id: number, v: CatalogValues): Promise<CatalogItem>;
   remove(id: number): Promise<void>;
   reorder(ids: number[]): Promise<void>;
+  /** Optional: upload a photo for the item (categories use it for their storefront tile). */
+  uploadImage?(item: CatalogItem, file: File): Promise<CatalogItem>;
 }
 
 /** Drag-to-reorder list with inline add / rename, active toggle and delete (409 "in use" -> deactivate hint). */
 @Component({
   selector: 'gd-catalog-manager',
-  imports: [FormsModule, CdkDropList, CdkDrag, CdkDragHandle, MatButtonModule, MatIconModule, MatSlideToggleModule, MatProgressSpinnerModule, Skeleton],
+  imports: [FormsModule, CdkDropList, CdkDrag, CdkDragHandle, MatButtonModule, MatIconModule, MatSlideToggleModule, MatProgressSpinnerModule, Skeleton, AssetUrlPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     :host { display: block; max-width: 720px; }
@@ -48,6 +51,11 @@ export interface CatalogAdapter {
     .list.is-dragging .item:not(.cdk-drag-placeholder) { transition: transform 200ms ease; }
     .actions { display: flex; align-items: center; gap: .15rem; }
     .error { display: grid; gap: .75rem; justify-items: center; }
+    .thumb { flex: none; width: 56px; height: 56px; border-radius: 10px; overflow: hidden; display: grid; place-items: center; cursor: pointer;
+      background: var(--p-surface-800); border: 1px dashed var(--p-surface-500); color: var(--p-surface-300); }
+    .thumb:hover, .thumb:focus-within { border-color: var(--p-primary-500); color: var(--p-surface-0); }
+    .thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .thumb.is-busy { cursor: progress; }
   `,
   template: `
     <form class="add" (submit)="$event.preventDefault(); add()">
@@ -69,6 +77,14 @@ export interface CatalogAdapter {
         @for (it of items(); track it.id) {
           <div class="item" [class.is-inactive]="!it.isActive" cdkDrag [cdkDragData]="it">
             <span class="handle" cdkDragHandle aria-label="Drag to reorder"><mat-icon>drag_indicator</mat-icon></span>
+            @if (adapter().uploadImage) {
+              <label class="thumb" [class.is-busy]="uploadingId() === it.id" [attr.aria-label]="(it.imageUrl ? 'Change photo for ' : 'Add photo for ') + it.name">
+                @if (uploadingId() === it.id) { <mat-progress-spinner mode="indeterminate" diameter="22" /> }
+                @else if (it.imageUrl) { <img [src]="it.imageUrl | assetUrl" alt="" /> }
+                @else { <mat-icon>add_photo_alternate</mat-icon> }
+                <input type="file" accept="image/*" hidden (change)="pickImage(it, $event)" />
+              </label>
+            }
             <div class="body">
               @if (editingId() === it.id) {
                 <form class="edit" (submit)="$event.preventDefault(); saveName(it)">
@@ -106,6 +122,7 @@ export class CatalogManager implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly adding = signal(false);
   protected readonly editingId = signal<number | null>(null);
+  protected readonly uploadingId = signal<number | null>(null);
   protected newName = '';
   protected editName = '';
 
@@ -120,6 +137,26 @@ export class CatalogManager implements OnInit {
       this.error.set(problemOf(e).detail ?? problemOf(e).title ?? 'Could not load');
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  protected async pickImage(it: CatalogItem, ev: Event): Promise<void> {
+    const input = ev.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    const upload = this.adapter().uploadImage;
+    if (!file || !upload || this.uploadingId() !== null) return;
+    this.uploadingId.set(it.id);
+    try {
+      const updated = await upload.call(this.adapter(), it, file);
+      this.items.update((l) => l.map((x) => (x.id === it.id ? { ...x, ...updated } : x)));
+      this.toast.add({ severity: 'success', summary: 'Photo updated', detail: it.name, life: 2500 });
+    } catch (e) {
+      const p = problemOf(e);
+      this.toast.add({ severity: 'error', summary: 'Could not upload the photo',
+        detail: p.status === 503 ? 'Photo storage is not configured on this server.' : (e instanceof Error && !p.status ? e.message : (p.detail ?? p.title ?? '')) });
+    } finally {
+      this.uploadingId.set(null);
     }
   }
 

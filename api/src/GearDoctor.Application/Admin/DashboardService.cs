@@ -14,7 +14,8 @@ public sealed class DashboardService(IAppDbContext db, IClock clock)
 
         var newOrders = await db.Orders.CountAsync(o => o.Status == OrderStatus.New, ct);
         var month = db.Orders.AsNoTracking().Where(o => o.CreatedAt >= monthStart && o.CreatedAt < nextMonth);
-        var ordersThisMonth = await month.CountAsync(ct);
+        // cancelled orders are not real sales: leave them out of the monthly count
+        var ordersThisMonth = await month.CountAsync(o => o.Status != OrderStatus.Cancelled, ct);
         var revenue = await month.Where(o => o.Status == OrderStatus.Confirmed || o.Status == OrderStatus.Shipped || o.Status == OrderStatus.Delivered)
             .SumAsync(o => (long?)o.Total, ct) ?? 0;
 

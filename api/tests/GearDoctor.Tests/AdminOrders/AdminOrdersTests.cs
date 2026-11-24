@@ -292,7 +292,7 @@ public sealed class AdminOrdersTests(ApiFactory f) : IAsyncLifetime
 
         var d = await Get("/api/admin/dashboard");
         Assert.Equal(1, d.GetProperty("newOrders").GetInt32());
-        Assert.Equal(4, d.GetProperty("ordersThisMonth").GetInt32());
+        Assert.Equal(3, d.GetProperty("ordersThisMonth").GetInt32());   // the cancelled order is not counted
         Assert.Equal(150600, d.GetProperty("revenueThisMonth").GetInt64());
 
         // default threshold 3: only L (stock 1) is low; M has 5

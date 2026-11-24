@@ -255,4 +255,23 @@ public sealed class AdminCatalogTests(ApiFactory f) : IAsyncLifetime
         Assert.Equal(bid, list[0].GetProperty("id").GetInt32());
         Assert.Equal(HttpStatusCode.NoContent, (await _a.Delete($"/api/admin/brands/{bid}")).StatusCode);
     }
+
+    [Fact]
+    public async Task Category_photo_presign_and_image_key_rules()
+    {
+        var res = await _a.Post("/api/admin/uploads/presign", new { kind = "category", contentType = "image/webp", bytes = 1000 });
+        // 200 when storage is configured, 503 when not: either way a valid request (not 400/404)
+        Assert.True(res.StatusCode is HttpStatusCode.OK or HttpStatusCode.ServiceUnavailable, res.StatusCode.ToString());
+        if (res.StatusCode == HttpStatusCode.OK)
+            Assert.StartsWith("categories/", (await AdminHttp.Body(res, HttpStatusCode.OK)).GetProperty("key").GetString());
+
+        var c = await AdminHttp.Body(await _a.Post("/api/admin/categories", new { name = "Photo Cat " + Guid.NewGuid().ToString("N")[..6] }), HttpStatusCode.Created);
+        var id = c.GetProperty("id").GetInt32();
+        var name = c.GetProperty("name").GetString();
+        // a key outside categories/ (e.g. another product's photo or an arbitrary path) is rejected
+        Assert.Equal(HttpStatusCode.BadRequest, (await _a.Put($"/api/admin/categories/{id}", new { name, imageKey = "products/1/x.webp" })).StatusCode);
+        var ok = await AdminHttp.Body(await _a.Put($"/api/admin/categories/{id}", new { name, isActive = false, imageKey = "categories/abc.webp" }), HttpStatusCode.OK);
+        Assert.EndsWith("categories/abc.webp", ok.GetProperty("imageUrl").GetString());
+        Assert.False(ok.GetProperty("isActive").GetBoolean());
+    }
 }

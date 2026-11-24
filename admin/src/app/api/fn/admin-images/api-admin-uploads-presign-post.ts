@@ -17,9 +17,9 @@ export interface ApiAdminUploadsPresignPost$Params {
 'productId'?: (number | null);
 
 /**
- * guide: key guides/{guid}.webp, 3 MB, image/webp
+ * guide: guides/{guid}.webp; category: categories/{guid}.webp; 3 MB, image/webp
  */
-'kind': 'main' | 'thumb' | 'guide';
+'kind': 'main' | 'thumb' | 'guide' | 'category';
 'contentType'?: 'image/webp';
 'bytes'?: number;
 }

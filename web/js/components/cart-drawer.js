@@ -10,6 +10,16 @@ import cart, { productHref } from "../data/cart.js";
 const ui = config.ui || {};
 const FOCUSABLE = 'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
+/**
+ * Keep only "cart changed" lines that still apply: once the shopper removes an item, its line goes.
+ * Lines are plain strings that contain the item title, so match on the titles still in the cart.
+ */
+export function pruneNotice(notice, items) {
+  if (!notice.length) return notice;
+  const titles = (items || []).map((i) => i.title).filter(Boolean);
+  return notice.filter((line) => titles.some((t) => line.includes(t)));
+}
+
 /** Dismissible "Your cart changed" notice (drawer + cart page). Wire [data-dismiss-notice] yourself. */
 export function noticeMarkup(changes) {
   if (!changes?.length) return "";
@@ -153,7 +163,9 @@ export default function mount(el) {
   on("cart:close", close);
   on("cart:add", (d) => { highlightKey = cart.keyOf({ slug: d.slug || d.productId, size: d.size || "", color: d.color || "" }); });
   on("cart:notice", ({ changes }) => { notice = changes; renderNotice(); });
-  on("cart:change", () => {
+  on("cart:change", (sum) => {
+    const pruned = pruneNotice(notice, (sum || cart.summary()).items);
+    if (pruned.length !== notice.length) { notice = pruned; renderNotice(); }
     if (!isOpen) return;
     const a = document.activeElement;
     const sel = a && content.contains(a) && a.dataset.act ? `[data-act="${a.dataset.act}"][data-key="${CSS.escape(a.dataset.key)}"]` : null;

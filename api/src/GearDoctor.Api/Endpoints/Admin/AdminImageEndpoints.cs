@@ -8,7 +8,7 @@ namespace GearDoctor.Api.Endpoints.Admin;
 /// <summary>
 /// Product images via presigned direct-to-R2 uploads (the API never receives file bytes;
 /// Vercel's 4.5 MB body limit makes that mandatory anyway).
-///   1. POST /api/admin/uploads/presign { productId, kind: main|thumb, contentType: image/webp, bytes }
+///   1. POST /api/admin/uploads/presign { productId, kind: main|thumb|guide|category, contentType: image/webp, bytes }
 ///      → { uploadUrl, key, headers, expiresAt } (10 min). The admin resized the photo client-side
 ///      to ≤2000 px WebP (~80 %) + a 480 px WebP thumbnail and PUTs each straight to R2.
 ///   2. POST /api/admin/products/{id}/images { key, thumbKey, width, height, alt }
@@ -44,16 +44,18 @@ public static class AdminImageEndpoints
     {
         var errors = new Dictionary<string, string[]>();
         var kind = req.Kind?.ToLowerInvariant();
-        if (kind is not ("main" or "thumb" or "guide")) errors["kind"] = ["kind must be 'main', 'thumb' or 'guide'."];
+        if (kind is not ("main" or "thumb" or "guide" or "category")) errors["kind"] = ["kind must be 'main', 'thumb', 'guide' or 'category'."];
         if (req.ContentType is not null && req.ContentType != WebP) errors["contentType"] = ["Only image/webp uploads are accepted (the admin converts photos before upload)."];
         var max = kind == "thumb" ? MaxThumbBytes : MaxMainBytes;
         if (req.Bytes is { } b && (b <= 0 || b > max)) errors["bytes"] = [$"File must be between 1 byte and {max / 1024} KB."];
         if (errors.Count > 0) return Error.Validation(errors).ToProblem();
 
-        if (kind != "guide" && !await db.Products.AnyAsync(p => p.Id == req.ProductId, ct)) return Error.NotFound("Product").ToProblem();
+        if (kind is "main" or "thumb" && !await db.Products.AnyAsync(p => p.Id == req.ProductId, ct)) return Error.NotFound("Product").ToProblem();
 
         // guide covers are not tied to a product: guides/{guid}.webp (main-size image)
+        // category tiles: categories/{guid}.webp (main-size image, not tied to a product)
         var key = kind == "guide" ? $"guides/{Guid.NewGuid():N}.webp"
+            : kind == "category" ? $"categories/{Guid.NewGuid():N}.webp"
             : $"products/{req.ProductId}/{Guid.NewGuid():N}{(kind == "thumb" ? "-480" : "")}.webp";
         try
         {

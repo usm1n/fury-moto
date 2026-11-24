@@ -89,7 +89,9 @@ public sealed class CategoryUpsertValidator : AbstractValidator<CategoryUpsert>
     {
         RuleFor(x => x.Name).NotEmpty().MaximumLength(60);
         RuleFor(x => x.Slug).MaximumLength(80);
-        RuleFor(x => x.ImageKey).MaximumLength(300);
+        RuleFor(x => x.ImageKey).MaximumLength(300)
+            .Must(k => string.IsNullOrEmpty(k) || k.StartsWith("categories/", StringComparison.Ordinal) || k.StartsWith("assets/", StringComparison.Ordinal))
+            .WithMessage("Upload the image first (key must start with categories/).");
     }
 }
 

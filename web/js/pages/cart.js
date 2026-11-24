@@ -6,7 +6,7 @@ import { config, formatPrice, deliveryNote } from "../core/config.js";
 import { html, renderTemplate, fill } from "../core/render.js";
 import { on } from "../core/bus.js";
 import cart, { productHref } from "../data/cart.js";
-import { noticeMarkup, totalsMarkup } from "../components/cart-drawer.js";
+import { noticeMarkup, totalsMarkup, pruneNotice } from "../components/cart-drawer.js";
 import { openCheckout } from "../components/checkout.js";
 
 const ui = config.ui || {};
@@ -132,7 +132,11 @@ export default function mount(main) {
   });
 
   on("cart:notice", ({ changes }) => { notice = changes; renderNotice(); });
-  on("cart:change", () => { if (step === "cart") render(); });
+  on("cart:change", (sum) => {
+    const pruned = pruneNotice(notice, (sum || cart.summary()).items);
+    if (pruned.length !== notice.length) { notice = pruned; renderNotice(); }
+    if (step === "cart") render();
+  });
   addEventListener("hashchange", () => {
     if (location.hash === "#checkout" && step === "cart") goCheckout();
     else if (location.hash !== "#checkout" && step === "checkout") showCart({ focus: true });

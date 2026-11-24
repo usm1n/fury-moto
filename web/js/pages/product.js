@@ -300,11 +300,43 @@ function initBuy(root, p, needsSize) {
     clampQty();
   }));
   qty.addEventListener("change", clampQty);
-  form.querySelectorAll('input[name="color"]').forEach((r) => r.addEventListener("change", () => { if (colorName) colorName.textContent = r.value; updateLow(); }));
-  form.querySelectorAll('input[name="size"]').forEach((r) => r.addEventListener("change", () => { updateLow(); err.hidden = true; form.querySelector("[data-size-field]")?.classList.remove("is-invalid"); }));
+  /** Stock of the chosen size + colour (null when no variant matches / nothing chosen yet). */
+  const selectedAvailable = () => {
+    const size = form.querySelector('input[name="size"]:checked')?.value;
+    const color = form.querySelector('input[name="color"]:checked')?.value;
+    if (!size && needsSize) return null;
+    const v = (p.variants || []).find((x) => (!size || x.size === size) && (!color || x.color === color));
+    return v ? v.available : null;
+  };
+  /**
+   * Per-colour availability: a size that is sold out in the chosen colour can't be picked, and the
+   * add buttons are disabled (and say "Out of stock") while the chosen size + colour has none left.
+   * The server still re-checks stock at checkout; this just stops the shopper adding it at all.
+   */
+  const refreshAvailability = () => {
+    const color = form.querySelector('input[name="color"]:checked')?.value;
+    if (p.variants?.length) {
+      form.querySelectorAll('input[name="size"]').forEach((r) => {
+        const ok = p.inStock && p.variants.some((v) => v.size === r.value && (!color || v.color === color) && v.available > 0);
+        r.disabled = !ok;
+        r.closest("label")?.classList.toggle("is-soldout", !ok);
+        if (!ok && r.checked) r.checked = false;
+      });
+    }
+    const avail = selectedAvailable();
+    const soldOut = !p.inStock || avail === 0;
+    root.querySelectorAll("[data-add], [data-bar-add]").forEach((b) => {
+      b.disabled = soldOut;
+      b.textContent = soldOut ? ui.outOfStock : ui.addToCart;
+    });
+    updateLow();
+  };
+
+  form.querySelectorAll('input[name="color"]').forEach((r) => r.addEventListener("change", () => { if (colorName) colorName.textContent = r.value; refreshAvailability(); }));
+  form.querySelectorAll('input[name="size"]').forEach((r) => r.addEventListener("change", () => { refreshAvailability(); err.hidden = true; form.querySelector("[data-size-field]")?.classList.remove("is-invalid"); }));
 
   function add() {
-    if (!p.inStock) return;
+    if (!p.inStock || selectedAvailable() === 0) return;
     const size = form.querySelector('input[name="size"]:checked')?.value || "";
     if (needsSize && !size) {
       err.hidden = false;
@@ -319,6 +351,7 @@ function initBuy(root, p, needsSize) {
     emit("cart:open", {});
   }
   form.addEventListener("submit", (e) => { e.preventDefault(); add(); });
+  refreshAvailability();
 
   // sticky bar: visible only while the main button is off-screen (mobile only via CSS)
   const bar = root.querySelector("[data-bar]");
