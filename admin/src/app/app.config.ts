@@ -1,12 +1,10 @@
-import { ApplicationConfig, provideBrowserGlobalErrorListeners, provideZonelessChangeDetection } from '@angular/core';
+import { ApplicationConfig, inject, provideAppInitializer, provideBrowserGlobalErrorListeners, provideZonelessChangeDetection } from '@angular/core';
 import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
 import { provideRouter, withComponentInputBinding, withInMemoryScrolling, withViewTransitions } from '@angular/router';
-import { providePrimeNG } from 'primeng/config';
-import { MessageService, ConfirmationService } from 'primeng/api';
-import { PRIMEUI_LICENSE } from './core/license.generated';
+import { MatIconRegistry } from '@angular/material/icon';
+import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
 import { routes } from './app.routes';
 import { apiInterceptor } from './core/http';
-import { GearDoctorTheme } from './core/theme';
 import { provideApiConfiguration } from './api/api-configuration';
 
 export const appConfig: ApplicationConfig = {
@@ -16,8 +14,8 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes, withComponentInputBinding(), withInMemoryScrolling({ scrollPositionRestoration: 'top' }), withViewTransitions()),
     provideHttpClient(withFetch(), withInterceptors([apiInterceptor])),
     provideApiConfiguration(''),            // same origin: /api/* (dev: proxied by proxy.conf.json)
-    providePrimeNG({ theme: { preset: GearDoctorTheme, options: { darkModeSelector: '.app-dark', cssLayer: false } }, ripple: false, license: PRIMEUI_LICENSE || undefined }),
-    MessageService,
-    ConfirmationService,
+    // <mat-icon>name</mat-icon> renders a Material Symbols (outlined) ligature; font loaded in index.html
+    provideAppInitializer(() => { inject(MatIconRegistry).setDefaultFontSetClass('material-symbols-outlined'); }),
+    { provide: MAT_FORM_FIELD_DEFAULT_OPTIONS, useValue: { appearance: 'outline', subscriptSizing: 'dynamic' } },
   ],
 };
