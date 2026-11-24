@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, input, linkedSignal, output, signal } from '@angular/core';
+import { AssetUrlPipe } from '../../shared/asset-url.pipe';
 import { FormsModule } from '@angular/forms';
 import { CdkDrag, CdkDragDrop, CdkDragHandle, CdkDropList, moveItemInArray } from '@angular/cdk/drag-drop';
 import { ButtonModule } from 'primeng/button';
@@ -20,7 +21,7 @@ interface UploadItem { key: number; name: string; stage: 'Preparing' | 'Uploadin
 /** Photo manager: pick/drop/camera -> resize + WebP in the browser -> presign -> PUT to R2 -> register. */
 @Component({
   selector: 'gd-product-images',
-  imports: [FormsModule, CdkDropList, CdkDrag, CdkDragHandle, ButtonModule, InputTextModule, MessageModule],
+  imports: [AssetUrlPipe, FormsModule, CdkDropList, CdkDrag, CdkDragHandle, ButtonModule, InputTextModule, MessageModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     :host { display: block; }
@@ -52,7 +53,7 @@ interface UploadItem { key: number; name: string; stage: 'Preparing' | 'Uploadin
       <div class="drop" [class.over]="over()" (dragover)="$event.preventDefault(); over.set(true)" (dragleave)="over.set(false)" (drop)="onDrop($event)">
         <i class="pi pi-camera" style="font-size:1.6rem"></i>
         <span>Drag photos here, or</span>
-        <button pButton type="button" icon="pi pi-camera" label="Take photo / Choose photos" (click)="fileInput.click()"></button>
+        <button pButton type="button" (click)="fileInput.click()"><span pButtonIcon class="pi pi-camera"></span><span pButtonLabel>Take photo / Choose photos</span></button>
         <input #fileInput type="file" accept="image/*" multiple capture="environment" hidden (change)="onPick($event)" />
         <small>Resized to 2000 px WebP automatically. First photo is the main one.</small>
       </div>
@@ -60,7 +61,7 @@ interface UploadItem { key: number; name: string; stage: 'Preparing' | 'Uploadin
       @for (u of uploads(); track u.key) {
         <div class="up">
           @if (u.stage === 'Failed') {
-            <div class="err"><span>{{ u.name }}: {{ u.error }}</span><button pButton type="button" class="p-button-text" size="small" label="Dismiss" (click)="dismiss(u.key)"></button></div>
+            <div class="err"><span>{{ u.name }}: {{ u.error }}</span><button pButton type="button" class="p-button-text" size="small" (click)="dismiss(u.key)"><span pButtonLabel>Dismiss</span></button></div>
           } @else {
             <div>{{ u.name }} · {{ u.stage }}...</div>
             <div class="bar"><i [style.width.%]="u.progress"></i></div>
@@ -72,7 +73,7 @@ interface UploadItem { key: number; name: string; stage: 'Preparing' | 'Uploadin
         <div class="grid" cdkDropList cdkDropListOrientation="mixed" (cdkDropListDropped)="drop($event)">
           @for (im of list(); track im.id; let i = $index) {
             <div class="img" cdkDrag>
-              <img [src]="im.thumbUrl" [alt]="im.alt || 'Product photo'" loading="lazy" />
+              <img [src]="im.thumbUrl | assetUrl" [alt]="im.alt || 'Product photo'" loading="lazy" />
               <div class="tools">
                 <span class="handle" cdkDragHandle aria-label="Drag to reorder"><i class="pi pi-arrows-alt"></i></span>
                 <button type="button" (click)="confirmDelete(im)" aria-label="Delete photo"><i class="pi pi-trash"></i></button>

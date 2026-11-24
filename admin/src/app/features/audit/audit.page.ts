@@ -44,7 +44,7 @@ import { AUDIT_ENTITIES, auditActionSeverity, auditLink } from '../content/conte
       <div class="card empty error">
         <i class="pi pi-exclamation-triangle" style="font-size:1.6rem"></i>
         <div>{{ err }}</div>
-        <button pButton type="button" label="Try again" icon="pi pi-refresh" (click)="load()"></button>
+        <button pButton type="button" (click)="load()"><span pButtonIcon class="pi pi-refresh"></span><span pButtonLabel>Try again</span></button>
       </div>
     } @else if (loading() && rows().length === 0) {
       @for (i of [1, 2, 3, 4, 5]; track i) { <p-skeleton height="72px" styleClass="mb-2" /><div style="height:.5rem"></div> }
@@ -52,7 +52,7 @@ import { AUDIT_ENTITIES, auditActionSeverity, auditLink } from '../content/conte
       <div class="card empty">
         @if (entity()) {
           <p>No activity for this type yet.</p>
-          <button pButton type="button" severity="secondary" label="Show all" (click)="setEntity(null)"></button>
+          <button pButton type="button" severity="secondary" (click)="setEntity(null)"><span pButtonLabel>Show all</span></button>
         } @else { <p>No activity recorded yet. Changes you make in the admin will show up here.</p> }
       </div>
     } @else {

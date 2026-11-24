@@ -34,14 +34,14 @@ import { problemOf } from '../../core/http';
   template: `
     <div class="page-head">
       <h1 class="page-title">Dashboard</h1>
-      <a pButton class="add" routerLink="/products/new" icon="pi pi-plus" label="Add product" size="large"></a>
+      <a pButton class="add" routerLink="/products/new" size="large"><span pButtonIcon class="pi pi-plus"></span><span pButtonLabel>Add product</span></a>
     </div>
 
     @if (error(); as err) {
       <div class="card empty error">
         <i class="pi pi-exclamation-triangle" style="font-size:1.6rem"></i>
         <div>{{ err }}</div>
-        <button pButton type="button" label="Try again" icon="pi pi-refresh" (click)="load()"></button>
+        <button pButton type="button" (click)="load()"><span pButtonIcon class="pi pi-refresh"></span><span pButtonLabel>Try again</span></button>
       </div>
     } @else if (!data()) {
       <div class="stats">

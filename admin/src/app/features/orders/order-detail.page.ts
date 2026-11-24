@@ -73,7 +73,7 @@ import { NextAction, STATUS_SEVERITY, ShortItem, nextActions, packingSlipText, p
         <div class="card empty error">
           <i class="pi pi-exclamation-triangle" style="font-size:1.6rem"></i>
           <div>{{ err }}</div>
-          <button pButton type="button" label="Try again" icon="pi pi-refresh" (click)="load()"></button>
+          <button pButton type="button" (click)="load()"><span pButtonIcon class="pi pi-refresh"></span><span pButtonLabel>Try again</span></button>
         </div>
       } @else if (!order()) {
         <p-skeleton height="2.5rem" width="60%" /><br /><p-skeleton height="12rem" /><br /><p-skeleton height="10rem" />
@@ -135,8 +135,8 @@ import { NextAction, STATUS_SEVERITY, ShortItem, nextActions, packingSlipText, p
                 }
                 @if (actions().length === 0) { <p class="muted" style="margin:0">This order is {{ (o.status ?? "").toLowerCase() }}; no further status changes.</p> }
                 <a pButton class="linkbtn" severity="success" [outlined]="true" [href]="o.whatsappUrl" target="_blank" rel="noopener noreferrer"><i class="pi pi-whatsapp"></i> Message customer on WhatsApp</a>
-                <button pButton type="button" severity="secondary" icon="pi pi-copy" label="Copy packing slip" (click)="copySlip()"></button>
-                <button pButton type="button" severity="secondary" icon="pi pi-print" label="Print packing slip" (click)="print()"></button>
+                <button pButton type="button" severity="secondary" (click)="copySlip()"><span pButtonIcon class="pi pi-copy"></span><span pButtonLabel>Copy packing slip</span></button>
+                <button pButton type="button" severity="secondary" (click)="print()"><span pButtonIcon class="pi pi-print"></span><span pButtonLabel>Print packing slip</span></button>
               </div>
             </section>
 
@@ -157,7 +157,7 @@ import { NextAction, STATUS_SEVERITY, ShortItem, nextActions, packingSlipText, p
                 <label for="note" class="sub">Add a note</label>
                 <textarea pTextarea id="note" rows="2" maxlength="500" [formControl]="note" placeholder="Internal note (e.g. called customer, no answer)"></textarea>
                 @if (noteError(); as ne) { <small class="field-error">{{ ne }}</small> }
-                <button pButton type="submit" label="Add note" icon="pi pi-plus" severity="secondary" [loading]="noteBusy()" [disabled]="noteBusy() || !note.value.trim()"></button>
+                <button pButton type="submit" severity="secondary" [loading]="noteBusy()" [disabled]="noteBusy() || !note.value.trim()"><span pButtonIcon class="pi pi-plus"></span><span pButtonLabel>Add note</span></button>
               </form>
             </section>
           </div>
@@ -187,7 +187,7 @@ import { NextAction, STATUS_SEVERITY, ShortItem, nextActions, packingSlipText, p
           </div>
           @if (statusError(); as se) { <small class="field-error">{{ se }}</small> }
           <ng-template #footer>
-            <button pButton type="button" severity="secondary" label="Back" [disabled]="busy()" (click)="cancelAsk()"></button>
+            <button pButton type="button" severity="secondary" [disabled]="busy()" (click)="cancelAsk()"><span pButtonLabel>Back</span></button>
             <p-button [label]="pending()?.label ?? 'Confirm'" [severity]="pending()?.severity === 'danger' ? 'danger' : undefined" [loading]="busy()" (onClick)="submit()" />
           </ng-template>
         </p-dialog>

@@ -39,20 +39,20 @@ import { GUIDE_TYPE_SEVERITY, guideTypeLabel, moveItem } from './content-helpers
   template: `
     <div class="page-head">
       <h1 class="page-title">Guides</h1>
-      <a routerLink="/guides/new" pButton icon="pi pi-plus" label="New guide"></a>
+      <a routerLink="/guides/new" pButton><span pButtonIcon class="pi pi-plus"></span><span pButtonLabel>New guide</span></a>
     </div>
 
     @if (error(); as err) {
       <div class="card empty error">
         <i class="pi pi-exclamation-triangle" style="font-size:1.6rem"></i>
         <div>{{ err }}</div>
-        <button pButton type="button" label="Try again" icon="pi pi-refresh" (click)="load()"></button>
+        <button pButton type="button" (click)="load()"><span pButtonIcon class="pi pi-refresh"></span><span pButtonLabel>Try again</span></button>
       </div>
     } @else if (loading()) {
       <div class="list">@for (i of [1, 2, 3, 4]; track i) { <p-skeleton height="64px" borderRadius="12px" /> }</div>
     } @else if (items().length === 0) {
       <div class="card empty"><p>No guides yet. Guides show on the storefront once published.</p>
-        <a routerLink="/guides/new" pButton icon="pi pi-plus" label="Write the first guide"></a></div>
+        <a routerLink="/guides/new" pButton><span pButtonIcon class="pi pi-plus"></span><span pButtonLabel>Write the first guide</span></a></div>
     } @else {
       <div class="list" cdkDropList (cdkDropListDropped)="drop($event)">
         @for (g of items(); track g.id) {

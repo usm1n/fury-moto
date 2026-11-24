@@ -45,7 +45,7 @@ const nullable = (s: string): string | null => (s.trim() === '' ? null : s.trim(
       <div class="card empty error">
         <i class="pi pi-exclamation-triangle" style="font-size:1.6rem"></i>
         <div>{{ err }}</div>
-        <button pButton type="button" label="Try again" icon="pi pi-refresh" (click)="load()"></button>
+        <button pButton type="button" (click)="load()"><span pButtonIcon class="pi pi-refresh"></span><span pButtonLabel>Try again</span></button>
       </div>
     } @else if (!loaded()) {
       <p-skeleton height="12rem" /><br /><p-skeleton height="10rem" />
@@ -130,7 +130,7 @@ const nullable = (s: string): string | null => (s.trim() === '' ? null : s.trim(
 
         <div class="bar">
           @if (form.dirty) { <span class="unsaved">Unsaved changes</span> }
-          <button pButton type="submit" label="Save settings" icon="pi pi-check" [loading]="saving()" [disabled]="saving() || !form.dirty"></button>
+          <button pButton type="submit" [loading]="saving()" [disabled]="saving() || !form.dirty"><span pButtonIcon class="pi pi-check"></span><span pButtonLabel>Save settings</span></button>
         </div>
       </form>
     }

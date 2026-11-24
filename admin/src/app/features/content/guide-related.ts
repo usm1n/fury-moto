@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, model, signal } from '@angular/core';
+import { AssetUrlPipe } from '../../shared/asset-url.pipe';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { CdkDrag, CdkDragDrop, CdkDragHandle, CdkDropList } from '@angular/cdk/drag-drop';
@@ -15,7 +16,7 @@ export interface RelatedItem { id: number; title: string; thumbUrl?: string | nu
 /** Related-products picker: search the admin catalogue, add up to 8 chips, drag to reorder. */
 @Component({
   selector: 'gd-guide-related',
-  imports: [FormsModule, CdkDropList, CdkDrag, CdkDragHandle, ButtonModule, InputTextModule],
+  imports: [AssetUrlPipe, FormsModule, CdkDropList, CdkDrag, CdkDragHandle, ButtonModule, InputTextModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     :host { display: block; }
@@ -49,7 +50,7 @@ export interface RelatedItem { id: number; title: string; thumbUrl?: string | nu
       <div class="results">
         @for (r of results(); track r.id) {
           <button type="button" class="res" [disabled]="has(r.id!) || items().length >= max" (click)="add(r)">
-            @if (r.thumbUrl) { <img class="thumb" [src]="r.thumbUrl" alt="" loading="lazy" /> } @else { <span class="thumb"></span> }
+            @if (r.thumbUrl) { <img class="thumb" [src]="r.thumbUrl | assetUrl" alt="" loading="lazy" /> } @else { <span class="thumb"></span> }
             <span class="grow">{{ r.title }}<br /><small class="hint">{{ r.brand }} · {{ r.status }}</small></span>
             <i class="pi" [class.pi-check]="has(r.id!)" [class.pi-plus]="!has(r.id!)"></i>
           </button>
@@ -61,9 +62,9 @@ export interface RelatedItem { id: number; title: string; thumbUrl?: string | nu
         @for (it of items(); track it.id) {
           <div class="chip" cdkDrag>
             <span class="handle" cdkDragHandle aria-label="Drag to reorder"><i class="pi pi-bars"></i></span>
-            @if (it.thumbUrl) { <img class="thumb" [src]="it.thumbUrl" alt="" /> } @else { <span class="thumb"></span> }
+            @if (it.thumbUrl) { <img class="thumb" [src]="it.thumbUrl | assetUrl" alt="" /> } @else { <span class="thumb"></span> }
             <span class="grow">{{ it.title }}</span>
-            <button pButton type="button" class="p-button-text" severity="danger" icon="pi pi-times" [attr.aria-label]="'Remove ' + it.title" (click)="remove(it.id)"></button>
+            <button pButton type="button" class="p-button-text" severity="danger" [attr.aria-label]="'Remove ' + it.title" (click)="remove(it.id)"><span pButtonIcon class="pi pi-times"></span></button>
           </div>
         }
       </div>

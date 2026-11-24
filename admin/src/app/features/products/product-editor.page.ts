@@ -74,19 +74,19 @@ function compareAtValidator(c: AbstractControl): ValidationErrors | null {
   `,
   template: `
     <div class="head">
-      <a routerLink="/products" pButton class="p-button-text" severity="secondary" icon="pi pi-arrow-left" aria-label="Back to products"></a>
+      <a routerLink="/products" pButton class="p-button-text" severity="secondary" aria-label="Back to products"><span pButtonIcon class="pi pi-arrow-left"></span></a>
       <h1 class="page-title">{{ isNew() ? 'New product' : (form.controls.title.value || 'Edit product') }}</h1>
       @if (product(); as p) { <p-tag [value]="p.status ?? 'Draft'" [severity]="p.status === 'Published' ? 'success' : 'secondary'" /> }
     </div>
 
     @if (loadError(); as err) {
-      <div class="card empty"><p>{{ err }}</p><button pButton type="button" label="Try again" icon="pi pi-refresh" (click)="load()"></button></div>
+      <div class="card empty"><p>{{ err }}</p><button pButton type="button" (click)="load()"><span pButtonIcon class="pi pi-refresh"></span><span pButtonLabel>Try again</span></button></div>
     } @else if (loading()) {
       <p-skeleton height="14rem" borderRadius="12px" /><div style="height:1rem"></div><p-skeleton height="12rem" borderRadius="12px" />
     } @else {
       @if (stale()) {
         <div class="banner"><span>Changed elsewhere. Reload to get the latest version (your unsaved edits here will be lost).</span>
-          <button pButton type="button" size="small" icon="pi pi-refresh" label="Reload" (click)="reload()"></button></div>
+          <button pButton type="button" size="small" (click)="reload()"><span pButtonIcon class="pi pi-refresh"></span><span pButtonLabel>Reload</span></button></div>
       }
       @if (formError(); as fe) { <div class="banner" style="border-color:var(--p-red-400)">{{ fe }}</div> }
 
@@ -163,19 +163,19 @@ function compareAtValidator(c: AbstractControl): ValidationErrors | null {
       </div>
 
       <div class="bar" role="toolbar" aria-label="Product actions">
-        <button pButton type="button" icon="pi pi-save" [loading]="busy() === 'save'" [disabled]="!!busy()" (click)="save()">{{ isNew() ? 'Save draft' : 'Save' }}</button>
+        <button pButton type="button" [loading]="busy() === 'save'" [disabled]="!!busy()" (click)="save()"><span pButtonIcon class="pi pi-save"></span><span pButtonLabel>{{ isNew() ? 'Save draft' : 'Save' }}</span></button>
         @if (product()?.status === 'Published') {
-          <button pButton type="button" severity="secondary" icon="pi pi-eye-slash" label="Unpublish" [loading]="busy() === 'unpublish'" [disabled]="!!busy()" (click)="setPublished(false)"></button>
+          <button pButton type="button" severity="secondary" [loading]="busy() === 'unpublish'" [disabled]="!!busy()" (click)="setPublished(false)"><span pButtonIcon class="pi pi-eye-slash"></span><span pButtonLabel>Unpublish</span></button>
         } @else {
-          <button pButton type="button" severity="success" icon="pi pi-send" label="Publish" [loading]="busy() === 'publish'" [disabled]="!!busy()" (click)="setPublished(true)"></button>
+          <button pButton type="button" severity="success" [loading]="busy() === 'publish'" [disabled]="!!busy()" (click)="setPublished(true)"><span pButtonIcon class="pi pi-send"></span><span pButtonLabel>Publish</span></button>
         }
         @if (!isNew()) {
-          <button pButton type="button" severity="secondary" icon="pi pi-copy" label="Duplicate" [loading]="busy() === 'dup'" [disabled]="!!busy()" (click)="duplicate()"></button>
-          <a pButton severity="secondary" class="p-button-outlined" icon="pi pi-external-link" label="View on store" [href]="storeUrl()" target="_blank" rel="noopener"></a>
+          <button pButton type="button" severity="secondary" [loading]="busy() === 'dup'" [disabled]="!!busy()" (click)="duplicate()"><span pButtonIcon class="pi pi-copy"></span><span pButtonLabel>Duplicate</span></button>
+          <a pButton severity="secondary" class="p-button-outlined" [href]="storeUrl()" target="_blank" rel="noopener"><span pButtonIcon class="pi pi-external-link"></span><span pButtonLabel>View on store</span></a>
         }
         <span class="sp"></span>
         @if (hasUnsavedChanges()) { <span class="unsaved">Unsaved changes</span> }
-        @if (!isNew()) { <button pButton type="button" severity="danger" class="p-button-text" icon="pi pi-trash" label="Delete" [disabled]="!!busy()" (click)="confirmDelete()"></button> }
+        @if (!isNew()) { <button pButton type="button" severity="danger" class="p-button-text" [disabled]="!!busy()" (click)="confirmDelete()"><span pButtonIcon class="pi pi-trash"></span><span pButtonLabel>Delete</span></button> }
       </div>
       @if (isNew()) { <p class="hint" style="margin-top:.5rem">Save once to add photos and variants.</p> }
     }

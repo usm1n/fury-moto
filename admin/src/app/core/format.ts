@@ -12,3 +12,9 @@ export const slugify = (s: string): string =>
 
 /** Storefront origin (same domain in production; the storefront dev server in development). */
 export const storefrontUrl = (path = ''): string => `${location.origin}/${path.replace(/^\//, '')}`;
+
+/** API image URLs may arrive relative ("assets/img/x.jpg"); under <base href="/admin/"> those would 404, so root them. */
+export const assetUrl = (u: string | null | undefined): string => {
+  if (!u) return '';
+  return /^(https?:|data:|blob:|\/)/i.test(u) ? u : '/' + u;
+};

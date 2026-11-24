@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
+import { AssetUrlPipe } from '../../shared/asset-url.pipe';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -28,7 +29,7 @@ import { GuideRelated, RelatedItem } from './guide-related';
 
 @Component({
   selector: 'gd-guide-editor.page',
-  imports: [ReactiveFormsModule, RouterLink, ButtonModule, InputTextModule, TextareaModule, SelectModule, ToggleSwitchModule, SkeletonModule, TagModule, GuideRelated],
+  imports: [AssetUrlPipe, ReactiveFormsModule, RouterLink, ButtonModule, InputTextModule, TextareaModule, SelectModule, ToggleSwitchModule, SkeletonModule, TagModule, GuideRelated],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     :host { display: block; max-width: 860px; }
@@ -67,19 +68,19 @@ import { GuideRelated, RelatedItem } from './guide-related';
   `,
   template: `
     <div class="head">
-      <a routerLink="/guides" pButton class="p-button-text" severity="secondary" icon="pi pi-arrow-left" aria-label="Back to guides"></a>
+      <a routerLink="/guides" pButton class="p-button-text" severity="secondary" aria-label="Back to guides"><span pButtonIcon class="pi pi-arrow-left"></span></a>
       <h1 class="page-title">{{ isNew() ? 'New guide' : (form.controls.title.value || 'Edit guide') }}</h1>
       @if (guide(); as g) { <p-tag [value]="g.isPublished ? 'Published' : 'Draft'" [severity]="g.isPublished ? 'success' : 'secondary'" /> }
     </div>
 
     @if (loadError(); as err) {
-      <div class="card empty"><p>{{ err }}</p><button pButton type="button" label="Try again" icon="pi pi-refresh" (click)="reload()"></button></div>
+      <div class="card empty"><p>{{ err }}</p><button pButton type="button" (click)="reload()"><span pButtonIcon class="pi pi-refresh"></span><span pButtonLabel>Try again</span></button></div>
     } @else if (loading()) {
       <p-skeleton height="14rem" borderRadius="12px" /><div style="height:1rem"></div><p-skeleton height="18rem" borderRadius="12px" />
     } @else {
       @if (stale()) {
         <div class="banner"><span>This guide was changed elsewhere. Reload to get the latest version (your unsaved edits here will be lost).</span>
-          <button pButton type="button" size="small" icon="pi pi-refresh" label="Reload" (click)="reload()"></button></div>
+          <button pButton type="button" size="small" (click)="reload()"><span pButtonIcon class="pi pi-refresh"></span><span pButtonLabel>Reload</span></button></div>
       }
       @if (formError(); as fe) { <div class="banner" style="border-color:var(--p-red-400)">{{ fe }}</div> }
 
@@ -130,12 +131,12 @@ import { GuideRelated, RelatedItem } from './guide-related';
         <section class="card">
           <h2>Cover image</h2>
           <div class="cover">
-            @if (coverPreview(); as src) { <img [src]="src" alt="Cover preview" /> } @else { <p class="muted">No cover image.</p> }
+            @if (coverPreview(); as src) { <img [src]="src | assetUrl" alt="Cover preview" /> } @else { <p class="muted">No cover image.</p> }
             @if (uploading(); as pct) { <div class="bar-up" role="progressbar" [attr.aria-valuenow]="pct"><i [style.width.%]="pct"></i></div> }
             @if (coverError(); as ce) { <small class="field-error">{{ ce }}</small> }
             <div class="row">
-              <button pButton type="button" severity="secondary" icon="pi pi-image" [disabled]="!!uploading()" (click)="fileInput.click()">{{ coverPreview() ? 'Replace image' : 'Choose image' }}</button>
-              @if (coverPreview()) { <button pButton type="button" class="p-button-text" severity="danger" icon="pi pi-times" label="Remove" (click)="clearCover()"></button> }
+              <button pButton type="button" severity="secondary" [disabled]="!!uploading()" (click)="fileInput.click()"><span pButtonIcon class="pi pi-image"></span><span pButtonLabel>{{ coverPreview() ? 'Replace image' : 'Choose image' }}</span></button>
+              @if (coverPreview()) { <button pButton type="button" class="p-button-text" severity="danger" (click)="clearCover()"><span pButtonIcon class="pi pi-times"></span><span pButtonLabel>Remove</span></button> }
             </div>
             <input #fileInput type="file" accept="image/*" hidden (change)="onCover($event)" />
             <small class="hint">Resized to 1600 px WebP automatically.</small>
@@ -165,10 +166,10 @@ import { GuideRelated, RelatedItem } from './guide-related';
       </form>
 
       <div class="bar" role="toolbar" aria-label="Guide actions">
-        <button pButton type="button" icon="pi pi-save" [loading]="busy() === 'save'" [disabled]="!!busy() || !!uploading()" (click)="save()">{{ isNew() ? 'Create guide' : 'Save' }}</button>
+        <button pButton type="button" [loading]="busy() === 'save'" [disabled]="!!busy() || !!uploading()" (click)="save()"><span pButtonIcon class="pi pi-save"></span><span pButtonLabel>{{ isNew() ? 'Create guide' : 'Save' }}</span></button>
         <span class="sp"></span>
         @if (hasUnsavedChanges()) { <span class="unsaved">Unsaved changes</span> }
-        @if (!isNew()) { <button pButton type="button" severity="danger" class="p-button-text" icon="pi pi-trash" label="Delete" [disabled]="!!busy()" (click)="confirmDelete()"></button> }
+        @if (!isNew()) { <button pButton type="button" severity="danger" class="p-button-text" [disabled]="!!busy()" (click)="confirmDelete()"><span pButtonIcon class="pi pi-trash"></span><span pButtonLabel>Delete</span></button> }
       </div>
     }
   `,

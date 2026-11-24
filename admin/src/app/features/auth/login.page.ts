@@ -24,7 +24,7 @@ import { problemOf } from '../../core/http';
         <label for="password">Password</label>
         <p-password inputId="password" formControlName="password" [feedback]="false" [toggleMask]="true"
                     autocomplete="current-password" styleClass="w-full" inputStyleClass="w-full" />
-        <button pButton type="submit" label="Sign in" [loading]="busy()" [disabled]="form.invalid"></button>
+        <button pButton type="submit" [loading]="busy()" [disabled]="form.invalid"><span pButtonLabel>Sign in</span></button>
       </form>
     </main>
   `,

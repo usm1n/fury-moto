@@ -50,13 +50,13 @@ export interface CatalogAdapter {
   template: `
     <form class="add" (ngSubmit)="add()">
       <input pInputText name="newName" [(ngModel)]="newName" [placeholder]="'New ' + noun() + ' name'" [attr.aria-label]="'New ' + noun() + ' name'" maxlength="80" autocomplete="off" />
-      <button pButton type="submit" icon="pi pi-plus" label="Add" [loading]="adding()" [disabled]="!newName.trim()"></button>
+      <button pButton type="submit" [loading]="adding()" [disabled]="!newName.trim()"><span pButtonIcon class="pi pi-plus"></span><span pButtonLabel>Add</span></button>
     </form>
 
     @if (error(); as err) {
       <div class="card empty error">
         <div>{{ err }}</div>
-        <button pButton type="button" label="Try again" icon="pi pi-refresh" (click)="load()"></button>
+        <button pButton type="button" (click)="load()"><span pButtonIcon class="pi pi-refresh"></span><span pButtonLabel>Try again</span></button>
       </div>
     } @else if (loading()) {
       <div class="list">@for (i of [1, 2, 3, 4]; track i) { <p-skeleton height="56px" borderRadius="12px" /> }</div>
@@ -71,8 +71,8 @@ export interface CatalogAdapter {
               @if (editingId() === it.id) {
                 <form class="edit" (ngSubmit)="saveName(it)">
                   <input pInputText name="rename" [(ngModel)]="editName" maxlength="80" aria-label="Name" autofocus (keydown.escape)="editingId.set(null)" />
-                  <button pButton type="submit" icon="pi pi-check" severity="success" size="small" aria-label="Save name"></button>
-                  <button pButton type="button" icon="pi pi-times" severity="secondary" size="small" aria-label="Cancel" (click)="editingId.set(null)"></button>
+                  <button pButton type="submit" severity="success" size="small" aria-label="Save name"><span pButtonIcon class="pi pi-check"></span></button>
+                  <button pButton type="button" severity="secondary" size="small" aria-label="Cancel" (click)="editingId.set(null)"><span pButtonIcon class="pi pi-times"></span></button>
                 </form>
               } @else {
                 <div class="name">{{ it.name }}@if (it.productCount !== undefined) { <span class="count">{{ it.productCount }} product{{ it.productCount === 1 ? '' : 's' }}</span> }</div>
@@ -81,10 +81,10 @@ export interface CatalogAdapter {
             </div>
             <div class="actions">
               @if (editingId() !== it.id) {
-                <button pButton type="button" class="p-button-text" severity="secondary" icon="pi pi-pencil" [attr.aria-label]="'Rename ' + it.name" (click)="startEdit(it)"></button>
+                <button pButton type="button" class="p-button-text" severity="secondary" [attr.aria-label]="'Rename ' + it.name" (click)="startEdit(it)"><span pButtonIcon class="pi pi-pencil"></span></button>
               }
               <p-toggleswitch [ngModel]="it.isActive" (onChange)="toggleActive(it, $event.checked)" [ariaLabel]="'Active: ' + it.name" />
-              <button pButton type="button" class="p-button-text" severity="danger" icon="pi pi-trash" [attr.aria-label]="'Delete ' + it.name" (click)="confirmDelete(it)"></button>
+              <button pButton type="button" class="p-button-text" severity="danger" [attr.aria-label]="'Delete ' + it.name" (click)="confirmDelete(it)"><span pButtonIcon class="pi pi-trash"></span></button>
             </div>
           </div>
         }

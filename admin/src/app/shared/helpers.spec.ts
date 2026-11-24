@@ -51,3 +51,27 @@ describe('slug', () => {
     expect(slugify('  Cafe  Racer ')).toBe('cafe-racer');
   });
 });
+
+import { colorHexForName } from './variant-matrix';
+import { assetUrl } from '../core/format';
+
+describe('colorHexForName', () => {
+  it('maps known names case-insensitively', () => {
+    expect(colorHexForName('Red')).toBe('#d32f2f');
+    expect(colorHexForName('  MATTE   black ')).toBe('#1c1c1c');
+    expect(colorHexForName('Hi-Vis Yellow')).toBe('#d4ff00');
+    expect(colorHexForName('gray')).toBe(colorHexForName('Grey'));
+  });
+  it('returns null for unknown names', () => { expect(colorHexForName('Mauve')).toBeNull(); });
+});
+
+describe('assetUrl', () => {
+  it('roots relative urls only', () => {
+    expect(assetUrl('assets/img/a.jpg')).toBe('/assets/img/a.jpg');
+    expect(assetUrl('/assets/a.jpg')).toBe('/assets/a.jpg');
+    expect(assetUrl('https://x/y.png')).toBe('https://x/y.png');
+    expect(assetUrl('blob:abc')).toBe('blob:abc');
+    expect(assetUrl('data:image/png;base64,AA')).toBe('data:image/png;base64,AA');
+    expect(assetUrl(null)).toBe('');
+  });
+});

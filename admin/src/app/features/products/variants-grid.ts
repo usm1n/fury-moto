@@ -9,7 +9,7 @@ import { Api } from '../../api/api';
 import { apiAdminProductsIdVariantsPut } from '../../api/fn/admin-products/api-admin-products-id-variants-put';
 import { Variant } from '../../api/models/variant';
 import { problemOf } from '../../core/http';
-import { ColorChip, VariantRow, buildMatrix, chipsFromRows, normalizeHex, uniqueChips } from '../../shared/variant-matrix';
+import { ColorChip, VariantRow, buildMatrix, colorHexForName, chipsFromRows, normalizeHex, uniqueChips } from '../../shared/variant-matrix';
 
 const toRows = (vs: readonly Variant[]): VariantRow[] => vs.map((v) => ({
   id: v.id ?? null, size: v.size ?? '', color: v.color ?? '', colorHex: v.colorHex ?? null, sku: v.sku ?? '',
@@ -55,7 +55,7 @@ const snapshot = (rows: readonly VariantRow[]): string => JSON.stringify(rows.ma
       </div>
       <form class="adder" (ngSubmit)="addSizes()">
         <input pInputText type="text" name="size" [(ngModel)]="sizeInput" placeholder="e.g. S, M, L (comma separated)" aria-label="Add sizes" />
-        <button pButton type="submit" icon="pi pi-plus" severity="secondary" aria-label="Add size" [disabled]="!sizeInput.trim()"></button>
+        <button pButton type="submit" severity="secondary" aria-label="Add size" [disabled]="!sizeInput.trim()"><span pButtonIcon class="pi pi-plus"></span></button>
       </form>
 
       <h4>Colours</h4>
@@ -67,7 +67,7 @@ const snapshot = (rows: readonly VariantRow[]): string => JSON.stringify(rows.ma
       <form class="adder" (ngSubmit)="addColor()">
         <input pInputText class="name" type="text" name="colorName" [(ngModel)]="colorName" placeholder="Colour name, e.g. Matte black" aria-label="Colour name" />
         <input type="color" name="colorHex" [(ngModel)]="colorHex" aria-label="Colour swatch" />
-        <button pButton type="submit" icon="pi pi-plus" severity="secondary" aria-label="Add colour" [disabled]="!colorName.trim()"></button>
+        <button pButton type="submit" severity="secondary" aria-label="Add colour" [disabled]="!colorName.trim()"><span pButtonIcon class="pi pi-plus"></span></button>
       </form>
 
       <div class="grid">
@@ -88,10 +88,10 @@ const snapshot = (rows: readonly VariantRow[]): string => JSON.stringify(rows.ma
       </div>
 
       @if (stale()) {
-        <div class="stale"><span>Variants changed elsewhere. Reload to see the latest.</span><button pButton type="button" size="small" label="Reload" (click)="reload.emit()"></button></div>
+        <div class="stale"><span>Variants changed elsewhere. Reload to see the latest.</span><button pButton type="button" size="small" (click)="reload.emit()"><span pButtonLabel>Reload</span></button></div>
       }
       <div class="foot">
-        <button pButton type="button" icon="pi pi-save" label="Save variants" [loading]="saving()" [disabled]="!dirty() || saving()" (click)="save()"></button>
+        <button pButton type="button" [loading]="saving()" [disabled]="!dirty() || saving()" (click)="save()"><span pButtonIcon class="pi pi-save"></span><span pButtonLabel>Save variants</span></button>
         @if (dirty()) { <span class="muted">Unsaved variant changes</span> }
         <span class="muted">Removed combinations are deactivated, not deleted.</span>
       </div>
@@ -141,7 +141,8 @@ export class VariantsGrid {
   protected addColor(): void {
     const name = this.colorName.trim();
     if (!name || this.colors().some((c) => c.name.toLowerCase() === name.toLowerCase())) { this.colorName = ''; return; }
-    const hex = normalizeHex(this.colorHex);
+    const mapped = this.colorHex === '#222222' ? colorHexForName(name) : null;
+    const hex = mapped ?? normalizeHex(this.colorHex);
     this.colorName = '';
     this.rebuild(this.sizes(), [...this.colors(), { name, hex }]);
   }

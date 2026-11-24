@@ -4,10 +4,13 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve --serve-path /admin/",
-    "build": "ng build",
+    "build": "node scripts/license.mjs && ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "gen:api": "ng-openapi-gen"
+    "gen:api": "ng-openapi-gen",
+    "prebuild": "node scripts/license.mjs",
+    "prestart": "node scripts/license.mjs",
+    "pretest": "node scripts/license.mjs"
   },
   "private": true,
   "packageManager": "npm@11.20.0",

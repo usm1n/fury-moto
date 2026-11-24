@@ -68,3 +68,16 @@ export const normalizeHex = (hex: string): string | null => {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
   return m ? `#${m[1].toLowerCase()}` : null;
 };
+
+const COLOR_HEX: Record<string, string> = {
+  black: '#111111', 'matte black': '#1c1c1c', 'gloss black': '#0a0a0a', carbon: '#2b2b2b', white: '#f5f5f5',
+  red: '#d32f2f', blue: '#1e66d0', 'navy': '#14213d', 'navy blue': '#14213d', green: '#2e7d32', yellow: '#f9d71c',
+  orange: '#f57c00', grey: '#8a8a8a', gray: '#8a8a8a', silver: '#c0c0c0', 'matte grey': '#6b6b6b', 'matte gray': '#6b6b6b',
+  fluo: '#d4ff00', 'fluo yellow': '#d4ff00', 'hi-vis yellow': '#d4ff00', 'hi vis yellow': '#d4ff00', 'hi-viz yellow': '#d4ff00',
+  brown: '#6d4c41', tan: '#c8a97e', pink: '#ec407a', purple: '#7b1fa2', gold: '#d4af37',
+};
+
+/** Sensible swatch for a well-known colour name, or null when unknown (caller keeps its default). */
+export function colorHexForName(name: string): string | null {
+  return COLOR_HEX[name.trim().toLowerCase().replace(/\s+/g, ' ')] ?? null;
+}

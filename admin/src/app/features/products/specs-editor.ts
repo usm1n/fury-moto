@@ -32,15 +32,15 @@ export function newSpecGroup(fb: NonNullableFormBuilder, label = '', value = '')
           <input pInputText formControlName="value" placeholder="e.g. Carbon fibre" [attr.aria-label]="'Spec ' + (i + 1) + ' value'" />
         </div>
         <div class="btns">
-          <button pButton type="button" class="p-button-text" size="small" severity="secondary" icon="pi pi-chevron-up" aria-label="Move up" [disabled]="i === 0" (click)="move(i, -1)"></button>
-          <button pButton type="button" class="p-button-text" size="small" severity="secondary" icon="pi pi-chevron-down" aria-label="Move down" [disabled]="i === array().length - 1" (click)="move(i, 1)"></button>
-          <button pButton type="button" class="p-button-text" size="small" severity="danger" icon="pi pi-trash" aria-label="Remove spec" (click)="remove(i)"></button>
+          <button pButton type="button" class="p-button-text" size="small" severity="secondary" aria-label="Move up" [disabled]="i === 0" (click)="move(i, -1)"><span pButtonIcon class="pi pi-chevron-up"></span></button>
+          <button pButton type="button" class="p-button-text" size="small" severity="secondary" aria-label="Move down" [disabled]="i === array().length - 1" (click)="move(i, 1)"><span pButtonIcon class="pi pi-chevron-down"></span></button>
+          <button pButton type="button" class="p-button-text" size="small" severity="danger" aria-label="Remove spec" (click)="remove(i)"><span pButtonIcon class="pi pi-trash"></span></button>
         </div>
       </div>
     } @empty {
       <p class="muted">No specs yet (weight, shell material, fit...).</p>
     }
-    <button pButton type="button" class="add" severity="secondary" icon="pi pi-plus" label="Add spec" (click)="add()"></button>
+    <button pButton type="button" class="add" severity="secondary" (click)="add()"><span pButtonIcon class="pi pi-plus"></span><span pButtonLabel>Add spec</span></button>
   `,
 })
 export class SpecsEditor {

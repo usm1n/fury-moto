@@ -37,7 +37,7 @@ const matches = (g: AbstractControl): ValidationErrors | null =>
         <label for="confirm">Repeat new password</label>
         <p-password inputId="confirm" formControlName="confirm" [feedback]="false" [toggleMask]="true" autocomplete="new-password" styleClass="w-full" inputStyleClass="w-full" />
         @if (form.hasError('mismatch') && form.controls.confirm.dirty) { <small class="field-error">Passwords don't match.</small> }
-        <button pButton type="submit" label="Save password" [loading]="busy()" [disabled]="form.invalid"></button>
+        <button pButton type="submit" [loading]="busy()" [disabled]="form.invalid"><span pButtonLabel>Save password</span></button>
       </form>
     </main>
   `,

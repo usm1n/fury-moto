@@ -27,7 +27,7 @@ interface NavItem { path: string; label: string; icon: string; exact?: boolean; 
       <a routerLink="/" class="brand"><span class="brand__dot"></span>Gear Doctor <small>admin</small></a>
       <span class="spacer"></span>
       <a class="view-store" href="/" target="_blank" rel="noopener"><i class="pi pi-external-link"></i><span>Store</span></a>
-      <button pButton type="button" class="p-button-text p-button-sm" icon="pi pi-sign-out" label="Sign out" (click)="signOut()"></button>
+      <button pButton type="button" class="p-button-text p-button-sm" (click)="signOut()"><span pButtonIcon class="pi pi-sign-out"></span><span pButtonLabel>Sign out</span></button>
     </header>
     <div class="frame">
       <nav class="sidenav" aria-label="Admin">

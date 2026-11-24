@@ -68,7 +68,7 @@ import { ORDER_STATUSES, STATUS_SEVERITY, relativeTime } from './order-helpers';
       <div class="card empty error">
         <i class="pi pi-exclamation-triangle" style="font-size:1.6rem"></i>
         <div>{{ err }}</div>
-        <button pButton type="button" label="Try again" icon="pi pi-refresh" (click)="load()"></button>
+        <button pButton type="button" (click)="load()"><span pButtonIcon class="pi pi-refresh"></span><span pButtonLabel>Try again</span></button>
       </div>
     } @else if (loading() && rows().length === 0) {
       @for (i of skeletons; track i) { <p-skeleton class="skel" height="76px" /> }
@@ -76,7 +76,7 @@ import { ORDER_STATUSES, STATUS_SEVERITY, relativeTime } from './order-helpers';
       <div class="card empty">
         @if (hasFilters()) {
           <p>No orders match these filters.</p>
-          <button pButton type="button" severity="secondary" label="Clear filters" (click)="clear()"></button>
+          <button pButton type="button" severity="secondary" (click)="clear()"><span pButtonLabel>Clear filters</span></button>
         } @else { <p>No orders yet. They will show up here as customers check out.</p> }
       </div>
     } @else {

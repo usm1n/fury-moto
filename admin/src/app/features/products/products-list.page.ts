@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
+import { AssetUrlPipe } from '../../shared/asset-url.pipe';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -34,7 +35,7 @@ const STATUS_OPTIONS: Option[] = [
 
 @Component({
   selector: 'gd-products-list.page',
-  imports: [FormsModule, RouterLink, ButtonModule, InputTextModule, SelectModule, TableModule, TagModule, SkeletonModule, PaginatorModule, ToggleSwitchModule],
+  imports: [AssetUrlPipe, FormsModule, RouterLink, ButtonModule, InputTextModule, SelectModule, TableModule, TagModule, SkeletonModule, PaginatorModule, ToggleSwitchModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     :host { display: block; }
@@ -62,7 +63,7 @@ const STATUS_OPTIONS: Option[] = [
   template: `
     <div class="page-head">
       <h1 class="page-title">Products</h1>
-      <a pButton routerLink="/products/new" icon="pi pi-plus" label="Add product"></a>
+      <a pButton routerLink="/products/new"><span pButtonIcon class="pi pi-plus"></span><span pButtonLabel>Add product</span></a>
     </div>
 
     <div class="filters">
@@ -79,7 +80,7 @@ const STATUS_OPTIONS: Option[] = [
       <div class="card empty error">
         <i class="pi pi-exclamation-triangle" style="font-size:1.6rem"></i>
         <div>{{ err }}</div>
-        <button pButton type="button" label="Try again" icon="pi pi-refresh" (click)="load()"></button>
+        <button pButton type="button" (click)="load()"><span pButtonIcon class="pi pi-refresh"></span><span pButtonLabel>Try again</span></button>
       </div>
     } @else if (loading() && rows().length === 0) {
       @for (i of skeletons; track i) {
@@ -89,10 +90,10 @@ const STATUS_OPTIONS: Option[] = [
       <div class="card empty">
         @if (hasFilters()) {
           <p>No products match these filters.</p>
-          <button pButton type="button" severity="secondary" label="Clear filters" (click)="clearFilters()"></button>
+          <button pButton type="button" severity="secondary" (click)="clearFilters()"><span pButtonLabel>Clear filters</span></button>
         } @else {
           <p>No products yet. Add your first one.</p>
-          <a pButton routerLink="/products/new" icon="pi pi-plus" label="Add product"></a>
+          <a pButton routerLink="/products/new"><span pButtonIcon class="pi pi-plus"></span><span pButtonLabel>Add product</span></a>
         }
       </div>
     } @else {
@@ -100,7 +101,7 @@ const STATUS_OPTIONS: Option[] = [
         <div class="cards" [style.opacity]="loading() ? .6 : 1">
           @for (r of rows(); track r.id) {
             <div class="pcard" (click)="open(r)" role="link" tabindex="0" (keydown.enter)="open(r)">
-              @if (r.thumbUrl) { <img class="thumb" [src]="r.thumbUrl" alt="" loading="lazy" /> } @else { <span class="thumb thumb--empty"><i class="pi pi-image"></i></span> }
+              @if (r.thumbUrl) { <img class="thumb" [src]="r.thumbUrl | assetUrl" alt="" loading="lazy" /> } @else { <span class="thumb thumb--empty"><i class="pi pi-image"></i></span> }
               <div>
                 <div class="title">{{ r.title }}</div>
                 <div class="sub">{{ r.brand }} · {{ r.category }}</div>
@@ -124,7 +125,7 @@ const STATUS_OPTIONS: Option[] = [
             </ng-template>
             <ng-template #body let-r>
               <tr class="row" (click)="open(r)">
-                <td>@if (r.thumbUrl) { <img class="thumb" [src]="r.thumbUrl" alt="" loading="lazy" /> } @else { <span class="thumb thumb--empty"><i class="pi pi-image"></i></span> }</td>
+                <td>@if (r.thumbUrl) { <img class="thumb" [src]="r.thumbUrl | assetUrl" alt="" loading="lazy" /> } @else { <span class="thumb thumb--empty"><i class="pi pi-image"></i></span> }</td>
                 <td><span class="title">{{ r.title }}</span><div class="sub">/{{ r.slug }}</div></td>
                 <td>{{ r.brand }}</td>
                 <td>{{ r.category }}</td>

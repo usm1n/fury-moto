@@ -46,19 +46,19 @@ import { moveItem } from './content-helpers';
   template: `
     <div class="page-head">
       <h1 class="page-title">FAQs</h1>
-      <button pButton type="button" icon="pi pi-plus" label="Add question" (click)="openNew()"></button>
+      <button pButton type="button" (click)="openNew()"><span pButtonIcon class="pi pi-plus"></span><span pButtonLabel>Add question</span></button>
     </div>
 
     @if (error(); as err) {
       <div class="card empty error">
         <i class="pi pi-exclamation-triangle" style="font-size:1.6rem"></i>
         <div>{{ err }}</div>
-        <button pButton type="button" label="Try again" icon="pi pi-refresh" (click)="load()"></button>
+        <button pButton type="button" (click)="load()"><span pButtonIcon class="pi pi-refresh"></span><span pButtonLabel>Try again</span></button>
       </div>
     } @else if (loading()) {
       <div class="list">@for (i of [1, 2, 3, 4]; track i) { <p-skeleton height="64px" borderRadius="12px" /> }</div>
     } @else if (items().length === 0) {
-      <div class="card empty"><p>No FAQs yet.</p><button pButton type="button" icon="pi pi-plus" label="Add the first question" (click)="openNew()"></button></div>
+      <div class="card empty"><p>No FAQs yet.</p><button pButton type="button" (click)="openNew()"><span pButtonIcon class="pi pi-plus"></span><span pButtonLabel>Add the first question</span></button></div>
     } @else {
       <div class="list" cdkDropList (cdkDropListDropped)="drop($event)">
         @for (f of items(); track f.id) {
@@ -67,8 +67,8 @@ import { moveItem } from './content-helpers';
             <div class="body"><span class="q">{{ f.q }}</span><span class="a">{{ f.a }}</span></div>
             <div class="actions">
               <p-toggleswitch [ngModel]="f.isPublished" (onChange)="togglePublish(f, $event.checked)" [ariaLabel]="'Published: ' + f.q" />
-              <button pButton type="button" class="p-button-text" severity="secondary" icon="pi pi-pencil" [attr.aria-label]="'Edit ' + f.q" (click)="openEdit(f)"></button>
-              <button pButton type="button" class="p-button-text" severity="danger" icon="pi pi-trash" [attr.aria-label]="'Delete ' + f.q" (click)="confirmDelete(f)"></button>
+              <button pButton type="button" class="p-button-text" severity="secondary" [attr.aria-label]="'Edit ' + f.q" (click)="openEdit(f)"><span pButtonIcon class="pi pi-pencil"></span></button>
+              <button pButton type="button" class="p-button-text" severity="danger" [attr.aria-label]="'Delete ' + f.q" (click)="confirmDelete(f)"><span pButtonIcon class="pi pi-trash"></span></button>
             </div>
           </div>
         }
@@ -89,8 +89,8 @@ import { moveItem } from './content-helpers';
         <div class="inline"><p-toggleswitch formControlName="isPublished" inputId="faq-pub" ariaLabel="Published" /><label for="faq-pub">Published</label></div>
         @if (formError(); as fe) { <small class="field-error">{{ fe }}</small> }
         <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem">
-          <button pButton type="button" severity="secondary" label="Cancel" [disabled]="saving()" (click)="dialogOpen.set(false)"></button>
-          <button pButton type="submit" icon="pi pi-save" label="Save" [loading]="saving()"></button>
+          <button pButton type="button" severity="secondary" [disabled]="saving()" (click)="dialogOpen.set(false)"><span pButtonLabel>Cancel</span></button>
+          <button pButton type="submit" [loading]="saving()"><span pButtonIcon class="pi pi-save"></span><span pButtonLabel>Save</span></button>
         </div>
       </form>
     </p-dialog>
